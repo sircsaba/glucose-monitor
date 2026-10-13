@@ -1,0 +1,53 @@
+name: Build Android app
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    env:
+      APP_NAME: ${{ vars.APP_NAME || 'Glucose Monitor' }}
+      BUNDLE_ID: ${{ vars.BUNDLE_ID || 'com.inforap.glucosemonitor' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create the Android and iOS project files
+        run: flutter create --org com.inforap --project-name glucose_monitor --platforms android,ios .
+
+      - name: Set app name, ID and permissions
+        run: python3 scripts/patch_platforms.py android
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: App icon
+        run: dart run flutter_launcher_icons
+        continue-on-error: true
+
+      - name: Check the code
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build APK
+        run: flutter build apk --release --build-number=${{ github.run_number }}
+
+      - name: Save the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: glucose-monitor-android
+          path: build/app/outputs/flutter-apk/app-release.apk
