@@ -1,0 +1,278 @@
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+
+import '../data/nightscout.dart';
+import '../logic/glucose.dart';
+import '../state/app_state.dart';
+import '../state/settings.dart';
+import 'common.dart';
+
+/// Glucose graph: dots by zone, prediction, treatments and temp basal.
+class BgChart extends StatelessWidget {
+  final int hours;
+  final double height;
+  const BgChart({super.key, required this.hours, this.height = 260});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = app.settings;
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: CustomPaint(
+        painter: _BgPainter(
+          entries: app.entries,
+          treatments: app.treatments,
+          device: app.device,
+          ranges: s.ranges,
+          mmol: s.mmol,
+          hours: hours,
+          showPred: s.flag('showPrediction'),
+          showBasal: s.flag('showBasal'),
+          showTreat: s.flag('showTreatments'),
+          h24: s.flag('time24'),
+          now: DateTime.now(),
+        ),
+      ),
+    );
+  }
+}
+
+class _BgPainter extends CustomPainter {
+  final List<Entry> entries;
+  final List<Treatment> treatments;
+  final DeviceInfo? device;
+  final List<ZoneRange> ranges;
+  final bool mmol;
+  final int hours;
+  final bool showPred;
+  final bool showBasal;
+  final bool showTreat;
+  final bool h24;
+  final DateTime now;
+
+  _BgPainter({
+    required this.entries,
+    required this.treatments,
+    required this.device,
+    required this.ranges,
+    required this.mmol,
+    required this.hours,
+    required this.showPred,
+    required this.showBasal,
+    required this.showTreat,
+    required this.h24,
+    required this.now,
+  });
+
+  void _text(Canvas c, String s, Offset at, {Color color = kMuted, double size = 10, bool center = false, bool right = false}) {
+    final tp = TextPainter(
+      text: TextSpan(text: s, style: TextStyle(color: color, fontSize: size)),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    var dx = at.dx;
+    if (center) dx -= tp.width / 2;
+    if (right) dx -= tp.width;
+    tp.paint(c, Offset(dx, at.dy - tp.height / 2));
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const left = 30.0;
+    const right = 6.0;
+    final top = showTreat ? 30.0 : 8.0;
+    const bottomLabels = 16.0;
+    final basalH = showBasal ? 30.0 : 0.0;
+    final plotBottom = size.height - bottomLabels - basalH - 4;
+    final w = size.width - left - right;
+    final plotH = plotBottom - top;
+    if (w <= 0 || plotH <= 0) return;
+
+    final pred = showPred ? (device?.mainPrediction ?? const <double>[]) : const <double>[];
+    final predStart = device?.predStart;
+    final futureMin = (showPred && pred.isNotEmpty) ? math.min(60, math.max(20, hours * 8)) : 5;
+    final tStart = now.subtract(Duration(hours: hours));
+    final tEnd = now.add(Duration(minutes: futureMin));
+    final span = tEnd.difference(tStart).inSeconds.toDouble();
+    double x(DateTime t) => left + t.difference(tStart).inSeconds / span * w;
+
+    final visible = entries.where((e) => e.t.isAfter(tStart)).toList();
+    var maxMg = 288.0;
+    for (final e in visible) {
+      if (e.mg + 18 > maxMg) maxMg = e.mg + 18;
+    }
+    const minMg = 36.0;
+    double y(double mg) => top + (1 - (mg.clamp(minMg, maxMg) - minMg) / (maxMg - minMg)) * plotH;
+
+    final r = activeRange(ranges, now);
+    // Green band and zone lines.
+    canvas.drawRect(Rect.fromLTRB(left, y(r.yelHi), left + w, y(r.yelLo)), Paint()..color = kGreen.withValues(alpha: 0.08));
+    final line = Paint()..strokeWidth = 1;
+    for (final v in [r.yelLo, r.yelHi]) {
+      line.color = kYellow.withValues(alpha: 0.35);
+      canvas.drawLine(Offset(left, y(v)), Offset(left + w, y(v)), line);
+    }
+    for (final v in [r.redLo, r.redHi]) {
+      line.color = kRed.withValues(alpha: 0.35);
+      canvas.drawLine(Offset(left, y(v)), Offset(left + w, y(v)), line);
+    }
+
+    // Grid labels.
+    final grid = mmol ? [4.0, 7.0, 10.0, 13.0, 16.0, 20.0, 25.0] : [70.0, 126.0, 180.0, 234.0, 288.0, 360.0, 450.0];
+    for (final g in grid) {
+      final mg = mmol ? g * mgPerMmol : g;
+      if (mg > maxMg) continue;
+      canvas.drawLine(Offset(left, y(mg)), Offset(left + w, y(mg)), Paint()..color = kLine);
+      _text(canvas, g.toStringAsFixed(0), Offset(left - 4, y(mg)), right: true);
+    }
+
+    // Hour labels.
+    var h = DateTime(tStart.year, tStart.month, tStart.day, tStart.hour).add(const Duration(hours: 1));
+    final stepH = hours <= 6 ? 1 : (hours <= 12 ? 2 : 4);
+    while (h.isBefore(tEnd)) {
+      if (h.hour % stepH == 0) {
+        final hx = x(h);
+        canvas.drawLine(Offset(hx, top), Offset(hx, plotBottom), Paint()..color = kLine.withValues(alpha: 0.6));
+        _text(canvas, fmtClock(h, h24).replaceAll(':00', h24 ? ':00' : ''), Offset(hx, size.height - bottomLabels / 2),
+            center: true);
+      }
+      h = h.add(const Duration(hours: 1));
+    }
+
+    // Now line.
+    final nx = x(now);
+    final dash = Paint()
+      ..color = kMuted.withValues(alpha: 0.7)
+      ..strokeWidth = 1;
+    for (var yy = top; yy < plotBottom; yy += 7) {
+      canvas.drawLine(Offset(nx, yy), Offset(nx, math.min(yy + 3, plotBottom)), dash);
+    }
+
+    // Temp basal.
+    if (showBasal) {
+      final base = size.height - bottomLabels - 2;
+      final temps = treatments.where((t) => t.absolute != null && (t.duration ?? 0) > 0).toList();
+      var maxRate = 0.5;
+      for (final t in temps) {
+        maxRate = math.max(maxRate, t.absolute!);
+      }
+      final fill = Paint()..color = const Color(0xFF2B4A63);
+      for (var i = 0; i < temps.length; i++) {
+        final t = temps[i];
+        var end = t.t.add(Duration(seconds: (t.duration! * 60).round()));
+        if (i + 1 < temps.length && temps[i + 1].t.isBefore(end)) end = temps[i + 1].t;
+        if (end.isBefore(tStart) || t.t.isAfter(tEnd)) continue;
+        final x1 = math.max(left, x(t.t));
+        final x2 = math.min(left + w, x(end));
+        final hh = t.absolute! / maxRate * (basalH - 4);
+        canvas.drawRect(Rect.fromLTRB(x1, base - hh, x2, base), fill);
+      }
+      _text(canvas, 'basal', Offset(left + 2, base - basalH + 8), size: 9);
+    }
+
+    // Treatments.
+    if (showTreat) {
+      for (final t in treatments) {
+        if (t.t.isBefore(tStart)) continue;
+        final tx = x(t.t);
+        if ((t.carbs ?? 0) > 0) {
+          canvas.drawCircle(Offset(tx, 8), 5, Paint()..color = kAmber);
+          _text(canvas, '${t.carbs!.round()}g', Offset(tx, 20), color: kText, size: 9.5, center: true);
+        }
+        if ((t.insulin ?? 0) > 0) {
+          if (t.isSmb) {
+            canvas.drawCircle(Offset(tx, top - 3), 2, Paint()..color = kAccent);
+          } else {
+            final p = Path()
+              ..moveTo(tx - 5, 2)
+              ..lineTo(tx + 5, 2)
+              ..lineTo(tx, 11)
+              ..close();
+            canvas.drawPath(p, Paint()..color = kAccent);
+            _text(canvas, '${t.insulin!.toStringAsFixed(1)}U', Offset(tx + 16, 7), color: kText, size: 9.5, center: true);
+          }
+        }
+      }
+    }
+
+    // Prediction.
+    if (pred.isNotEmpty && predStart != null) {
+      final ring = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2
+        ..color = kMuted;
+      for (var i = 0; i < pred.length; i++) {
+        final t = predStart.add(Duration(minutes: 5 * i));
+        if (t.isBefore(now) || t.isAfter(tEnd)) continue;
+        canvas.drawCircle(Offset(x(t), y(pred[i])), 2.6, ring);
+      }
+    }
+
+    // Glucose dots.
+    final rad = hours <= 3 ? 3.4 : (hours <= 6 ? 2.6 : (hours <= 12 ? 2.0 : 1.6));
+    for (final e in visible) {
+      final c = zoneColor(zoneOf(e.mg, activeRange(ranges, e.t)));
+      canvas.drawCircle(Offset(x(e.t), y(e.mg)), rad, Paint()..color = c);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+/// A small line graph for the night view.
+class SparkLine extends StatelessWidget {
+  final double height;
+  final Color color;
+  final int hours;
+  const SparkLine({super.key, required this.height, required this.color, this.hours = 2});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: CustomPaint(painter: _SparkPainter(app.entries, color, hours, app.range)),
+    );
+  }
+}
+
+class _SparkPainter extends CustomPainter {
+  final List<Entry> entries;
+  final Color color;
+  final int hours;
+  final ZoneRange range;
+  _SparkPainter(this.entries, this.color, this.hours, this.range);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final now = DateTime.now();
+    final start = now.subtract(Duration(hours: hours));
+    final pts = entries.where((e) => e.t.isAfter(start)).toList();
+    const lo = 36.0;
+    var hi = 270.0;
+    for (final e in pts) {
+      hi = math.max(hi, e.mg + 10);
+    }
+    double y(double mg) => size.height - (mg.clamp(lo, hi) - lo) / (hi - lo) * size.height;
+    double x(DateTime t) => t.difference(start).inSeconds / (hours * 3600) * size.width;
+    canvas.drawRect(Rect.fromLTRB(0, y(range.yelHi), size.width, y(range.yelLo)), Paint()..color = color.withValues(alpha: 0.08));
+    if (pts.length < 2) return;
+    final path = Path()..moveTo(x(pts.first.t), y(pts.first.mg));
+    for (final e in pts.skip(1)) {
+      path.lineTo(x(e.t), y(e.mg));
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..strokeJoin = StrokeJoin.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}

@@ -1,0 +1,2 @@
+app_identifier(ENV["BUNDLE_ID"] || "com.inforap.glucosemonitor")
+team_id(ENV["TEAMID"])
