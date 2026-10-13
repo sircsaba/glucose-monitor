@@ -1,0 +1,58 @@
+name: Build iPhone app (TestFlight)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    env:
+      APP_NAME: ${{ vars.APP_NAME || 'Glucose Monitor' }}
+      BUNDLE_ID: ${{ vars.BUNDLE_ID || 'com.monitorglucose.app' }}
+      TEAMID: ${{ secrets.TEAMID }}
+      FASTLANE_KEY_ID: ${{ secrets.FASTLANE_KEY_ID }}
+      FASTLANE_ISSUER_ID: ${{ secrets.FASTLANE_ISSUER_ID }}
+      FASTLANE_KEY: ${{ secrets.FASTLANE_KEY }}
+      GH_PAT: ${{ secrets.GH_PAT }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+      BUILD_NUMBER: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check secrets are set
+        run: |
+          for s in TEAMID FASTLANE_KEY_ID FASTLANE_ISSUER_ID FASTLANE_KEY GH_PAT MATCH_PASSWORD; do
+            if [ -z "${!s}" ]; then echo "::error::Secret $s is missing. See README, step 3."; exit 1; fi
+          done
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create the Android and iOS project files
+        run: flutter create --org com.monitorglucose --project-name glucose_monitor --platforms android,ios .
+
+      - name: Set app name, ID and settings
+        run: python3 scripts/patch_platforms.py ios
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: App icon
+        run: dart run flutter_launcher_icons
+        continue-on-error: true
+
+      - name: Prepare the Xcode project
+        run: |
+          flutter build ios --release --config-only --build-number=$BUILD_NUMBER
+          cd ios && pod install
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Sign, build and upload to TestFlight
+        run: bundle exec fastlane ios build_upload
