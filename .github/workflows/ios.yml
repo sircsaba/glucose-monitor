@@ -18,13 +18,14 @@ jobs:
       GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
       BUILD_NUMBER: ${{ github.run_number }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check secrets are set
         run: |
           for s in TEAMID FASTLANE_KEY_ID FASTLANE_ISSUER_ID FASTLANE_KEY GH_PAT MATCH_PASSWORD; do
             if [ -z "${!s}" ]; then echo "::error::Secret $s is missing. See README, step 3."; exit 1; fi
           done
+          chmod +x scripts/step.sh
 
       - uses: subosito/flutter-action@v2
         with:
@@ -32,13 +33,13 @@ jobs:
           cache: true
 
       - name: Create the Android and iOS project files
-        run: flutter create --org com.monitorglucose --project-name glucose_monitor --platforms android,ios .
+        run: scripts/step.sh "flutter create" flutter create --org com.monitorglucose --project-name glucose_monitor --platforms android,ios .
 
       - name: Set app name, ID and settings
-        run: python3 scripts/patch_platforms.py ios
+        run: scripts/step.sh "Patch iOS project" python3 scripts/patch_platforms.py ios
 
       - name: Get packages
-        run: flutter pub get
+        run: scripts/step.sh "flutter pub get" flutter pub get
 
       - name: App icon
         run: dart run flutter_launcher_icons
@@ -46,8 +47,10 @@ jobs:
 
       - name: Prepare the Xcode project
         run: |
-          flutter build ios --release --config-only --build-number=$BUILD_NUMBER
-          cd ios && pod install
+          scripts/step.sh "Prepare Xcode project" flutter build ios --release --config-only --build-number=$BUILD_NUMBER
+          if [ -f ios/Podfile ]; then
+            cd ios && ../scripts/step.sh "pod install" pod install
+          fi
 
       - uses: ruby/setup-ruby@v1
         with:
@@ -55,4 +58,4 @@ jobs:
           bundler-cache: true
 
       - name: Sign, build and upload to TestFlight
-        run: bundle exec fastlane ios build_upload
+        run: scripts/step.sh "fastlane (sign, build, upload)" bundle exec fastlane ios build_upload
