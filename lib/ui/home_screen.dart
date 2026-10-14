@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../logic/glucose.dart';
 import '../state/app_state.dart';
+import '../state/settings.dart';
 import 'bg_chart.dart';
 import 'common.dart';
 import 'quick_alarms_screen.dart';
@@ -41,198 +44,266 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class LiveScreen extends StatefulWidget {
+class LiveScreen extends StatelessWidget {
   const LiveScreen({super.key});
-  @override
-  State<LiveScreen> createState() => _LiveScreenState();
-}
-
-class _LiveScreenState extends State<LiveScreen> {
-  int? _hours;
-
-  Widget _tile(String label, String value, {String? sub, Color? subColor}) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-        decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: kBorder)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: const TextStyle(color: kMuted, fontSize: 12)),
-          const SizedBox(height: 2),
-          // Shrinks instead of wrapping on small phones (iPhone SE).
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(value, maxLines: 1, style: kMono.copyWith(fontSize: 18, fontWeight: FontWeight.w600)),
-          ),
-          if (sub != null)
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(sub, maxLines: 1, style: TextStyle(color: subColor ?? kMuted, fontSize: 11)),
-            ),
-        ]),
-      ),
-    );
-  }
-
-  Widget _small(String label, String value, {String? hint}) => Expanded(
-        child: Column(children: [
-          Text(label, style: const TextStyle(color: kMuted, fontSize: 12)),
-          const SizedBox(height: 2),
-          FittedBox(fit: BoxFit.scaleDown, child: Text(value, maxLines: 1, style: kMono.copyWith(fontSize: 13))),
-          if (hint != null) Text(hint, style: const TextStyle(color: kMuted, fontSize: 10)),
-        ]),
-      );
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: app,
-      builder: (context, _) {
-        final s = app.settings;
-        final mmol = s.mmol;
-        final l = app.latest;
-        final age = app.age;
-        final stale = app.isStale;
-        final color = l == null ? kMuted : (stale ? kMuted : app.colorFor(l.mg));
-        final d = app.device;
-        final now = DateTime.now();
-        final buttons = app.graphButtons;
-        final hours = _hours != null && buttons.contains(_hours) ? _hours! : s.integer('graphHours');
-        final loopAge = d?.loopTime == null ? null : now.difference(d!.loopTime!);
-        final bolus = app.lastBolus;
-        final carbs = app.lastCarbs;
-        final delta = app.delta5;
+    return RefreshIndicator(
+      onRefresh: () => app.refresh(),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(12, 2, 12, 20),
+        children: const [DayView()],
+      ),
+    );
+  }
+}
 
-        String reservoir() {
-          if (d?.reservoirText != null) return d!.reservoirText!;
-          if (d?.reservoir != null) return '${d!.reservoir!.round()}U';
-          return '–';
-        }
+/// The main screen, laid out from Settings › Day view layout: each element has
+/// its own size, colour, alignment, width share and line. Used by the Live tab
+/// and by the layout editor preview ([preview], [highlight], [onSelect]).
+class DayView extends StatefulWidget {
+  final bool preview;
+  final String? highlight;
+  final ValueChanged<String>? onSelect;
+  const DayView({super.key, this.preview = false, this.highlight, this.onSelect});
 
-        String battery() {
-          if (d?.pumpBattery != null) return '${d!.pumpBattery}%';
-          if (d?.pumpVolts != null) return '${d!.pumpVolts!.toStringAsFixed(2)}V';
-          return '–';
-        }
+  @override
+  State<DayView> createState() => _DayViewState();
+}
 
-        return RefreshIndicator(
-          onRefresh: () => app.refresh(),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            children: [
-              Row(children: [
-                Expanded(
-                  child: Text(
-                    age == null ? 'No readings yet' : fmtAgo(age),
-                    style: TextStyle(color: stale ? kAmber : kMuted, fontSize: 13),
-                  ),
-                ),
-                if (loopAge != null) LoopBadge(age: loopAge, late: loopAge.inMinutes >= s.integer('loopMin')),
-                IconButton(
-                  tooltip: 'Night view',
-                  onPressed: app.openNight,
-                  icon: const Icon(Icons.bedtime_outlined, color: kMuted),
-                ),
-                IconButton(
-                  tooltip: 'Settings',
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuScreen())),
-                  icon: const Icon(Icons.settings_outlined, color: kMuted),
-                ),
+class _DayViewState extends State<DayView> {
+  int? _hours;
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    // Keeps the clock and "min ago" current between data refreshes.
+    _tick = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  static Alignment _align(String a) => a == 'left' ? Alignment.centerLeft : (a == 'right' ? Alignment.centerRight : Alignment.center);
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(listenable: app, builder: (c, _) => _content(c));
+
+  Widget _content(BuildContext context) {
+    final s = app.settings;
+    final mmol = s.mmol;
+    final l = app.latest;
+    final age = app.age;
+    final stale = app.isStale;
+    final zc = l == null || stale ? kMuted : app.colorFor(l.mg);
+    final d = app.device;
+    final now = DateTime.now();
+    final buttons = app.graphButtons;
+    final hours = _hours != null && buttons.contains(_hours) ? _hours! : s.integer('graphHours');
+    final loopAge = d?.loopTime == null ? null : now.difference(d!.loopTime!);
+    final bolus = app.lastBolus;
+    final carbs = app.lastCarbs;
+    final delta = app.delta5;
+
+    String reservoir() {
+      if (d?.reservoirText != null) return d!.reservoirText!;
+      if (d?.reservoir != null) return '${d!.reservoir!.round()}U';
+      return '–';
+    }
+
+    String battery() {
+      if (d?.pumpBattery != null) return '${d!.pumpBattery}%';
+      if (d?.pumpVolts != null) return '${d!.pumpVolts!.toStringAsFixed(2)}V';
+      return '–';
+    }
+
+    String ageOf(DateTime? t) => t == null ? '–' : fmtAge(now.difference(t));
+
+    Widget content(LineCfg c) {
+      final col = c.zoneColor ? zc : Color(c.color);
+      final size = c.size;
+      final weight = c.bold ? FontWeight.w700 : FontWeight.w500;
+      final align = _align(c.align);
+
+      // "Label value" on one line, shrinking rather than wrapping.
+      Widget pair(String label, String value, {Color? labelColor}) => FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: align,
+            child: Text.rich(
+              TextSpan(children: [
+                TextSpan(text: '$label ', style: TextStyle(color: labelColor ?? kMuted, fontSize: size * 0.85)),
+                TextSpan(text: value, style: kMono.copyWith(color: col, fontSize: size, fontWeight: weight)),
               ]),
-              if (app.error != null)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: const Color(0xFF2A1F0E), borderRadius: BorderRadius.circular(10)),
-                  child: Text(app.error!, style: const TextStyle(color: kAmber, fontSize: 13)),
-                ),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Text(
-                    l == null ? '---' : fmtBg(l.mg, mmol),
-                    style: kMono.copyWith(
-                      fontSize: 84,
-                      height: 1,
-                      fontWeight: FontWeight.w600,
-                      color: color,
-                      decoration: stale && l != null ? TextDecoration.lineThrough : null,
+              maxLines: 1,
+            ),
+          );
+      Widget text(String t, {Color? color}) => FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: align,
+            child: Text(t, maxLines: 1, style: kMono.copyWith(color: color ?? col, fontSize: size, fontWeight: weight)),
+          );
+
+      switch (c.id) {
+        case 'ago':
+          return text(age == null ? 'No readings yet' : fmtAgo(age), color: stale ? kAmber : null);
+        case 'loop':
+          if (loopAge == null) return const SizedBox.shrink();
+          return Align(alignment: align, child: LoopBadge(age: loopAge, late: loopAge.inMinutes >= s.integer('loopMin'), size: size));
+        case 'clock':
+          return text(fmtClock(now, s.flag('time24')));
+        case 'bg':
+          final valueStyle = kMono.copyWith(
+            fontSize: size,
+            height: 1,
+            fontWeight: weight,
+            color: col,
+            letterSpacing: -size * 0.02,
+            decoration: stale && l != null ? TextDecoration.lineThrough : null,
+          );
+          return FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: align,
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(l == null ? '---' : fmtBg(l.mg, mmol), style: valueStyle),
+              if (l != null && (s.flag('dayArrow') || s.flag('dayBgDelta'))) ...[
+                SizedBox(width: size * 0.06),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                  if (s.flag('dayArrow')) ArrowIcon(direction: l.direction, size: size * 0.4, color: col),
+                  if (s.flag('dayBgDelta')) ...[
+                    Text(delta == null ? '' : fmtDelta(delta, mmol), style: kMono.copyWith(fontSize: size * 0.17, color: kText)),
+                    Text(unitLabel(mmol), style: TextStyle(color: kMuted, fontSize: size * 0.11)),
+                  ],
+                ]),
+              ],
+            ]),
+          );
+        case 'delta':
+          return text(delta == null ? '' : '${fmtDelta(delta, mmol)} ${unitLabel(mmol)}');
+        case 'iob':
+          return pair('IOB', d?.iob == null ? '–' : '${d!.iob!.toStringAsFixed(2)}U');
+        case 'cob':
+          return pair('COB', d?.cob == null ? '–' : '${d!.cob!.round()}g');
+        case 'basal':
+          final temp = (d?.basalMinLeft ?? 0) > 0;
+          return pair(temp ? 'Temp' : 'Basal', d?.basal == null ? '–' : '${d!.basal!.toStringAsFixed(2)}U/h',
+              labelColor: temp ? kAmber : null);
+        case 'reservoir':
+          return pair('Res', reservoir());
+        case 'battery':
+          return pair('Batt', battery());
+        case 'bolus':
+          return text(bolus == null ? 'No bolus in 24 h' : 'Bolus ${bolus.insulin!.toStringAsFixed(1)}U · ${fmtAge(now.difference(bolus.t))} ago');
+        case 'carbs':
+          return text(carbs == null ? '' : 'Carbs ${carbs.carbs!.round()}g · ${fmtAge(now.difference(carbs.t))} ago');
+        case 'sensor':
+          return pair('Sensor', ageOf(app.sensorStart));
+        case 'cannula':
+          return pair('Cannula', ageOf(app.siteChange));
+        case 'phone':
+          return pair('Phone', d?.phoneBattery == null ? '–' : '${d!.phoneBattery}%');
+        case 'graph':
+          return Container(
+            padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
+            decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: kBorder)),
+            child: Column(children: [
+              Row(children: [
+                for (final h in buttons)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: _RangeButton(label: '${h}h', selected: hours == h, onTap: () => setState(() => _hours = h)),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    if (l != null) ArrowIcon(direction: l.direction, size: 40, color: color),
-                    Text(delta == null ? '' : fmtDelta(delta, mmol), style: kMono.copyWith(fontSize: 17)),
-                    Text(unitLabel(mmol), style: const TextStyle(color: kMuted, fontSize: 12)),
-                  ]),
-                ]),
-              ),
-              Row(children: [
-                _tile('IOB', d?.iob == null ? '–' : '${d!.iob!.toStringAsFixed(2)}U'),
-                const SizedBox(width: 8),
-                _tile('COB', d?.cob == null ? '–' : '${d!.cob!.round()}g'),
-                const SizedBox(width: 8),
-                _tile(
-                  'Basal',
-                  d?.basal == null ? '–' : '${d!.basal!.toStringAsFixed(2)}U/h',
-                  sub: (d?.basalMinLeft ?? 0) > 0 ? 'Temp · ${d!.basalMinLeft!.round()} min' : null,
-                  subColor: kAmber,
-                ),
               ]),
-              const SizedBox(height: 10),
-              Row(children: [
-                Expanded(
-                  child: Text(
-                    bolus == null ? 'No bolus in 24 h' : 'Bolus ${bolus.insulin!.toStringAsFixed(1)}U · ${fmtAge(now.difference(bolus.t))} ago',
-                    style: const TextStyle(fontSize: 13, color: Color(0xFFC4CCD6)),
-                  ),
-                ),
-                Text(
-                  carbs == null ? '' : 'Carbs ${carbs.carbs!.round()}g · ${fmtAge(now.difference(carbs.t))} ago',
-                  style: const TextStyle(fontSize: 13, color: Color(0xFFC4CCD6)),
-                ),
-              ]),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
-                decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: kBorder)),
-                child: Column(children: [
-                  Row(children: [
-                    for (final h in buttons)
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 3),
-                          child: _RangeButton(
-                            label: '${h}h',
-                            selected: hours == h,
-                            onTap: () => setState(() => _hours = h),
-                          ),
-                        ),
-                      ),
-                  ]),
-                  const SizedBox(height: 6),
-                  BgChart(hours: hours),
-                ]),
-              ),
-              const SizedBox(height: 14),
-              Row(children: [
-                _small('Reservoir', reservoir()),
-                _small('Pump battery', battery()),
-                _small('Sensor', app.sensorStart == null ? '–' : fmtAge(now.difference(app.sensorStart!))),
-                _small('Cannula', app.siteChange == null ? '–' : fmtAge(now.difference(app.siteChange!))),
-              ]),
-              if (d?.phoneBattery != null) ...[
-                const SizedBox(height: 8),
-                Center(
-                  child: Text('Looping phone battery ${d!.phoneBattery}%', style: const TextStyle(color: kMuted, fontSize: 12)),
-                ),
-              ],
-            ],
-          ),
+              const SizedBox(height: 6),
+              BgChart(hours: hours, height: size),
+            ]),
+          );
+      }
+      return const SizedBox.shrink();
+    }
+
+    Widget cell(LineCfg c) {
+      Widget w = content(c);
+      if (c.box && c.id != 'graph') {
+        w = Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+          decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: kBorder)),
+          child: Align(alignment: _align(c.align), child: w),
         );
-      },
-    );
+      } else if (c.id != 'graph') {
+        w = Align(alignment: _align(c.align), child: w);
+      }
+      if (widget.highlight == c.id) {
+        w = DecoratedBox(
+          position: DecorationPosition.foreground,
+          decoration: BoxDecoration(border: Border.all(color: kAccent, width: 2), borderRadius: BorderRadius.circular(6)),
+          child: w,
+        );
+      }
+      if (widget.onSelect != null) {
+        w = GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => widget.onSelect!(c.id), child: w);
+      }
+      return w;
+    }
+
+    // Elements marked "same line as the one before" share a line.
+    final groups = <List<LineCfg>>[];
+    for (final c in s.day.where((c) => c.show)) {
+      final canJoin = c.join && groups.isNotEmpty && c.id != 'graph' && groups.last.first.id != 'graph';
+      if (canJoin) {
+        groups.last.add(c);
+      } else {
+        groups.add([c]);
+      }
+    }
+
+    final icons = Row(mainAxisSize: MainAxisSize.min, children: [
+      IconButton(
+        tooltip: 'Night view',
+        visualDensity: VisualDensity.compact,
+        onPressed: widget.preview ? null : app.openNight,
+        icon: const Icon(Icons.bedtime_outlined, color: kMuted),
+      ),
+      IconButton(
+        tooltip: 'Settings',
+        visualDensity: VisualDensity.compact,
+        onPressed: widget.preview ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuScreen())),
+        icon: const Icon(Icons.settings_outlined, color: kMuted),
+      ),
+    ]);
+
+    final rows = <Widget>[];
+    for (var gi = 0; gi < groups.length; gi++) {
+      final g = groups[gi];
+      final children = <Widget>[];
+      for (var i = 0; i < g.length; i++) {
+        if (i > 0) children.add(const SizedBox(width: 6));
+        children.add(Expanded(flex: g[i].flex, child: cell(g[i])));
+      }
+      if (gi == 0) children.add(icons);
+      rows.add(Padding(
+        padding: EdgeInsets.only(top: g.first.space),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: children),
+      ));
+      if (gi == 0 && app.error != null && !widget.preview) {
+        rows.add(Container(
+          margin: const EdgeInsets.only(top: 4),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: const Color(0xFF2A1F0E), borderRadius: BorderRadius.circular(10)),
+          child: Text(app.error!, style: const TextStyle(color: kAmber, fontSize: 13)),
+        ));
+      }
+    }
+    if (groups.isEmpty) rows.add(Align(alignment: Alignment.centerRight, child: icons));
+    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: rows);
   }
 }
 
@@ -273,7 +344,8 @@ class _RangeButton extends StatelessWidget {
 class LoopBadge extends StatefulWidget {
   final Duration age;
   final bool late;
-  const LoopBadge({super.key, required this.age, required this.late});
+  final double size;
+  const LoopBadge({super.key, required this.age, required this.late, this.size = 13});
   @override
   State<LoopBadge> createState() => _LoopBadgeState();
 }
@@ -314,8 +386,8 @@ class _LoopBadgeState extends State<LoopBadge> with SingleTickerProviderStateMix
     const bright = Color(0xFFFFB020);
     final text = Row(mainAxisSize: MainAxisSize.min, children: [
       Container(
-        width: widget.late ? 10 : 8,
-        height: widget.late ? 10 : 8,
+        width: widget.size * (widget.late ? 0.75 : 0.6),
+        height: widget.size * (widget.late ? 0.75 : 0.6),
         decoration: BoxDecoration(color: widget.late ? bright : kAccent, shape: BoxShape.circle),
       ),
       const SizedBox(width: 6),
@@ -323,7 +395,7 @@ class _LoopBadgeState extends State<LoopBadge> with SingleTickerProviderStateMix
         'Loop ${fmtAge(widget.age)}',
         style: TextStyle(
           color: widget.late ? bright : kMuted,
-          fontSize: widget.late ? 15 : 13,
+          fontSize: widget.size * (widget.late ? 1.15 : 1.0),
           fontWeight: widget.late ? FontWeight.w700 : FontWeight.w400,
         ),
       ),

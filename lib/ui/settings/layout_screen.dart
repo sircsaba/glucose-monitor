@@ -6,16 +6,6 @@ import '../../state/settings.dart';
 import '../common.dart';
 import '../night_screen.dart';
 
-const _swatches = <String, int>{
-  'White': 0xFFE6EDF3,
-  'Grey': 0xFF9AA4B2,
-  'Dark grey': 0xFF5C6672,
-  'Blue': 0xFF5BC0EB,
-  'Green': 0xFF3DBE7A,
-  'Yellow': 0xFFF2C94C,
-  'Red': 0xFFFF4D5A,
-  'Purple': 0xFFB39DFF,
-};
 
 class LayoutScreen extends StatefulWidget {
   const LayoutScreen({super.key});
@@ -129,33 +119,15 @@ class _LayoutScreenState extends State<LayoutScreen> {
                     onChanged: (i) => upd((c) => c.zoneColor = i == 0),
                   ),
                   const SizedBox(height: 10),
-                  Wrap(spacing: 8, runSpacing: 8, children: [
-                    for (final e in _swatches.entries)
-                      Semantics(
-                        label: e.key,
-                        button: true,
-                        selected: !cur.zoneColor && cur.color == e.value,
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: () => upd((c) {
-                            c.zoneColor = false;
-                            c.color = e.value;
-                          }),
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: Color(e.value),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: !cur.zoneColor && cur.color == e.value ? Colors.white : kBg,
-                                width: 3,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ]),
+                  ColorPick(
+                    value: cur.color,
+                    zoneSelected: cur.zoneColor,
+                    onZone: () => upd((c) => c.zoneColor = true),
+                    onPick: (v) => upd((c) {
+                      c.zoneColor = false;
+                      c.color = v;
+                    }),
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     cur.zoneColor

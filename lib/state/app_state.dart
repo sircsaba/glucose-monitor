@@ -175,7 +175,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   Entry? get latest => entries.isEmpty ? null : entries.last;
   ZoneRange get range => activeRange(settings.ranges, DateTime.now());
   Zone? get zone => latest == null ? null : zoneOf(latest!.mg, range);
-  Color colorFor(double mg) => zoneColor(zoneOf(mg, range));
+  Color colorFor(double mg) {
+    final r = range;
+    return zoneColorIn(zoneOf(mg, r), r);
+  }
   Duration? get age => latest == null ? null : DateTime.now().difference(latest!.t);
   double? get delta5 => avgDelta5(entries);
   bool get isStale => age == null || age!.inMinutes >= settings.integer('nightStaleMin');
