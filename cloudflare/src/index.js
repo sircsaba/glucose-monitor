@@ -439,6 +439,11 @@ async function readDocs(db, table, query, sub, now = Date.now()) {
 async function authLevel(request, env, url) {
   const secret = opt(env.API_SECRET);
   if (secret && secret.length < 12) throw new HttpError(500, 'API_SECRET must be at least 12 characters');
+  // The deploy page pre-fills the example values from .dev.vars.example. They are public,
+  // so refuse to run with them rather than let anyone who read the guide in.
+  if ([secret, opt(env.READ_TOKENS), opt(env.CARE_TOKENS)].some((v) => /change-me|choose-a-long-secret/i.test(v))) {
+    throw new HttpError(500, 'Replace the example values of API_SECRET, READ_TOKENS and CARE_TOKENS (Settings > Variables and Secrets)');
+  }
   const hash = secret ? await sha1(secret) : '';
   const given = (request.headers.get('api-secret') || '').trim();
   if (secret && given && (same(hash, given.toLowerCase()) || same(secret, given))) return { level: ADMIN, bySecret: true };
@@ -645,6 +650,20 @@ async function handle(request, env, ctx) {
   const path = url.pathname.replace(/\/+$/, '').replace(/\.json$/, '') || '/';
   if (path === '/') {
     const name = String(env.SITE_NAME || 'Glucose').replace(/[<>&"]/g, '');
+    let problem = '';
+    try {
+      await authLevel(request, env, url);
+    } catch (e) {
+      problem = String(e.message).replace(/[<>&"]/g, '');
+    }
+    if (problem) {
+      return new Response(
+        `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${name}</title>` +
+          `<body style="font-family:system-ui;background:#0D1117;color:#E6EDF3;padding:32px"><h1>${name}</h1>` +
+          `<p style="color:#F85149">Not ready: ${problem}.</p>`,
+        { status: 500, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+      );
+    }
     return new Response(
       `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${name}</title>` +
         `<body style="font-family:system-ui;background:#0D1117;color:#E6EDF3;padding:32px"><h1>${name}</h1>` +
