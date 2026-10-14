@@ -67,7 +67,8 @@ GitHub account (Cloudflare puts a copy of the code in it so it can update the se
 
 5. Click **Deploy**. After a minute or two you get your address, like
    `https://glucose-server.yourname.workers.dev`. Write it down.
-6. Open that address in a browser: it should say **The glucose server is running**.
+6. Open that address in a browser: you should see the **Glucose Monitor web app** asking to connect
+   (or a page saying **The glucose server is running**). See *Step 5 — See your data in a browser*.
 
 > **Changing a setting later:** Cloudflare dashboard › Workers & Pages › **glucose-server** ›
 > Settings › *Variables and Secrets* › edit › **Deploy**.
@@ -107,6 +108,23 @@ Any app that reads Nightscout can read the server with a **read token**:
 The **Glucose Monitor** app (night view, red/yellow/green zones per time of day, soft-music
 alarms) connects the same way: Settings › Data & general › site address + access token.
 
+## Step 5 — See your data in a browser
+
+Open your server's address (`https://glucose-server.yourname.workers.dev`) in any browser, on a
+computer, tablet or phone. It shows the **Glucose Monitor app**, the same as on the phone: graph,
+big glucose number and arrow, night view, zones per time of day, IOB / COB, sensor and site ages.
+
+1. The address is already filled in. Choose **Access token** and type one of your `READ_TOKENS`
+   (or `CARE_TOKENS` to log carbs and notes). Pick your units › **Test and connect**.
+2. Click once anywhere on the page: browsers only allow sound after a click, so alarms can sound.
+3. Settings are kept in that browser (each computer has its own).
+
+Alarms only sound **while the page is open**. A phone's browser stops when the screen locks, so for
+overnight alarms use the phone app. On a computer or a tablet left on the night view, it works.
+
+The web app is published once by this project (on GitHub Pages) and your server shows it at its own
+address, so it gets updates by itself. To turn it off, add a variable `WEB_APP_URL` = `none`.
+
 ## Good to know
 
 - **If the server is down in Relay mode,** Loop / Trio can't upload until it is back, the same as when
@@ -128,8 +146,11 @@ alarms) connects the same way: Settings › Data & general › site address + ac
 - **Your data stays in your Cloudflare account.** Only people with your secret or one of your keys can
   read it through the server. To delete everything: Workers & Pages ›
   glucose-server › Settings › Delete, then Storage & Databases › D1 › glucose-db › Delete.
-- **Updates:** when this project is updated, open your copy of the repository on GitHub and click
-  *Sync fork* (or re-run the deploy). Cloudflare rebuilds the server by itself.
+- **Updates:** the web app updates by itself. For the server, the Deploy button made a copy of this
+  code in your GitHub account (repository **glucose-server**), with your settings in `wrangler.jsonc`.
+  When this project's `cloudflare/src/index.js` changes, open the same file in your copy › pencil
+  (*Edit*) › replace everything with the new file › *Commit changes*. Cloudflare rebuilds the server
+  by itself within a minute. Don't click Deploy again: it would make a second server and database.
 
 ## Troubleshooting
 

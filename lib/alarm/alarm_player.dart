@@ -63,8 +63,11 @@ class AlarmPlayer {
       await _alarm.setVolume(from.clamp(0.0, 1.0));
       await _alarm.play(AssetSource(_asset(cfg.sound)), volume: from.clamp(0.0, 1.0));
     } catch (_) {
+      // In a browser this fails until the page is clicked: retry then.
+      _blocked = () => _play(cfg, scale);
       return;
     }
+    _blocked = null;
     if (cfg.volMode == 0 || cfg.secs <= 0) return;
     final start = DateTime.now();
     _ramp = Timer.periodic(const Duration(milliseconds: 500), (t) {
@@ -76,6 +79,7 @@ class AlarmPlayer {
   }
 
   Future<void> stop() async {
+    _blocked = null;
     _ramp?.cancel();
     _delay?.cancel();
     _vibe?.cancel();
@@ -85,6 +89,27 @@ class AlarmPlayer {
     try {
       await _alarm.stop();
     } catch (_) {}
+  }
+
+  bool _unlocked = false;
+  Future<void> Function()? _blocked;
+
+  /// Browsers only let a page play sound after a click or tap on it. On the
+  /// first one, both players play a silent moment so later alarms can sound.
+  Future<void> unlock() async {
+    if (_unlocked) return;
+    _unlocked = true;
+    for (final p in [_alarm, _preview]) {
+      if (p.state == PlayerState.playing) continue; // an alarm is already sounding
+      try {
+        await p.setReleaseMode(ReleaseMode.stop);
+        await p.play(AssetSource(_asset(0)), volume: 0.0);
+        await p.stop();
+      } catch (_) {}
+    }
+    final retry = _blocked;
+    _blocked = null;
+    if (retry != null) await retry();
   }
 
   /// Plays a sound once so it can be chosen in settings. Calling again stops it.

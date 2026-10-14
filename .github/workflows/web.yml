@@ -1,0 +1,62 @@
+name: Build web app
+
+# Builds the browser version of the app and publishes it on GitHub Pages.
+# Every glucose server (cloudflare/) shows it at its own address.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['lib/**', 'assets/**', 'pubspec.yaml', 'scripts/patch_web.py', '.github/workflows/web.yml']
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      APP_NAME: ${{ vars.APP_NAME || 'Glucose Monitor' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create the web project files
+        run: flutter create --org com.inforap --project-name glucose_monitor --platforms web .
+
+      - name: Set app name and icon
+        run: python3 scripts/patch_web.py web
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Check the code
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Build the web app
+        run: scripts/step.sh "Web build" flutter build web --release --base-href / --build-number=${{ github.run_number }}
+
+      - name: Make it work from any folder
+        run: python3 scripts/patch_web.py build
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

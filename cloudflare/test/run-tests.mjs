@@ -68,6 +68,7 @@ function makeEnv(extra = {}) {
     SITE_NAME: 'Test',
     UNITS: 'mmol',
     NIGHTSCOUT_URL: '',
+    WEB_APP_URL: 'none',
     ...extra,
   };
 }
@@ -105,6 +106,26 @@ await test('example values from the deploy page are refused', async () => {
   const e2 = makeEnv({ READ_TOKENS: 'readable-change-me' });
   assert.equal((await call(e2, 'GET', '/api/v1/entries.json', { token: 'readable-change-me' })).status, 500);
   assert.equal((await call(makeEnv(), 'GET', '/')).status, 200);
+});
+
+await test('web app is shown at the server address; /api stays the API', async () => {
+  const web = process.env.FAKE_WEB_URL;
+  if (!web) return console.log('skip  web app test (set FAKE_WEB_URL)');
+  const e = makeEnv({ WEB_APP_URL: web });
+  const home = await call(e, 'GET', '/');
+  assert.equal(home.status, 200);
+  assert.match(String(home.data), /Glucose Monitor/);
+  const js = await call(e, 'GET', '/main.dart.js');
+  assert.equal(js.status, 200);
+  assert.match(String(js.data), /console/);
+  assert.equal((await call(e, 'GET', '/nothing-here.js')).status, 404);
+  assert.equal((await call(e, 'GET', '/api/v1/entries.json')).status, 401);
+  // Example secrets still block the home page.
+  assert.equal((await call(makeEnv({ WEB_APP_URL: web, API_SECRET: 'change-me-type-your-own-secret' }), 'GET', '/')).status, 500);
+  // Web app unreachable: the plain status page.
+  const off = await call(makeEnv({ WEB_APP_URL: 'http://127.0.0.1:9' }), 'GET', '/');
+  assert.equal(off.status, 200);
+  assert.match(String(off.data), /server is running/);
 });
 
 // ---------------------------------------------------------------- standalone (Loop)

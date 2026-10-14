@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'state/app_state.dart';
@@ -19,6 +20,8 @@ double uiScaleFor(Size screen) {
   if (pct > 0) return pct / 100.0;
   final side = screen.shortestSide;
   if (side < 600) return 1.0;
+  // A computer's browser window (wider than tall): keep the normal size.
+  if (kIsWeb && screen.width > screen.height) return 1.0;
   return (side / 430.0).clamp(1.0, 2.0);
 }
 
@@ -40,7 +43,7 @@ class GlucoseApp extends StatelessWidget {
           final mq = MediaQuery.of(context);
           final s = uiScaleFor(mq.size);
           final logical = mq.size / s;
-          return FittedBox(
+          final scaled = FittedBox(
             fit: BoxFit.fill,
             alignment: Alignment.topLeft,
             child: SizedBox(
@@ -58,6 +61,9 @@ class GlucoseApp extends StatelessWidget {
               ),
             ),
           );
+          if (!kIsWeb) return scaled;
+          // In a browser, the first click or tap allows alarm sounds.
+          return Listener(onPointerDown: (_) => app.player.unlock(), child: scaled);
         },
       ),
       home: ListenableBuilder(
