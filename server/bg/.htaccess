@@ -1,0 +1,22 @@
+# Glucose server: every request goes to index.php.
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Keep the api-secret header and Authorization header available to PHP.
+  RewriteCond %{HTTP:api-secret} .
+  RewriteRule .* - [E=HTTP_API_SECRET:%{HTTP:api-secret}]
+  RewriteCond %{HTTP:Authorization} .
+  RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+  # Real files (none needed besides index.php) are served as is.
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+# Never show the settings file, the SQL file or the code folder.
+<FilesMatch "^(config\.php|config\.sample\.php|.*\.sql|.*\.md)$">
+  Require all denied
+</FilesMatch>
