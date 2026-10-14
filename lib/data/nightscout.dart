@@ -111,14 +111,20 @@ class NightscoutClient {
   }
 
   Future<dynamic> _get(String path, [Map<String, String> q = const {}]) async {
-    final http.Response r;
-    try {
-      r = await http.get(_uri(path, q), headers: _headers).timeout(const Duration(seconds: 25));
-    } on TimeoutException {
-      throw NsException('The site did not answer in time');
-    } catch (e) {
-      throw NsException('Cannot reach the site: $e');
+    http.Response? res;
+    // One quiet retry: a request dropped on the way (Wi-Fi blip, many requests at
+    // once after a settings change) should not show an error.
+    for (var attempt = 0; res == null; attempt++) {
+      try {
+        res = await http.get(_uri(path, q), headers: _headers).timeout(const Duration(seconds: 25));
+      } on TimeoutException {
+        throw NsException('The site did not answer in time');
+      } catch (e) {
+        if (attempt >= 1) throw NsException('Cannot reach the site: $e');
+        await Future.delayed(const Duration(seconds: 2));
+      }
     }
+    final http.Response r = res;
     if (r.statusCode == 401 || r.statusCode == 403) {
       throw NsException('Not authorised: check the token or API secret');
     }
