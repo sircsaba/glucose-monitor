@@ -1,5 +1,9 @@
 # Glucose Monitor (iPhone and Android)
 
+> **Free server for Loop and Trio users:** see [`cloudflare/README.md`](cloudflare/README.md),
+> a one-click, free Nightscout-compatible server (copy, relay or standalone) on Cloudflare.
+> For a PHP/MySQL host (cPanel), see [`server/README.md`](server/README.md).
+
 A night-time glucose monitor that reads your Nightscout site: big readings, red / yellow / green zones per time range, soft-music alarms with volume that rises or falls, your own snooze buttons, a fully adjustable night view, a before-sleep checklist and reports.
 
 You do not need a Mac. GitHub builds both apps in the cloud, the same way as an AAPS browser build:
