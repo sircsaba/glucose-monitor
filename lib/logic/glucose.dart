@@ -24,6 +24,20 @@ Color zoneColor(Zone z) {
   }
 }
 
+/// The colour of a zone in a given time range (each range can have its own colours).
+Color zoneColorIn(Zone z, ZoneRange r) {
+  switch (z) {
+    case Zone.redLow:
+    case Zone.redHigh:
+      return Color(r.cRed);
+    case Zone.yellowLow:
+    case Zone.yellowHigh:
+      return Color(r.cYel);
+    case Zone.green:
+      return Color(r.cGreen);
+  }
+}
+
 Zone zoneOf(double mg, ZoneRange r) {
   if (mg < r.redLo) return Zone.redLow;
   if (mg < r.yelLo) return Zone.yellowLow;

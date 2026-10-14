@@ -348,3 +348,76 @@ Widget setChoice(String label, String key, List<String> options, {String? hint})
 void toast(BuildContext context, String msg) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 }
+
+/// Colours offered wherever a colour can be chosen.
+const Map<String, int> kSwatches = {
+  'White': 0xFFE6EDF3,
+  'Light grey': 0xFFC4CCD6,
+  'Grey': 0xFF9AA4B2,
+  'Dark grey': 0xFF5C6672,
+  'Blue': 0xFF5BC0EB,
+  'Deep blue': 0xFF3D7BF7,
+  'Teal': 0xFF2EC4B6,
+  'Green': 0xFF3DBE7A,
+  'Lime': 0xFF9BE15D,
+  'Yellow': 0xFFF2C94C,
+  'Orange': 0xFFF5A623,
+  'Coral': 0xFFFF7A59,
+  'Red': 0xFFFF4D5A,
+  'Dark red': 0xFFC62834,
+  'Pink': 0xFFF08BD0,
+  'Purple': 0xFFB39DFF,
+};
+
+/// A row of round colour buttons. With [onZone], the first button means
+/// "follow the zone colour" (green, yellow or red).
+class ColorPick extends StatelessWidget {
+  final int value;
+  final bool zoneSelected;
+  final ValueChanged<int> onPick;
+  final VoidCallback? onZone;
+  final double dot;
+  const ColorPick({super.key, required this.value, required this.onPick, this.onZone, this.zoneSelected = false, this.dot = 36});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget circle({required bool selected, required String label, required VoidCallback onTap, required Widget fill}) => Semantics(
+          label: label,
+          button: true,
+          selected: selected,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: Container(
+              width: dot,
+              height: dot,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: selected ? Colors.white : kBg, width: 3),
+              ),
+              child: ClipOval(child: fill),
+            ),
+          ),
+        );
+    return Wrap(spacing: 6, runSpacing: 6, children: [
+      if (onZone != null)
+        circle(
+          selected: zoneSelected,
+          label: 'Zone colour',
+          onTap: onZone!,
+          fill: Row(children: [
+            Expanded(child: Container(color: kGreen)),
+            Expanded(child: Container(color: kYellow)),
+            Expanded(child: Container(color: kRed)),
+          ]),
+        ),
+      for (final e in kSwatches.entries)
+        circle(
+          selected: !zoneSelected && value == e.value,
+          label: e.key,
+          onTap: () => onPick(e.value),
+          fill: Container(color: Color(e.value)),
+        ),
+    ]);
+  }
+}

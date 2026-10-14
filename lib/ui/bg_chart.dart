@@ -35,6 +35,8 @@ class BgChart extends StatelessWidget {
           now: DateTime.now(),
           topMg: s.number('graphTop'),
           dotScale: const [1.0, 1.4, 1.9][s.integer('dotSize').clamp(0, 2)],
+          treatScale: (s.integer('treatSize') / 100.0).clamp(0.5, 3.0),
+          treatOnLine: s.integer('treatPlace') == 1,
         ),
       ),
     );
@@ -55,6 +57,8 @@ class _BgPainter extends CustomPainter {
   final DateTime now;
   final double topMg; // 0 = auto
   final double dotScale;
+  final double treatScale;
+  final bool treatOnLine;
 
   _BgPainter({
     required this.entries,
@@ -70,6 +74,8 @@ class _BgPainter extends CustomPainter {
     required this.now,
     required this.topMg,
     required this.dotScale,
+    required this.treatScale,
+    required this.treatOnLine,
   });
 
   void _text(Canvas c, String s, Offset at, {Color color = kMuted, double size = 10, bool center = false, bool right = false}) {
@@ -87,7 +93,8 @@ class _BgPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     const left = 30.0;
     const right = 6.0;
-    final top = showTreat ? 30.0 : 8.0;
+    final k = treatScale;
+    final top = showTreat && !treatOnLine ? 30.0 * k : (showTreat ? 8.0 + 14 * k : 8.0);
     const bottomLabels = 16.0;
     final basalH = showBasal ? 30.0 : 0.0;
     final plotBottom = size.height - bottomLabels - basalH - 4;
@@ -120,15 +127,15 @@ class _BgPainter extends CustomPainter {
     double y(double mg) => top + (1 - (mg.clamp(minMg, maxMg) - minMg) / (maxMg - minMg)) * plotH;
 
     final r = rr;
-    // Green band and zone lines.
-    canvas.drawRect(Rect.fromLTRB(left, y(r.yelHi), left + w, y(r.yelLo)), Paint()..color = kGreen.withValues(alpha: 0.08));
+    // Green band and zone lines, in this range's colours.
+    canvas.drawRect(Rect.fromLTRB(left, y(r.yelHi), left + w, y(r.yelLo)), Paint()..color = Color(r.cGreen).withValues(alpha: 0.08));
     final line = Paint()..strokeWidth = 1;
     for (final v in [r.yelLo, r.yelHi]) {
-      line.color = kYellow.withValues(alpha: 0.35);
+      line.color = Color(r.cYel).withValues(alpha: 0.35);
       canvas.drawLine(Offset(left, y(v)), Offset(left + w, y(v)), line);
     }
     for (final v in [r.redLo, r.redHi]) {
-      line.color = kRed.withValues(alpha: 0.35);
+      line.color = Color(r.cRed).withValues(alpha: 0.35);
       canvas.drawLine(Offset(left, y(v)), Offset(left + w, y(v)), line);
     }
 
@@ -185,26 +192,55 @@ class _BgPainter extends CustomPainter {
       _text(canvas, 'basal', Offset(left + 2, base - basalH + 8), size: 9);
     }
 
-    // Treatments.
+    // Treatments: at the top of the graph, or on the glucose line at their time.
     if (showTreat) {
+      double? bgAt(DateTime t) {
+        Entry? best;
+        var bestSec = 20 * 60;
+        for (final e in visible) {
+          final d = (e.t.difference(t).inSeconds).abs();
+          if (d < bestSec) {
+            bestSec = d;
+            best = e;
+          }
+        }
+        return best?.mg;
+      }
+
+      final fs = 9.5 * k;
       for (final t in treatments) {
         if (t.t.isBefore(tStart)) continue;
         final tx = x(t.t);
+        final mg = treatOnLine ? bgAt(t.t) : null;
+        final lineY = mg == null ? null : y(mg);
         if ((t.carbs ?? 0) > 0) {
-          canvas.drawCircle(Offset(tx, 8), 5, Paint()..color = kAmber);
-          _text(canvas, '${t.carbs!.round()}g', Offset(tx, 20), color: kText, size: 9.5, center: true);
+          final r = 5 * k;
+          // Top lane, or just under the glucose dot.
+          final cy = lineY == null ? 8 * k : math.min(plotBottom - r, lineY + 6 * k + r);
+          canvas.drawCircle(Offset(tx, cy), r, Paint()..color = kAmber);
+          _text(canvas, '${t.carbs!.round()}g', Offset(tx, cy + r + fs * 0.75), color: kText, size: fs, center: true);
         }
         if ((t.insulin ?? 0) > 0) {
           if (t.isSmb) {
-            canvas.drawCircle(Offset(tx, top - 3), 2, Paint()..color = kAccent);
+            final cy = lineY == null ? top - 3 * k : math.max(top, lineY - 5 * k);
+            canvas.drawCircle(Offset(tx, cy), 2 * k, Paint()..color = kAccent);
           } else {
+            final hw = 5 * k;
+            final hh = 9 * k;
+            // Triangle pointing down: top lane, or just above the glucose dot.
+            final tipY = lineY == null ? 2 * k + hh : math.max(top, lineY - 5 * k);
             final p = Path()
-              ..moveTo(tx - 5, 2)
-              ..lineTo(tx + 5, 2)
-              ..lineTo(tx, 11)
+              ..moveTo(tx - hw, tipY - hh)
+              ..lineTo(tx + hw, tipY - hh)
+              ..lineTo(tx, tipY)
               ..close();
             canvas.drawPath(p, Paint()..color = kAccent);
-            _text(canvas, '${t.insulin!.toStringAsFixed(1)}U', Offset(tx + 16, 7), color: kText, size: 9.5, center: true);
+            final label = '${t.insulin!.toStringAsFixed(1)}U';
+            if (lineY == null) {
+              _text(canvas, label, Offset(tx + hw + 2, tipY - hh / 2), color: kText, size: fs);
+            } else {
+              _text(canvas, label, Offset(tx, tipY - hh - fs * 0.75), color: kText, size: fs, center: true);
+            }
           }
         }
       }
@@ -227,7 +263,8 @@ class _BgPainter extends CustomPainter {
     // Small dots: thinner on long views. Size can be raised in settings.
     final rad = (hours <= 2 ? 1.9 : (hours <= 3 ? 1.7 : (hours <= 6 ? 1.5 : (hours <= 12 ? 1.25 : 1.0)))) * dotScale;
     for (final e in visible) {
-      final c = zoneColor(zoneOf(e.mg, activeRange(ranges, e.t)));
+      final er = activeRange(ranges, e.t);
+      final c = zoneColorIn(zoneOf(e.mg, er), er);
       canvas.drawCircle(Offset(x(e.t), y(e.mg)), rad, Paint()..color = c);
     }
   }

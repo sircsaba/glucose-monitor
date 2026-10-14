@@ -13,6 +13,10 @@ class ZoneRange {
   double yelLo;
   double yelHi;
   double redHi;
+  // Colours used for this range's zones (ARGB).
+  int cRed;
+  int cYel;
+  int cGreen;
 
   ZoneRange({
     required this.name,
@@ -23,6 +27,9 @@ class ZoneRange {
     required this.yelLo,
     required this.yelHi,
     required this.redHi,
+    this.cRed = 0xFFFF4D5A,
+    this.cYel = 0xFFF2C94C,
+    this.cGreen = 0xFF3DBE7A,
   });
 
   /// True when [t] falls inside this range.
@@ -47,6 +54,9 @@ class ZoneRange {
         'yelLo': yelLo,
         'yelHi': yelHi,
         'redHi': redHi,
+        'cRed': cRed,
+        'cYel': cYel,
+        'cGreen': cGreen,
       };
 
   factory ZoneRange.fromJson(Map<String, dynamic> j) => ZoneRange(
@@ -58,6 +68,9 @@ class ZoneRange {
         yelLo: (j['yelLo'] as num? ?? 81).toDouble(),
         yelHi: (j['yelHi'] as num? ?? 180).toDouble(),
         redHi: (j['redHi'] as num? ?? 234).toDouble(),
+        cRed: (j['cRed'] as num? ?? 0xFFFF4D5A).toInt(),
+        cYel: (j['cYel'] as num? ?? 0xFFF2C94C).toInt(),
+        cGreen: (j['cGreen'] as num? ?? 0xFF3DBE7A).toInt(),
       );
 }
 
@@ -102,9 +115,9 @@ class SoundCfg {
       );
 }
 
-/// One line on the night view.
+/// One element of the night view or of the day view.
 class LineCfg {
-  String id; // clock, bg, ago, delta, since, iob, graph
+  String id; // night: clock, bg, ago, delta, since, iob, graph. Day: see kDayNames.
   bool show;
   double size;
   bool zoneColor;
@@ -112,6 +125,10 @@ class LineCfg {
   String align; // left, center, right
   double space;
   bool bold;
+  // Day view only.
+  int flex; // share of the line's width
+  bool join; // on the same line as the element before
+  bool box; // drawn on a card
 
   LineCfg({
     required this.id,
@@ -122,6 +139,9 @@ class LineCfg {
     this.align = 'center',
     this.space = 8,
     this.bold = false,
+    this.flex = 1,
+    this.join = false,
+    this.box = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -133,6 +153,9 @@ class LineCfg {
         'align': align,
         'space': space,
         'bold': bold,
+        'flex': flex,
+        'join': join,
+        'box': box,
       };
 
   factory LineCfg.fromJson(Map<String, dynamic> j) => LineCfg(
@@ -144,6 +167,9 @@ class LineCfg {
         align: (j['align'] ?? 'center').toString(),
         space: (j['space'] as num? ?? 8).toDouble(),
         bold: j['bold'] == true,
+        flex: (j['flex'] as num? ?? 1).toInt().clamp(1, 12),
+        join: j['join'] == true,
+        box: j['box'] == true,
       );
 }
 
@@ -156,6 +182,26 @@ const Map<String, String> kLineNames = {
   'since': 'Last bolus & carbs',
   'iob': 'IOB / COB',
   'graph': 'Small graph',
+};
+
+/// Names shown for each day-view element.
+const Map<String, String> kDayNames = {
+  'ago': 'Minutes since reading',
+  'loop': 'Loop status',
+  'clock': 'Clock',
+  'bg': 'Glucose value',
+  'delta': 'Avg change (separate)',
+  'iob': 'IOB',
+  'cob': 'COB',
+  'basal': 'Basal',
+  'reservoir': 'Reservoir',
+  'battery': 'Pump battery',
+  'bolus': 'Last bolus',
+  'carbs': 'Last carbs',
+  'graph': 'Graph',
+  'sensor': 'Sensor age',
+  'cannula': 'Cannula age',
+  'phone': 'Looping phone battery',
 };
 
 /// Alarm sounds bundled with the app (assets/sounds/<file>.wav).
@@ -205,6 +251,10 @@ class Settings {
     'showPrediction': true,
     'showBasal': true,
     'showTreatments': true,
+    'treatSize': 100, // treatment markers on the graph, percent
+    'treatPlace': 0, // 0 = top of the graph, 1 = on the glucose line
+    'dayArrow': true,
+    'dayBgDelta': true, // change and units next to the glucose value
     'tirLo': 70.0,
     'tirHi': 180.0,
     // Other alarms
@@ -259,6 +309,7 @@ class Settings {
   List<ZoneRange> ranges;
   List<SoundCfg> sounds;
   List<LineCfg> lines;
+  List<LineCfg> day;
   List<int> snoozePresets;
 
   Settings({
@@ -266,6 +317,7 @@ class Settings {
     required this.ranges,
     required this.sounds,
     required this.lines,
+    required this.day,
     required this.snoozePresets,
   });
 
@@ -274,6 +326,7 @@ class Settings {
         ranges: defaultRanges(),
         sounds: defaultSounds(),
         lines: defaultLines(),
+        day: defaultDay(),
         snoozePresets: [10, 20, 30, 60],
       );
 
@@ -303,6 +356,30 @@ class Settings {
         LineCfg(id: 'graph', size: 70, space: 20),
       ];
 
+  static List<LineCfg> defaultDay() {
+    const white = 0xFFE6EDF3;
+    const grey = 0xFF9AA4B2;
+    const soft = 0xFFC4CCD6;
+    return [
+      LineCfg(id: 'ago', size: 13, zoneColor: false, color: grey, align: 'left', space: 0),
+      LineCfg(id: 'loop', size: 13, zoneColor: false, color: grey, align: 'right', space: 0, join: true),
+      LineCfg(id: 'clock', size: 24, zoneColor: false, color: 0xFF5BC0EB, align: 'left', space: 0, flex: 2),
+      LineCfg(id: 'bg', size: 110, align: 'center', space: 0, bold: true, flex: 8, join: true),
+      LineCfg(id: 'delta', size: 18, zoneColor: false, color: white, align: 'right', space: 0, flex: 2, join: true, show: false),
+      LineCfg(id: 'iob', size: 14, zoneColor: false, color: white, space: 8, flex: 2, box: true),
+      LineCfg(id: 'cob', size: 14, zoneColor: false, color: white, space: 8, flex: 2, box: true, join: true),
+      LineCfg(id: 'basal', size: 14, zoneColor: false, color: white, space: 8, flex: 3, box: true, join: true),
+      LineCfg(id: 'reservoir', size: 14, zoneColor: false, color: white, space: 8, flex: 2, box: true, join: true),
+      LineCfg(id: 'battery', size: 14, zoneColor: false, color: white, space: 8, flex: 2, box: true, join: true),
+      LineCfg(id: 'bolus', size: 13, zoneColor: false, color: soft, align: 'left', space: 8),
+      LineCfg(id: 'carbs', size: 13, zoneColor: false, color: soft, align: 'right', space: 8, join: true),
+      LineCfg(id: 'graph', size: 260, space: 8),
+      LineCfg(id: 'sensor', size: 13, zoneColor: false, color: soft, space: 10),
+      LineCfg(id: 'cannula', size: 13, zoneColor: false, color: soft, space: 10, join: true),
+      LineCfg(id: 'phone', size: 13, zoneColor: false, color: soft, space: 10, join: true),
+    ];
+  }
+
   dynamic raw(String k) => v.containsKey(k) ? v[k] : defaults[k];
   String str(String k) => (raw(k) ?? '').toString();
   bool flag(String k) => raw(k) == true;
@@ -317,6 +394,7 @@ class Settings {
         'ranges': ranges.map((e) => e.toJson()).toList(),
         'sounds': sounds.map((e) => e.toJson()).toList(),
         'lines': lines.map((e) => e.toJson()).toList(),
+        'day': day.map((e) => e.toJson()).toList(),
         'snoozePresets': snoozePresets,
       };
 
@@ -330,6 +408,11 @@ class Settings {
       final ranges = (j['ranges'] as List?)?.map((e) => ZoneRange.fromJson(Map<String, dynamic>.from(e as Map))).toList();
       final sounds = (j['sounds'] as List?)?.map((e) => SoundCfg.fromJson(Map<String, dynamic>.from(e as Map))).toList();
       final lines = (j['lines'] as List?)?.map((e) => LineCfg.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+      final day = (j['day'] as List?)?.map((e) => LineCfg.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+      final dayList = (day == null || day.isEmpty) ? init.day : day;
+      for (final d in init.day) {
+        if (!dayList.any((l) => l.id == d.id)) dayList.add(d..show = false);
+      }
       final presets = (j['snoozePresets'] as List?)?.map((e) => (e as num).toInt()).toList();
       // Add any night-view line that is missing (for older saved settings).
       final lineList = (lines == null || lines.isEmpty) ? init.lines : lines;
@@ -342,6 +425,7 @@ class Settings {
         ranges: (ranges == null || ranges.isEmpty) ? init.ranges : ranges,
         sounds: soundList,
         lines: lineList,
+        day: dayList,
         snoozePresets: presets ?? init.snoozePresets,
       );
     } catch (_) {

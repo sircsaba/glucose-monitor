@@ -5,6 +5,7 @@ import '../checklist_screen.dart';
 import '../common.dart';
 import 'alarm_settings_screen.dart';
 import 'data_settings_screen.dart';
+import 'day_layout_screen.dart';
 import 'display_settings_screen.dart';
 import 'layout_screen.dart';
 import 'night_settings_screen.dart';
@@ -32,6 +33,7 @@ class MenuScreen extends StatelessWidget {
       Section(children: [
         LinkRow(label: 'BG zones & time ranges', hint: 'Red, yellow and green limits for each time range', onTap: () => go(const ZonesScreen())),
         LinkRow(label: 'Alarm sounds & snooze', hint: 'Soft music, volume over time, snooze buttons', onTap: () => go(const SoundsScreen())),
+        LinkRow(label: 'Day view layout', hint: 'Size, colour, line and position of everything on the main screen', onTap: () => go(const DayLayoutScreen())),
         LinkRow(label: 'Night view layout', hint: 'Size, colour and position of each line', onTap: () => go(const LayoutScreen())),
         LinkRow(label: 'Night view & checklist', hint: 'Brightness, schedule, before-sleep checks', onTap: () => go(const NightSettingsScreen())),
         LinkRow(label: 'Before-sleep checklist', hint: 'Run the checks now', onTap: () => go(const ChecklistScreen())),

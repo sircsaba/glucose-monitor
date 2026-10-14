@@ -185,27 +185,27 @@ class _ZonesScreenState extends State<ZonesScreen> {
                     child: SizedBox(
                       height: 28,
                       child: Row(children: [
-                        Expanded(flex: math.max(1, w(36, cur.redLo).round()), child: Container(color: kRed)),
-                        Expanded(flex: math.max(1, w(cur.redLo, cur.yelLo).round()), child: Container(color: kYellow)),
+                        Expanded(flex: math.max(1, w(36, cur.redLo).round()), child: Container(color: Color(cur.cRed))),
+                        Expanded(flex: math.max(1, w(cur.redLo, cur.yelLo).round()), child: Container(color: Color(cur.cYel))),
                         Expanded(
                           flex: math.max(1, w(cur.yelLo, cur.yelHi).round()),
                           child: Container(
-                            color: kGreen,
+                            color: Color(cur.cGreen),
                             alignment: Alignment.center,
                             child: const Text('green', style: TextStyle(color: kBg, fontSize: 11, fontWeight: FontWeight.w600)),
                           ),
                         ),
-                        Expanded(flex: math.max(1, w(cur.yelHi, cur.redHi).round()), child: Container(color: kYellow)),
-                        Expanded(flex: math.max(1, w(cur.redHi, 360).round()), child: Container(color: kRed)),
+                        Expanded(flex: math.max(1, w(cur.yelHi, cur.redHi).round()), child: Container(color: Color(cur.cYel))),
+                        Expanded(flex: math.max(1, w(cur.redHi, 360).round()), child: Container(color: Color(cur.cRed))),
                       ]),
                     ),
                   ),
                 ]),
               ),
-              limit('redLo', 'Red below', 'Urgent low zone', kRed, cur.redLo),
-              limit('yelLo', 'Yellow below', 'Low warning starts', kYellow, cur.yelLo),
-              limit('yelHi', 'Yellow above', 'High warning starts', kYellow, cur.yelHi),
-              limit('redHi', 'Red above', 'Urgent high zone', kRed, cur.redHi),
+              limit('redLo', 'Red below', 'Urgent low zone', Color(cur.cRed), cur.redLo),
+              limit('yelLo', 'Yellow below', 'Low warning starts', Color(cur.cYel), cur.yelLo),
+              limit('yelHi', 'Yellow above', 'High warning starts', Color(cur.cYel), cur.yelHi),
+              limit('redHi', 'Red above', 'Urgent high zone', Color(cur.cRed), cur.redHi),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Text(
@@ -214,6 +214,48 @@ class _ZonesScreenState extends State<ZonesScreen> {
                   'Red under ${fmtBg(cur.redLo, mmol)} or over ${fmtBg(cur.redHi, mmol)}',
                   style: const TextStyle(fontSize: 13, color: Color(0xFFC4CCD6)),
                 ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Text('Colours for "${cur.name}"', style: const TextStyle(fontSize: 15)),
+                  const Text(
+                    'Used for the glucose value, the graph dots and the night view during this range.',
+                    style: TextStyle(color: kMuted, fontSize: 12),
+                  ),
+                  for (final z in const [('Red zones', 'r'), ('Yellow zones', 'y'), ('Green zone', 'g')]) ...[
+                    const SizedBox(height: 12),
+                    Text(z.$1, style: const TextStyle(color: kMuted, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    ColorPick(
+                      dot: 32,
+                      value: z.$2 == 'r' ? cur.cRed : (z.$2 == 'y' ? cur.cYel : cur.cGreen),
+                      onPick: (v) => app.change((x) {
+                        final r = x.ranges[_sel];
+                        if (z.$2 == 'r') {
+                          r.cRed = v;
+                        } else if (z.$2 == 'y') {
+                          r.cYel = v;
+                        } else {
+                          r.cGreen = v;
+                        }
+                      }),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: () => app.change((x) {
+                        final r = x.ranges[_sel];
+                        r.cRed = 0xFFFF4D5A;
+                        r.cYel = 0xFFF2C94C;
+                        r.cGreen = 0xFF3DBE7A;
+                      }),
+                      child: const Text('Back to red, yellow and green'),
+                    ),
+                  ),
+                ]),
               ),
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
