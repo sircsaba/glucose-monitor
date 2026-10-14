@@ -33,8 +33,12 @@ class NightView extends StatelessWidget {
   MainAxisAlignment _main(String a) =>
       a == 'left' ? MainAxisAlignment.start : (a == 'right' ? MainAxisAlignment.end : MainAxisAlignment.center);
 
+  // The night screen holds this widget as a const, so it must listen for new
+  // readings itself; otherwise Flutter keeps showing the first values.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(listenable: app, builder: (c, _) => _content(c));
+
+  Widget _content(BuildContext context) {
     final s = app.settings;
     final mmol = s.mmol;
     final now = DateTime.now();

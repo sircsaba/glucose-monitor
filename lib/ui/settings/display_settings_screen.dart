@@ -1,16 +1,52 @@
 import 'package:flutter/material.dart';
 
 import '../../state/app_state.dart';
+import '../../state/settings.dart';
 import '../common.dart';
+
+/// Hours a graph button can show.
+const _hourChoices = [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 18, 24];
 
 class DisplaySettingsScreen extends StatelessWidget {
   const DisplaySettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    const hours = [3, 6, 12, 24];
     return SettingsPage(title: 'Display & graph', builder: (_) {
       final s = app.settings;
+      final buttons = List<int>.from(app.graphButtons);
+      while (buttons.length < 5) {
+        buttons.add(24);
+      }
+
+      void setButton(int i, int dir) {
+        final cur = buttons[i];
+        var k = _hourChoices.indexOf(cur);
+        if (k < 0) k = 0;
+        k = (k + dir).clamp(0, _hourChoices.length - 1);
+        final list = List<int>.from(buttons);
+        list[i] = _hourChoices[k];
+        app.change((x) {
+          x.set('graphButtons', list);
+          if (!list.contains(x.integer('graphHours'))) x.set('graphHours', list[0]);
+        });
+      }
+
+      // Top of the graph: auto, or a fixed value (stored in mg/dL).
+      final topsMmol = [0.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0, 22.0];
+      final topsMg = [0.0, 180.0, 200.0, 240.0, 280.0, 320.0, 400.0];
+      final tops = s.mmol ? topsMmol.map((v) => v * mgPerMmol).toList() : topsMg;
+      final topLabels = s.mmol
+          ? topsMmol.map((v) => v == 0 ? 'Auto' : v.toStringAsFixed(0)).toList()
+          : topsMg.map((v) => v == 0 ? 'Auto' : v.toStringAsFixed(0)).toList();
+      var topIndex = 0;
+      for (var i = 0; i < tops.length; i++) {
+        if ((tops[i] - s.number('graphTop')).abs() < 1) topIndex = i;
+      }
+
+      const scales = [0, 100, 115, 130, 150, 175, 200];
+      final scaleIndex = scales.indexOf(s.integer('uiScale')).clamp(0, scales.length - 1);
+
       return [
         Section(title: 'Units', children: [
           ChoiceRow(
@@ -20,16 +56,54 @@ class DisplaySettingsScreen extends StatelessWidget {
             onChanged: (i) => app.change((x) => x.set('mmol', i == 0)),
           ),
         ]),
+        Section(title: 'Buttons above the graph', children: [
+          for (var i = 0; i < 5; i++)
+            StepRow(
+              label: 'Button ${i + 1}',
+              value: '${buttons[i]} h',
+              onMinus: () => setButton(i, -1),
+              onPlus: () => setButton(i, 1),
+            ),
+          ChoiceRow(
+            label: 'Selected when the app opens',
+            options: [for (final h in buttons.take(5)) '$h hours'],
+            index: buttons.indexOf(s.integer('graphHours')).clamp(0, 4),
+            onChanged: (i) => app.change((x) => x.set('graphHours', buttons[i])),
+          ),
+          LinkRow(
+            label: 'Back to 1, 2, 3, 6 and 12 hours',
+            onTap: () => app.change((x) {
+              x.set('graphButtons', [1, 2, 3, 6, 12]);
+              x.set('graphHours', 3);
+            }),
+          ),
+        ]),
         Section(title: 'Graph', children: [
           ChoiceRow(
-            label: 'Default length',
-            options: const ['3 hours', '6 hours', '12 hours', '24 hours'],
-            index: hours.indexOf(s.integer('graphHours')).clamp(0, 3),
-            onChanged: (i) => app.change((x) => x.set('graphHours', hours[i])),
+            label: 'Top of graph',
+            hint: 'Auto: just above your high line, higher when readings go above it',
+            options: topLabels,
+            index: topIndex,
+            onChanged: (i) => app.change((x) => x.set('graphTop', tops[i])),
+          ),
+          ChoiceRow(
+            label: 'Dot size',
+            options: const ['Small', 'Medium', 'Large'],
+            index: s.integer('dotSize'),
+            onChanged: (i) => app.change((x) => x.set('dotSize', i)),
           ),
           setSwitch('Prediction', 'showPrediction'),
           setSwitch('Temp basal under graph', 'showBasal'),
           setSwitch('Treatment markers', 'showTreatments'),
+        ]),
+        Section(title: 'Screen size', children: [
+          ChoiceRow(
+            label: 'Size of everything',
+            hint: 'Auto makes the app larger on a tablet',
+            options: const ['Auto', '100%', '115%', '130%', '150%', '175%', '200%'],
+            index: scaleIndex,
+            onChanged: (i) => app.change((x) => x.set('uiScale', scales[i])),
+          ),
         ]),
         Section(title: 'Reports: time in range', children: [
           setMg('Range from', 'tirLo', min: 54, max: 140),

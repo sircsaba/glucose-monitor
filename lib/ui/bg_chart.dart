@@ -33,6 +33,8 @@ class BgChart extends StatelessWidget {
           showTreat: s.flag('showTreatments'),
           h24: s.flag('time24'),
           now: DateTime.now(),
+          topMg: s.number('graphTop'),
+          dotScale: const [1.0, 1.4, 1.9][s.integer('dotSize').clamp(0, 2)],
         ),
       ),
     );
@@ -51,6 +53,8 @@ class _BgPainter extends CustomPainter {
   final bool showTreat;
   final bool h24;
   final DateTime now;
+  final double topMg; // 0 = auto
+  final double dotScale;
 
   _BgPainter({
     required this.entries,
@@ -64,6 +68,8 @@ class _BgPainter extends CustomPainter {
     required this.showTreat,
     required this.h24,
     required this.now,
+    required this.topMg,
+    required this.dotScale,
   });
 
   void _text(Canvas c, String s, Offset at, {Color color = kMuted, double size = 10, bool center = false, bool right = false}) {
@@ -98,14 +104,22 @@ class _BgPainter extends CustomPainter {
     double x(DateTime t) => left + t.difference(tStart).inSeconds / span * w;
 
     final visible = entries.where((e) => e.t.isAfter(tStart)).toList();
-    var maxMg = 288.0;
-    for (final e in visible) {
-      if (e.mg + 18 > maxMg) maxMg = e.mg + 18;
+    final rr = activeRange(ranges, now);
+    // Top of the graph: fixed from settings, or just above the high line and
+    // the highest reading. Rounded up to the next grid line.
+    final gridStep = mmol ? 2 * mgPerMmol : 40.0;
+    final minMg = mmol ? 2 * mgPerMmol : 40.0;
+    var maxMg = topMg > 0 ? topMg : math.max(rr.yelHi, mmol ? 10 * mgPerMmol : 200.0);
+    if (topMg <= 0) {
+      for (final e in visible) {
+        if (e.mg + 5 > maxMg) maxMg = e.mg + 5;
+      }
+      // Round up to the next grid line (10, 12, 14… mmol/L).
+      maxMg = minMg + ((maxMg - minMg) / gridStep - 0.01).ceil() * gridStep;
     }
-    const minMg = 36.0;
     double y(double mg) => top + (1 - (mg.clamp(minMg, maxMg) - minMg) / (maxMg - minMg)) * plotH;
 
-    final r = activeRange(ranges, now);
+    final r = rr;
     // Green band and zone lines.
     canvas.drawRect(Rect.fromLTRB(left, y(r.yelHi), left + w, y(r.yelLo)), Paint()..color = kGreen.withValues(alpha: 0.08));
     final line = Paint()..strokeWidth = 1;
@@ -118,13 +132,13 @@ class _BgPainter extends CustomPainter {
       canvas.drawLine(Offset(left, y(v)), Offset(left + w, y(v)), line);
     }
 
-    // Grid labels.
-    final grid = mmol ? [4.0, 7.0, 10.0, 13.0, 16.0, 20.0, 25.0] : [70.0, 126.0, 180.0, 234.0, 288.0, 360.0, 450.0];
-    for (final g in grid) {
-      final mg = mmol ? g * mgPerMmol : g;
-      if (mg > maxMg) continue;
+    // Grid labels: 2, 4, 6, 8, 10… mmol/L (40, 80, 120… mg/dL).
+    for (var k = 0; k < 40; k++) {
+      final mg = minMg + k * gridStep;
+      if (mg > maxMg + 0.5) break;
+      final label = mmol ? (2 + 2 * k).toString() : (40 + 40 * k).toString();
       canvas.drawLine(Offset(left, y(mg)), Offset(left + w, y(mg)), Paint()..color = kLine);
-      _text(canvas, g.toStringAsFixed(0), Offset(left - 4, y(mg)), right: true);
+      _text(canvas, label, Offset(left - 4, y(mg)), right: true);
     }
 
     // Hour labels.
@@ -205,12 +219,13 @@ class _BgPainter extends CustomPainter {
       for (var i = 0; i < pred.length; i++) {
         final t = predStart.add(Duration(minutes: 5 * i));
         if (t.isBefore(now) || t.isAfter(tEnd)) continue;
-        canvas.drawCircle(Offset(x(t), y(pred[i])), 2.6, ring);
+        canvas.drawCircle(Offset(x(t), y(pred[i])), 1.8 * dotScale, ring);
       }
     }
 
     // Glucose dots.
-    final rad = hours <= 3 ? 3.4 : (hours <= 6 ? 2.6 : (hours <= 12 ? 2.0 : 1.6));
+    // Small dots: thinner on long views. Size can be raised in settings.
+    final rad = (hours <= 2 ? 1.9 : (hours <= 3 ? 1.7 : (hours <= 6 ? 1.5 : (hours <= 12 ? 1.25 : 1.0)))) * dotScale;
     for (final e in visible) {
       final c = zoneColor(zoneOf(e.mg, activeRange(ranges, e.t)));
       canvas.drawCircle(Offset(x(e.t), y(e.mg)), rad, Paint()..color = c);
