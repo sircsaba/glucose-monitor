@@ -462,6 +462,49 @@ function need(have, level) {
   if (have < level) throw new HttpError(401, 'Unauthorized');
 }
 
+// ---------------------------------------------------------------- web app
+
+// The browser version of the Glucose Monitor app is built once and published on
+// GitHub Pages. Each server shows it at its own address, so the app reads this
+// server without any cross-site setup, and app updates reach everyone at once.
+// WEB_APP_URL = "none" turns it off; another address uses your own build.
+const DEFAULT_WEB_APP = 'https://sircsaba.github.io/glucose-monitor';
+
+function webAppBase(env) {
+  if (env.WEB_APP_URL === undefined || String(env.WEB_APP_URL).trim() === '') return DEFAULT_WEB_APP;
+  return opt(env.WEB_APP_URL).replace(/\/+$/, '');
+}
+
+// Files that say which version to load: checked often, so updates show quickly.
+const WEB_SHORT_CACHE = /(^\/index\.html|flutter_bootstrap\.js|flutter_service_worker\.js|version\.json|manifest\.json)$/;
+
+async function serveWebApp(request, env, url) {
+  const base = webAppBase(env);
+  if (!base) return null;
+  let p = url.pathname === '/' ? '/index.html' : url.pathname;
+  if (p.includes('..') || p.includes('//')) return null;
+  const short = WEB_SHORT_CACHE.test(p);
+  let res;
+  try {
+    res = await fetch(base + p + url.search, {
+      redirect: 'follow',
+      cf: { cacheEverything: true, cacheTtl: short ? 60 : 3600 },
+    });
+  } catch (e) {
+    console.log('web app not reachable', e && e.message);
+    return null;
+  }
+  if (!res.ok) return null;
+  const headers = new Headers();
+  for (const k of ['content-type', 'etag', 'last-modified']) {
+    const v = res.headers.get(k);
+    if (v) headers.set(k, v);
+  }
+  headers.set('cache-control', `public, max-age=${short ? 60 : 3600}`);
+  headers.set('x-content-type-options', 'nosniff');
+  return new Response(request.method === 'HEAD' ? null : res.body, { status: 200, headers });
+}
+
 // ---------------------------------------------------------------- Nightscout link
 
 function nightscoutBase(env) {
@@ -648,6 +691,13 @@ async function handle(request, env, ctx) {
   if (method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
 
   const path = url.pathname.replace(/\/+$/, '').replace(/\.json$/, '') || '/';
+  const isApi = url.pathname === '/api' || url.pathname.startsWith('/api/');
+  // The web app (same as the phone app), for every address outside /api.
+  if (!isApi && path !== '/' && (method === 'GET' || method === 'HEAD')) {
+    const page = await serveWebApp(request, env, url);
+    if (page) return page;
+    throw new HttpError(404, 'Not found');
+  }
   if (path === '/') {
     const name = String(env.SITE_NAME || 'Glucose').replace(/[<>&"]/g, '');
     let problem = '';
@@ -663,6 +713,10 @@ async function handle(request, env, ctx) {
           `<p style="color:#F85149">Not ready: ${problem}.</p>`,
         { status: 500, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
       );
+    }
+    if (method === 'GET' || method === 'HEAD') {
+      const page = await serveWebApp(request, env, url);
+      if (page) return page;
     }
     return new Response(
       `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${name}</title>` +

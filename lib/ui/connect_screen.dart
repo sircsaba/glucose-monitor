@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../state/app_state.dart';
@@ -23,7 +24,12 @@ class _ConnectScreenState extends State<ConnectScreen> {
   @override
   void initState() {
     super.initState();
-    _url = TextEditingController(text: app.settings.str('nsUrl'));
+    var url = app.settings.str('nsUrl');
+    // Web version opened from a glucose server: that server is the site.
+    if (url.isEmpty && kIsWeb && Uri.base.scheme == 'https' && !Uri.base.host.endsWith('github.io')) {
+      url = Uri.base.origin;
+    }
+    _url = TextEditingController(text: url);
     _token = TextEditingController(text: app.settings.str('nsToken'));
     _apiSecret = app.settings.flag('apiSecret');
     _mmol = app.settings.mmol;
