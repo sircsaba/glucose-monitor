@@ -1,0 +1,44 @@
+{
+  "name": "glucose-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Free Nightscout-compatible glucose server for Cloudflare Workers + D1 (copy, relay or standalone).",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "db:migrations:apply": "wrangler d1 migrations apply DB --remote",
+    "deploy": "npm run db:migrations:apply && wrangler deploy",
+    "test": "node --experimental-sqlite test/run-tests.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.40.0"
+  },
+  "cloudflare": {
+    "bindings": {
+      "API_SECRET": {
+        "description": "Your server's secret, 12 characters or more. Type it in Loop or Trio (as the Nightscout API secret) or in the Glucose Monitor app. **Relay mode:** you may use your Nightscout API secret here."
+      },
+      "READ_TOKENS": {
+        "description": "Read-only keys for followers, separated by commas (e.g. `readable-mom,readable-school`)."
+      },
+      "CARE_TOKENS": {
+        "description": "Keys that can read **and** log treatments (careportal), separated by commas, or `none`. Carbs logged with these keys can reach Loop / Trio and be dosed for: share them only with people who may enter carbs."
+      },
+      "NIGHTSCOUT_SECRET": {
+        "description": "Your **Nightscout** API secret, for Copy and Relay modes. Leave empty if it is the same as API_SECRET or if you don't use Nightscout."
+      },
+      "NIGHTSCOUT_URL": {
+        "description": "Your Nightscout address (e.g. `https://my-site.herokuapp.com`) to **copy from** it and **relay** to it. Leave empty to use this server on its own (standalone)."
+      },
+      "SITE_NAME": {
+        "description": "Name shown by apps after connecting."
+      },
+      "UNITS": {
+        "description": "`mmol` or `mg/dl` (data is always stored in mg/dL)."
+      },
+      "KEEP_DAYS": {
+        "description": "Delete data older than this many days. `365` is a safe choice: the free database stops accepting data at 500 MB (`0` = keep everything)."
+      }
+    }
+  }
+}
