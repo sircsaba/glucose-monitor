@@ -84,6 +84,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   DateTime? sensorStart;
   DateTime? siteChange;
   DateTime? insulinChange;
+  DateTime? pumpBatteryChange;
   String? error;
   DateTime? lastFetch;
   bool loading = false;
@@ -164,6 +165,13 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       NightscoutClient(settings.str('nsUrl'), settings.str('nsToken'), settings.flag('apiSecret'));
 
   bool get mmol => settings.mmol;
+
+  /// Hours for the 5 buttons above the graph (from settings).
+  List<int> get graphButtons {
+    final raw = settings.raw('graphButtons');
+    final list = raw is List ? raw.whereType<num>().map((e) => e.toInt()).where((h) => h >= 1 && h <= 24).toList() : <int>[];
+    return list.isEmpty ? const [1, 2, 3, 6, 12] : list;
+  }
   Entry? get latest => entries.isEmpty ? null : entries.last;
   ZoneRange get range => activeRange(settings.ranges, DateTime.now());
   Zone? get zone => latest == null ? null : zoneOf(latest!.mg, range);
@@ -223,9 +231,13 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       }
       device = await c.deviceStatus();
       if (full || _n % 15 == 0) {
-        sensorStart = await c.lastOfTypes(['Sensor Change', 'Sensor Start']);
-        siteChange = await c.lastOfTypes(['Site Change']);
-        insulinChange = await c.lastOfTypes(['Insulin Change']);
+        // Ages are extras: a problem here must not stop the glucose readings.
+        try {
+          sensorStart = await c.lastOfTypes(['Sensor Change', 'Sensor Start']) ?? sensorStart;
+          siteChange = await c.lastOfTypes(['Site Change']) ?? siteChange;
+          insulinChange = await c.lastOfTypes(['Insulin Change']) ?? insulinChange;
+          pumpBatteryChange = await c.lastOfTypes(['Pump Battery Change']) ?? pumpBatteryChange;
+        } catch (_) {}
       }
       error = null;
       lastFetch = now;

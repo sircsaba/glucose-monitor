@@ -53,23 +53,34 @@ class _LiveScreenState extends State<LiveScreen> {
   Widget _tile(String label, String value, {String? sub, Color? subColor}) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
         decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: kBorder)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(label, style: const TextStyle(color: kMuted, fontSize: 12)),
           const SizedBox(height: 2),
-          Text(value, style: kMono.copyWith(fontSize: 18, fontWeight: FontWeight.w600)),
-          if (sub != null) Text(sub, style: TextStyle(color: subColor ?? kMuted, fontSize: 11)),
+          // Shrinks instead of wrapping on small phones (iPhone SE).
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value, maxLines: 1, style: kMono.copyWith(fontSize: 18, fontWeight: FontWeight.w600)),
+          ),
+          if (sub != null)
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(sub, maxLines: 1, style: TextStyle(color: subColor ?? kMuted, fontSize: 11)),
+            ),
         ]),
       ),
     );
   }
 
-  Widget _small(String label, String value) => Expanded(
+  Widget _small(String label, String value, {String? hint}) => Expanded(
         child: Column(children: [
           Text(label, style: const TextStyle(color: kMuted, fontSize: 12)),
           const SizedBox(height: 2),
-          Text(value, style: kMono.copyWith(fontSize: 13)),
+          FittedBox(fit: BoxFit.scaleDown, child: Text(value, maxLines: 1, style: kMono.copyWith(fontSize: 13))),
+          if (hint != null) Text(hint, style: const TextStyle(color: kMuted, fontSize: 10)),
         ]),
       );
 
@@ -86,11 +97,24 @@ class _LiveScreenState extends State<LiveScreen> {
         final color = l == null ? kMuted : (stale ? kMuted : app.colorFor(l.mg));
         final d = app.device;
         final now = DateTime.now();
-        final hours = _hours ?? s.integer('graphHours');
+        final buttons = app.graphButtons;
+        final hours = _hours != null && buttons.contains(_hours) ? _hours! : s.integer('graphHours');
         final loopAge = d?.loopTime == null ? null : now.difference(d!.loopTime!);
         final bolus = app.lastBolus;
         final carbs = app.lastCarbs;
         final delta = app.delta5;
+
+        String reservoir() {
+          if (d?.reservoirText != null) return d!.reservoirText!;
+          if (d?.reservoir != null) return '${d!.reservoir!.round()}U';
+          return '–';
+        }
+
+        String battery() {
+          if (d?.pumpBattery != null) return '${d!.pumpBattery}%';
+          if (d?.pumpVolts != null) return '${d!.pumpVolts!.toStringAsFixed(2)}V';
+          return '–';
+        }
 
         return RefreshIndicator(
           onRefresh: () => app.refresh(),
@@ -104,18 +128,7 @@ class _LiveScreenState extends State<LiveScreen> {
                     style: TextStyle(color: stale ? kAmber : kMuted, fontSize: 13),
                   ),
                 ),
-                if (loopAge != null) ...[
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: loopAge.inMinutes < s.integer('loopMin') ? kAccent : kAmber,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text('Loop ${fmtAge(loopAge)}', style: const TextStyle(color: kMuted, fontSize: 13)),
-                ],
+                if (loopAge != null) LoopBadge(age: loopAge, late: loopAge.inMinutes >= s.integer('loopMin')),
                 IconButton(
                   tooltip: 'Night view',
                   onPressed: app.openNight,
@@ -156,13 +169,13 @@ class _LiveScreenState extends State<LiveScreen> {
                 ]),
               ),
               Row(children: [
-                _tile('IOB', d?.iob == null ? '–' : '${d!.iob!.toStringAsFixed(2)} U'),
+                _tile('IOB', d?.iob == null ? '–' : '${d!.iob!.toStringAsFixed(2)}U'),
                 const SizedBox(width: 8),
-                _tile('COB', d?.cob == null ? '–' : '${d!.cob!.round()} g'),
+                _tile('COB', d?.cob == null ? '–' : '${d!.cob!.round()}g'),
                 const SizedBox(width: 8),
                 _tile(
                   'Basal',
-                  d?.basal == null ? '–' : d!.basal!.toStringAsFixed(2),
+                  d?.basal == null ? '–' : '${d!.basal!.toStringAsFixed(2)}U/h',
                   sub: (d?.basalMinLeft ?? 0) > 0 ? 'Temp · ${d!.basalMinLeft!.round()} min' : null,
                   subColor: kAmber,
                 ),
@@ -171,12 +184,12 @@ class _LiveScreenState extends State<LiveScreen> {
               Row(children: [
                 Expanded(
                   child: Text(
-                    bolus == null ? 'No bolus in 24 h' : 'Bolus ${bolus.insulin!.toStringAsFixed(1)} U · ${fmtAge(now.difference(bolus.t))} ago',
+                    bolus == null ? 'No bolus in 24 h' : 'Bolus ${bolus.insulin!.toStringAsFixed(1)}U · ${fmtAge(now.difference(bolus.t))} ago',
                     style: const TextStyle(fontSize: 13, color: Color(0xFFC4CCD6)),
                   ),
                 ),
                 Text(
-                  carbs == null ? '' : 'Carbs ${carbs.carbs!.round()} g · ${fmtAge(now.difference(carbs.t))} ago',
+                  carbs == null ? '' : 'Carbs ${carbs.carbs!.round()}g · ${fmtAge(now.difference(carbs.t))} ago',
                   style: const TextStyle(fontSize: 13, color: Color(0xFFC4CCD6)),
                 ),
               ]),
@@ -185,12 +198,17 @@ class _LiveScreenState extends State<LiveScreen> {
                 padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
                 decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: kBorder)),
                 child: Column(children: [
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-                    for (final h in [3, 6, 12, 24])
-                      ChoiceChip(
-                        label: Text('${h}h'),
-                        selected: hours == h,
-                        onSelected: (_) => setState(() => _hours = h),
+                  Row(children: [
+                    for (final h in buttons)
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: _RangeButton(
+                            label: '${h}h',
+                            selected: hours == h,
+                            onTap: () => setState(() => _hours = h),
+                          ),
+                        ),
                       ),
                   ]),
                   const SizedBox(height: 6),
@@ -199,15 +217,118 @@ class _LiveScreenState extends State<LiveScreen> {
               ),
               const SizedBox(height: 14),
               Row(children: [
-                _small('Reservoir', d?.reservoir == null ? '–' : '${d!.reservoir!.round()} U'),
-                _small('Battery', d?.pumpBattery == null ? '–' : '${d!.pumpBattery}%'),
+                _small('Reservoir', reservoir()),
+                _small('Pump battery', battery()),
                 _small('Sensor', app.sensorStart == null ? '–' : fmtAge(now.difference(app.sensorStart!))),
                 _small('Cannula', app.siteChange == null ? '–' : fmtAge(now.difference(app.siteChange!))),
               ]),
+              if (d?.phoneBattery != null) ...[
+                const SizedBox(height: 8),
+                Center(
+                  child: Text('Looping phone battery ${d!.phoneBattery}%', style: const TextStyle(color: kMuted, fontSize: 12)),
+                ),
+              ],
             ],
           ),
         );
       },
     );
+  }
+}
+
+class _RangeButton extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _RangeButton({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: selected ? const Color(0xFF12303D) : Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: selected ? kAccent : kBorder),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: SizedBox(
+            height: 38,
+            child: Center(
+              child: Text(label, style: TextStyle(color: selected ? kText : kMuted, fontSize: 14, fontWeight: selected ? FontWeight.w600 : FontWeight.w400)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Loop 3 min" above the glucose value. When the loop is late it turns
+/// bright amber and flashes.
+class LoopBadge extends StatefulWidget {
+  final Duration age;
+  final bool late;
+  const LoopBadge({super.key, required this.age, required this.late});
+  @override
+  State<LoopBadge> createState() => _LoopBadgeState();
+}
+
+class _LoopBadgeState extends State<LoopBadge> with SingleTickerProviderStateMixin {
+  late final AnimationController _blink = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+
+  @override
+  void initState() {
+    super.initState();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(covariant LoopBadge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _sync();
+  }
+
+  void _sync() {
+    if (widget.late && !_blink.isAnimating) {
+      _blink.repeat(reverse: true);
+    } else if (!widget.late && _blink.isAnimating) {
+      _blink.stop();
+      _blink.value = 1;
+    }
+    if (!widget.late) _blink.value = 1;
+  }
+
+  @override
+  void dispose() {
+    _blink.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const bright = Color(0xFFFFB020);
+    final text = Row(mainAxisSize: MainAxisSize.min, children: [
+      Container(
+        width: widget.late ? 10 : 8,
+        height: widget.late ? 10 : 8,
+        decoration: BoxDecoration(color: widget.late ? bright : kAccent, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 6),
+      Text(
+        'Loop ${fmtAge(widget.age)}',
+        style: TextStyle(
+          color: widget.late ? bright : kMuted,
+          fontSize: widget.late ? 15 : 13,
+          fontWeight: widget.late ? FontWeight.w700 : FontWeight.w400,
+        ),
+      ),
+    ]);
+    if (!widget.late) return text;
+    return FadeTransition(opacity: Tween<double>(begin: 0.25, end: 1.0).animate(_blink), child: text);
   }
 }

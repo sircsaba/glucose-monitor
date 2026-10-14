@@ -197,6 +197,11 @@ class Settings {
     'time24': true,
     // Graph
     'graphHours': 3,
+    'graphButtons': [1, 2, 3, 6, 12], // the 5 buttons above the graph, in hours
+    'graphTop': 0, // 0 = auto, else the top of the graph in mg/dL
+    'dotSize': 0, // 0 small, 1 medium, 2 large
+    'uiScale': 0, // 0 = auto (bigger on tablets), else percent
+
     'showPrediction': true,
     'showBasal': true,
     'showTreatments': true,

@@ -50,7 +50,11 @@ class DeviceInfo {
   DateTime? predStart;
   List<List<double>> predLines = [];
   double? reservoir;
+  String? reservoirText; // e.g. "50+U" from Omnipod
   int? pumpBattery;
+  double? pumpVolts; // some pumps send volts instead of percent
+  int? phoneBattery;
+  DateTime? pumpTime;
 
   /// The prediction line drawn on the graph.
   List<double> get mainPrediction => predLines.isEmpty ? const [] : predLines.first;
@@ -189,10 +193,17 @@ class NightscoutClient {
   }
 
   /// Time of the latest treatment of one of [types] (for sensor / site age).
-  Future<DateTime?> lastOfTypes(List<String> types) async {
+  /// Nightscout only searches the last 2 days unless a start date is given,
+  /// so look back [days] days.
+  Future<DateTime?> lastOfTypes(List<String> types, {int days = 30}) async {
     DateTime? best;
+    final since = DateTime.now().subtract(Duration(days: days)).toUtc().toIso8601String();
     for (final type in types) {
-      final j = await _get('/api/v1/treatments.json', {'find[eventType]': type, 'count': '1'});
+      final j = await _get('/api/v1/treatments.json', {
+        'find[eventType]': type,
+        'find[created_at][\$gte]': since,
+        'count': '1',
+      });
       if (j is List && j.isNotEmpty) {
         final t = _treatment(j.first);
         if (t != null && (best == null || t.t.isAfter(best))) best = t.t;
@@ -202,7 +213,8 @@ class NightscoutClient {
   }
 
   Future<DeviceInfo> deviceStatus() async {
-    final j = await _get('/api/v1/devicestatus.json', {'count': '10'});
+    // Pump details are not in every upload, so look through more of them.
+    final j = await _get('/api/v1/devicestatus.json', {'count': '40'});
     final info = DeviceInfo();
     if (j is! List) return info;
     for (final ds in j) {
@@ -257,13 +269,32 @@ class NightscoutClient {
       }
       final p = ds['pump'];
       if (p is Map) {
-        info.reservoir ??= _d(p['reservoir']);
+        info.pumpTime ??= _time(p['clock']) ?? _time(ds['created_at']);
+        if (info.reservoir == null && info.reservoirText == null) {
+          final over = p['reservoir_display_override'];
+          if (over is String && over.isNotEmpty) {
+            info.reservoirText = over;
+          } else {
+            info.reservoir = _d(p['reservoir']);
+          }
+        }
         final b = p['battery'];
-        if (b is Map && info.pumpBattery == null) info.pumpBattery = _d(b['percent'])?.round();
+        if (b is Map) {
+          info.pumpBattery ??= _d(b['percent'])?.round();
+          info.pumpVolts ??= _d(b['voltage']);
+        } else if (b is num && info.pumpBattery == null) {
+          info.pumpBattery = b.round();
+        }
       }
-      final up = ds['uploader'];
-      if (up is Map && info.pumpBattery == null && ds['pump'] == null) {
-        // Some uploaders only send the phone battery; ignore it for the pump.
+      // Phone (uploader) battery: AAPS sends "uploaderBattery", Loop/xDrip "uploader".
+      if (info.phoneBattery == null) {
+        final ub = ds['uploaderBattery'];
+        final up = ds['uploader'];
+        if (ub is num) {
+          info.phoneBattery = ub.round();
+        } else if (up is Map) {
+          info.phoneBattery = _d(up['battery'])?.round();
+        }
       }
     }
     return info;

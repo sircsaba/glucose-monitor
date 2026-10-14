@@ -40,7 +40,9 @@ ThemeData buildTheme() {
   );
 }
 
-const TextStyle kMono = TextStyle(fontFamily: 'monospace', fontFeatures: [FontFeature.tabularFigures()]);
+/// Numbers: the phone's normal font with equal-width digits, so values don't
+/// jump around, while the decimal point and letters keep their narrow width.
+const TextStyle kMono = TextStyle(fontFeatures: [FontFeature.tabularFigures()]);
 
 /// A titled card holding settings rows.
 class Section extends StatelessWidget {
