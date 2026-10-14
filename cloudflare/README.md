@@ -50,7 +50,9 @@ GitHub account (Cloudflare puts a copy of the code in it so it can update the se
 1. Click **Deploy to Cloudflare** at the top of this page and sign in.
 2. Connect your GitHub account when asked, and keep the proposed repository name.
 3. Cloudflare creates the database (**glucose-db**) by itself. Keep its name.
-4. Fill in the settings it shows:
+4. Fill in the settings it shows. **API_SECRET, READ_TOKENS and CARE_TOKENS come pre-filled with
+   hidden example values (the dots): erase each one and type your own.** The server refuses to
+   run with the example values, because everyone who reads this guide knows them.
 
 | Setting | What to type |
 |---|---|
@@ -137,6 +139,7 @@ alarms) connects the same way: Settings › Data & general › site address + ac
 | Copy mode stays empty | NIGHTSCOUT_URL must start with `https://`; NIGHTSCOUT_SECRET must be your Nightscout API secret. Dashboard › glucose-server › *Logs* shows "copy from Nightscout failed" with the reason. The first copy covers the last 30 hours; older history is not copied. |
 | Loop / Trio errors in Relay mode with a 301 / 302 status | NIGHTSCOUT_URL must be the exact address Nightscout answers on (usually `https://...`, with or without `www`). The server does not follow redirects, so an upload can never be lost on the way. |
 | Follower app shows nothing | Use a READ_TOKEN, and check the address has no extra folder at the end. |
+| Home page says "Not ready: Replace the example values…" | Settings › Variables and Secrets: give API_SECRET, READ_TOKENS and CARE_TOKENS your own values, then Deploy. |
 | "API_SECRET must be at least 12 characters" | Make the secret longer in Variables and Secrets, then Deploy. |
 
 ## Without the button (for developers)

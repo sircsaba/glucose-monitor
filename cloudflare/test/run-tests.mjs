@@ -95,6 +95,18 @@ const S = 'server-secret-123';
 const D = new Date(Date.now() - 86400e3).toISOString().slice(0, 10);
 const q = (o) => '?' + new URLSearchParams(o).toString();
 
+await test('example values from the deploy page are refused', async () => {
+  const e = makeEnv({ API_SECRET: 'change-me-type-your-own-secret' });
+  const r = await call(e, 'GET', '/api/v1/entries.json', { token: 'change-me-type-your-own-secret' });
+  assert.equal(r.status, 500);
+  const home = await call(e, 'GET', '/');
+  assert.equal(home.status, 500);
+  assert.match(String(home.data), /Not ready/);
+  const e2 = makeEnv({ READ_TOKENS: 'readable-change-me' });
+  assert.equal((await call(e2, 'GET', '/api/v1/entries.json', { token: 'readable-change-me' })).status, 500);
+  assert.equal((await call(makeEnv(), 'GET', '/')).status, 200);
+});
+
 // ---------------------------------------------------------------- standalone (Loop)
 const env = makeEnv();
 const now = Date.now();

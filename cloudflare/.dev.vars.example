@@ -1,4 +1,4 @@
-API_SECRET=choose-a-long-secret-12-characters-or-more
+API_SECRET=change-me-type-your-own-secret
 READ_TOKENS=readable-change-me
 CARE_TOKENS=careportal-change-me
 NIGHTSCOUT_SECRET=
