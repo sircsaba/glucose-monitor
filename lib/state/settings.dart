@@ -263,6 +263,10 @@ class Settings {
     'treatPlace': 0, // 0 = top of the graph, 1 = on the glucose line
     'gridLines': true, // dotted grid on the graph
     'basalLabels': true, // rate written on top of the temp basal bars
+    'basalTextSize': 10.0,
+    'basalTextBold': false,
+    'basalTextColor': 0xFF9CC3E0,
+    'basalBarColor': 0xFF2B4A63,
     'gridMinutes': [15, 15, 15, 30, 60], // minutes between time lines, for each graph button
     'tipBg': 2, // mouse over a reading: 0 nothing, 1 value, 2 value and time, 3 time
     'tipTreat': 2, // mouse over a treatment: same choices
