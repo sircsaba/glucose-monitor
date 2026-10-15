@@ -1,6 +1,6 @@
 # Glucose server (on WHC)
 
-Your own Nightscout-compatible server. Loop's **Inforap** service sends its data here,
+Your own Nightscout-compatible server. Loop's **Glucose Monitor Service** sends its data here,
 while the normal Nightscout service keeps sending to Nightscout. The Glucose Monitor
 app can read from either.
 
@@ -14,7 +14,7 @@ It must live at the **root of its own address**, for example `https://bg.inforap
 | `bg/.htaccess` | `bg.inforap.com` document root, e.g. `/home/CPANELUSER/bg.inforap.com/.htaccess` |
 | `bg/index.php` | same folder |
 | `bg/config.sample.php` | same folder, then copied to `config.php` and filled in |
-| `bg/lib/server.php` and `bg/lib/.htaccess` | `lib/` sub-folder of that folder |
+| `bg/lib/server.php`, `bg/lib/copy.php` and `bg/lib/.htaccess` | `lib/` sub-folder of that folder |
 | `install.sql` | not uploaded: pasted once into phpMyAdmin |
 
 ## Steps (cPanel at WHC)
@@ -45,8 +45,35 @@ It must live at the **root of its own address**, for example `https://bg.inforap
 1. GitHub › `sircsaba/LoopWorkspace` › *Actions* › **4. Build Loop Manual** › *Run workflow* ›
    in **Use workflow from** choose **inforap-service** › *Run workflow*.
 2. Install the new Loop build from TestFlight.
-3. Loop › Settings › Services › **Add Service** › **Inforap** › Site URL `https://bg.inforap.com`, API Secret = your `api_secret` › Login.
+3. Loop › Settings › Services › **Add Service** › **Glucose Monitor Service** › Site URL `https://bg.inforap.com`, API Secret = your `api_secret` › Login.
    Keep the Nightscout service as it is: both upload at the same time.
+
+## Glucose readings when Loop's CGM is "Nightscout"
+
+Loop never uploads readings that came **from** Nightscout (so they don't go round in a
+circle), and that applies to every service. The server then gets treatments and loop
+status from Loop, but no glucose. `lib/copy.php` fetches the readings from Nightscout instead:
+
+1. Upload `lib/copy.php` to the `lib/` folder (next to `server.php`).
+2. In `config.php`, add (or fill in) these lines before the last `];`:
+   ```php
+   'nightscout_url' => 'https://YOUR-NIGHTSCOUT-ADDRESS',
+   'nightscout_secret' => 'YOUR-NIGHTSCOUT-API-SECRET',
+   'copy_first_hours' => 30,
+   ```
+3. cPanel › *Cron Jobs* › *Add New Cron Job*:
+   - *Common Settings*: **Once Per Minute (\* \* \* \* \*)**
+   - *Command* (replace CPANELUSER and the folder with your document root from step 1):
+     ```
+     /usr/local/bin/php /home/CPANELUSER/bg.inforap.com/lib/copy.php >/dev/null 2>&1
+     ```
+   - *Add New Cron Job*.
+4. Check after 2 minutes: `https://bg.inforap.com/api/v1/entries/sgv.json?token=YOUR-READ-TOKEN` shows readings.
+   The first run copies the last 30 hours; then each minute only the new ones. A reading
+   is never stored twice.
+
+To test the command once by hand: cPanel › *Terminal* (if your plan has it) and run the same
+command without `>/dev/null 2>&1`: it prints `Copied N new reading(s) from Nightscout`.
 
 ## Glucose Monitor app
 
