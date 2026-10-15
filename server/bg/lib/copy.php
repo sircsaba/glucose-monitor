@@ -66,7 +66,8 @@ if (!is_array($docs)) {
     exit(1);
 }
 
-$find = $db->prepare('SELECT id FROM entries WHERE type = ? AND date_ms = ?');
+// Within 30 seconds counts as the same reading (another source may stamp it slightly differently).
+$find = $db->prepare('SELECT id FROM entries WHERE type = ? AND date_ms BETWEEN ? AND ?');
 $byId = $db->prepare('SELECT 1 FROM entries WHERE id = ?');
 $insert = $db->prepare('INSERT INTO entries (id, date_ms, type, doc) VALUES (?, ?, ?, ?)');
 $update = $db->prepare('UPDATE entries SET doc = ? WHERE id = ?');
@@ -78,7 +79,7 @@ foreach ($docs as $doc) {
     $date = (int)$doc->date;
     $type = (string)($doc->type ?? 'sgv');
     // Same reading already here (same type and time): keep one, with the newest content.
-    $find->execute([$type, $date]);
+    $find->execute([$type, $date - 30000, $date + 30000]);
     $id = $find->fetchColumn();
     $json = json_encode($doc, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
     if ($id) {
