@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
+import 'logic/glucose.dart';
 import 'state/app_state.dart';
 import 'ui/common.dart';
 import 'ui/connect_screen.dart';
@@ -43,7 +44,7 @@ class GlucoseApp extends StatelessWidget {
           final mq = MediaQuery.of(context);
           final s = uiScaleFor(mq.size);
           final logical = mq.size / s;
-          final scaled = FittedBox(
+          Widget scaled = FittedBox(
             fit: BoxFit.fill,
             alignment: Alignment.topLeft,
             child: SizedBox(
@@ -61,6 +62,15 @@ class GlucoseApp extends StatelessWidget {
               ),
             ),
           );
+          // Browser tab (and the phone's app switcher): the latest glucose,
+          // e.g. "7.4 ↗ +0.1".
+          final l = app.latest;
+          final tabTitle = l == null
+              ? 'Glucose Monitor'
+              : '${app.isStale ? '⚠ ' : ''}${fmtBg(l.mg, app.mmol)} ${arrowText(l.direction)}'
+                  '${app.delta5 == null ? '' : ' ${fmtDelta(app.delta5!, app.mmol)}'}'
+                  '${app.isStale && app.age != null ? ' (${fmtAge(app.age!)})' : ''}';
+          scaled = Title(title: tabTitle, color: const Color(0xFF0D1117), child: scaled);
           if (!kIsWeb) return scaled;
           // In a browser, the first click or tap allows alarm sounds.
           return Listener(onPointerDown: (_) => app.player.unlock(), child: scaled);
