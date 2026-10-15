@@ -10,6 +10,7 @@ import '../logic/glucose.dart';
 import '../ui/alert_screen.dart';
 import '../ui/checklist_screen.dart';
 import '../ui/night_screen.dart';
+import '../ui/target_screen.dart';
 import 'settings.dart';
 
 enum AlarmKind { redLow, yellowLow, predictedLow, yellowHigh, redHigh, noData, loop, reservoir, pumpBattery }
@@ -64,6 +65,42 @@ class ActiveAlarm {
   ActiveAlarm(this.kind, this.started, {this.gentle = false, this.test = false});
 }
 
+/// One-time alert: sound / vibrate / flash once the glucose reaches a value.
+class TargetWatch {
+  final double mg;
+  final bool rising; // true: alert at mg or higher; false: at mg or lower
+  final DateTime started;
+  final DateTime? expires; // countdown end, null = none
+  final bool timeUpAlert; // at the end of the countdown: alert (true) or just cancel
+  final bool sound;
+  final int soundIndex;
+  final int volume;
+  final bool vibrate;
+  final bool flash;
+  final int color;
+  TargetWatch({
+    required this.mg,
+    required this.rising,
+    required this.started,
+    this.expires,
+    this.timeUpAlert = true,
+    this.sound = true,
+    this.soundIndex = 0,
+    this.volume = 80,
+    this.vibrate = true,
+    this.flash = true,
+    this.color = 0xFF3DBE7A,
+  });
+}
+
+/// A target alert that went off: reached, or countdown over.
+class TargetHit {
+  final TargetWatch watch;
+  final bool reached;
+  final double? mg;
+  TargetHit(this.watch, this.reached, this.mg);
+}
+
 class Snooze {
   final DateTime until;
   final double? level;
@@ -92,6 +129,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   ActiveAlarm? active;
   final Map<AlarmKind, Snooze> snoozes = {};
   bool alertOpen = false;
+  TargetWatch? target;
+  TargetHit? targetHit;
+  bool _targetOpen = false;
   bool nightOpen = false;
   bool checklistOpen = false;
   String _lastAutoNight = '';
@@ -293,8 +333,74 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     return false;
   }
 
+  // ---------- one-time target alert ----------
+
+  void startTarget(TargetWatch w) {
+    target = w;
+    targetHit = null;
+    notifyListeners();
+  }
+
+  void cancelTarget() {
+    target = null;
+    notifyListeners();
+  }
+
+  void _checkTarget() {
+    final w = target;
+    if (w == null) return;
+    final l = latest;
+    final now = DateTime.now();
+    // Only readings that arrive after the alert was turned on count.
+    if (l != null && l.t.isAfter(w.started)) {
+      final reached = w.rising ? l.mg >= w.mg - 0.01 : l.mg <= w.mg + 0.01;
+      if (reached) {
+        _fireTarget(w, true, l.mg);
+        return;
+      }
+    }
+    if (w.expires != null && now.isAfter(w.expires!)) {
+      if (w.timeUpAlert) {
+        _fireTarget(w, false, l?.mg);
+      } else {
+        target = null;
+        notifyListeners();
+      }
+    }
+  }
+
+  void _fireTarget(TargetWatch w, bool reached, double? mg) {
+    target = null;
+    targetHit = TargetHit(w, reached, mg);
+    if (w.sound || w.vibrate) {
+      player.start(
+        SoundCfg(sound: w.soundIndex, volMode: 0, v1: w.volume, v2: w.volume, secs: 60, vibrate: w.vibrate),
+        vibrateOnly: !w.sound,
+      );
+    }
+    final nav = navKey?.currentState;
+    if (nav != null && !_targetOpen) {
+      _targetOpen = true;
+      nav
+          .push(MaterialPageRoute<void>(builder: (_) => const TargetAlertScreen(), fullscreenDialog: true))
+          .then((_) => _targetOpen = false);
+    }
+    notifyListeners();
+  }
+
+  void dismissTarget() {
+    targetHit = null;
+    player.stop();
+    // A regular alarm that was sounding starts again if it still applies.
+    active = null;
+    notifyListeners();
+    evaluate();
+  }
+
   /// Works out which alarm (if any) should be sounding now.
   void evaluate() {
+    _checkTarget();
+    if (targetHit != null) return; // the target alert has the sound for now
     if (active?.test == true) return;
     final s = settings;
     final now = DateTime.now();

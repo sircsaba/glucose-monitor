@@ -95,6 +95,8 @@ class DisplaySettingsScreen extends StatelessWidget {
             index: s.integer('dotSize'),
             onChanged: (i) => app.change((x) => x.set('dotSize', i)),
           ),
+          setSwitch('Phone on its side: split the screen', 'landSplit', hint: 'Values on the left, graph on the right'),
+          setInt('Width of the values side', 'splitLeft', step: 5, min: 25, max: 70, unit: '%'),
           setChoice('Bottom bar (Live, Treat…)', 'navCompact', const ['Thin on a computer', 'Always thin', 'Always normal'],
               hint: 'Thin leaves more room for the graph'),
           ...graphGridSettings(),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../state/app_state.dart';
 import '../checklist_screen.dart';
 import '../common.dart';
+import '../target_screen.dart';
 import 'alarm_settings_screen.dart';
 import 'data_settings_screen.dart';
 import 'day_layout_screen.dart';
@@ -37,6 +38,7 @@ class MenuScreen extends StatelessWidget {
         LinkRow(label: 'Night view layout', hint: 'Size, colour and position of each line', onTap: () => go(const LayoutScreen())),
         LinkRow(label: 'Night view & checklist', hint: 'Brightness, schedule, before-sleep checks', onTap: () => go(const NightSettingsScreen())),
         LinkRow(label: 'Before-sleep checklist', hint: 'Run the checks now', onTap: () => go(const ChecklistScreen())),
+        LinkRow(label: 'Target alert', hint: 'Defaults for the Target button: value, sound, vibrate, flash, colour, countdown', onTap: () => go(const TargetSettingsScreen())),
         LinkRow(label: 'Other alarms', hint: 'No data, low predicted, loop, pump, gentle wake-up, quiet hours', onTap: () => go(const AlarmSettingsScreen())),
         LinkRow(label: 'Display & graph', hint: 'Units, graph, reports range', onTap: () => go(const DisplaySettingsScreen())),
         LinkRow(label: 'Data & general', hint: 'Site, refresh, time format, backup', onTap: () => go(const DataSettingsScreen())),

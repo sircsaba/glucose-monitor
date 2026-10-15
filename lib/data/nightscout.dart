@@ -28,6 +28,12 @@ class Treatment {
   final double? duration; // minutes
   final bool isSmb;
   final String notes;
+  // Presets: Loop "Temporary Override", Trio / AAPS "Temporary Target".
+  final String reason;
+  final double? targetLo; // mg/dL
+  final double? targetHi;
+  final double? scale; // Loop: insulin needs, 1 = 100 %
+  final bool indefinite;
   Treatment({
     required this.t,
     required this.type,
@@ -37,7 +43,14 @@ class Treatment {
     this.duration,
     this.isSmb = false,
     this.notes = '',
+    this.reason = '',
+    this.targetLo,
+    this.targetHi,
+    this.scale,
+    this.indefinite = false,
   });
+
+  bool get isPreset => type == 'Temporary Override' || type == 'Temporary Target';
 }
 
 /// Loop / pump status from the latest device status uploads.
@@ -179,7 +192,23 @@ class NightscoutClient {
       duration: _d(e['duration']),
       isSmb: e['isSMB'] == true || (e['type'] ?? '').toString() == 'SMB',
       notes: (e['notes'] ?? '').toString(),
+      reason: (e['reason'] ?? e['notes'] ?? '').toString(),
+      targetLo: _presetTarget(e, true),
+      targetHi: _presetTarget(e, false),
+      scale: _d(e['insulinNeedsScaleFactor']),
+      indefinite: (e['durationType'] ?? '').toString() == 'indefinite',
     );
+  }
+
+  /// Target range of a preset in mg/dL: Loop's correctionRange, or Trio's targetBottom / targetTop.
+  double? _presetTarget(Map e, bool low) {
+    final cr = e['correctionRange'];
+    if (cr is List && cr.length == 2) return _d(cr[low ? 0 : 1]);
+    final v = _d(e[low ? 'targetBottom' : 'targetTop']);
+    if (v == null) return null;
+    // Trio / AAPS may send mmol/L.
+    final units = (e['units'] ?? '').toString().toLowerCase();
+    return units.startsWith('mmol') || v < 30 ? v * 18.0182 : v;
   }
 
   Future<List<Treatment>> treatmentsSince(DateTime since) async {

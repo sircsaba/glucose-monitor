@@ -10,6 +10,7 @@ import 'common.dart';
 import 'quick_alarms_screen.dart';
 import 'reports_screen.dart';
 import 'settings/menu_screen.dart';
+import 'target_screen.dart';
 import 'treat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -24,14 +25,23 @@ class _HomeScreenState extends State<HomeScreen> {
   static const _tabs = [
     (Icons.show_chart, 'Live'),
     (Icons.add_circle_outline, 'Treat'),
+    (Icons.flag_outlined, 'Target'),
     (Icons.bar_chart, 'Reports'),
     (Icons.notifications_none, 'Alarms'),
   ];
+  static const _targetTab = 2;
+
+  /// Light background on the Target button while a target alert is active.
+  Color? _tabTint(int i) {
+    final w = app.target;
+    if (i != _targetTab || w == null) return null;
+    return Color(w.color).withValues(alpha: 0.35);
+  }
 
   /// Thin bottom bar: on a computer by default, or as set.
   bool _compactNav(BuildContext context) {
     final mode = app.settings.integer('navCompact');
-    return mode == 1 || (mode == 0 && DayView.isWide(context));
+    return mode == 1 || (mode == 0 && (DayView.isWide(context) || DayView.phoneSideways(context)));
   }
 
   /// About 40 px high instead of 80: icon and name side by side.
@@ -50,8 +60,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
                     decoration: BoxDecoration(
-                      color: _tab == i ? const Color(0xFF12303D) : Colors.transparent,
+                      color: _tabTint(i) ?? (_tab == i ? const Color(0xFF12303D) : Colors.transparent),
                       borderRadius: BorderRadius.circular(15),
+                      border: _tabTint(i) != null && _tab == i ? Border.all(color: kText.withValues(alpha: 0.5)) : null,
                     ),
                     child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                       Icon(_tabs[i].$1, size: 18, color: _tab == i ? kText : kMuted),
@@ -75,17 +86,24 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         child: IndexedStack(
           index: _tab,
-          children: const [LiveScreen(), TreatScreen(), ReportsScreen(), QuickAlarmsScreen()],
+          children: const [LiveScreen(), TreatScreen(), TargetScreen(), ReportsScreen(), QuickAlarmsScreen()],
         ),
       ),
       bottomNavigationBar: _compactNav(context) ? _thinBar() : NavigationBar(
         selectedIndex: _tab,
         onDestinationSelected: (i) => setState(() => _tab = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.show_chart), label: 'Live'),
-          NavigationDestination(icon: Icon(Icons.add_circle_outline), label: 'Treat'),
-          NavigationDestination(icon: Icon(Icons.bar_chart), label: 'Reports'),
-          NavigationDestination(icon: Icon(Icons.notifications_none), label: 'Alarms'),
+        destinations: [
+          for (var i = 0; i < _tabs.length; i++)
+            NavigationDestination(
+              icon: _tabTint(i) == null
+                  ? Icon(_tabs[i].$1)
+                  : Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                      decoration: BoxDecoration(color: _tabTint(i), borderRadius: BorderRadius.circular(14)),
+                      child: Icon(Icons.flag, color: kText),
+                    ),
+              label: _tabs[i].$2,
+            ),
         ],
       ),
     );
@@ -101,6 +119,27 @@ class LiveScreen extends StatelessWidget {
       listenable: app,
       builder: (context, _) {
         const pad = EdgeInsets.fromLTRB(12, 2, 12, 12);
+        if (DayView.splitNow(context)) {
+          // Phone on its side: everything but the graph on the left (scrolls if
+          // needed), the graph filling the right side.
+          final leftPct = app.settings.integer('splitLeft').clamp(25, 70);
+          return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Expanded(
+              flex: leftPct,
+              child: RefreshIndicator(
+                onRefresh: () => app.refresh(),
+                child: ListView(padding: const EdgeInsets.fromLTRB(10, 2, 6, 8), children: const [DayView(part: 1)]),
+              ),
+            ),
+            Expanded(
+              flex: 100 - leftPct,
+              child: const Padding(
+                padding: EdgeInsets.fromLTRB(4, 4, 8, 6),
+                child: DayView(part: 2, fill: true),
+              ),
+            ),
+          ]);
+        }
         if (!DayView.fitsGraph(context)) {
           return RefreshIndicator(
             onRefresh: () => app.refresh(),
@@ -132,7 +171,17 @@ class DayView extends StatefulWidget {
   final ValueChanged<String>? onSelect;
   final bool? wide; // preview: which default to show
   final bool fill; // the graph takes the height that is left
-  const DayView({super.key, this.preview = false, this.highlight, this.onSelect, this.wide, this.fill = false});
+  final int part; // 0 everything, 1 everything but the graph, 2 the graph only
+  const DayView({super.key, this.preview = false, this.highlight, this.onSelect, this.wide, this.fill = false, this.part = 0});
+
+  /// A phone turned on its side (short screen, wider than tall).
+  static bool phoneSideways(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    return size.width > size.height && size.shortestSide < 600;
+  }
+
+  /// Phone on its side with the split setting on: values left, graph right.
+  static bool splitNow(BuildContext context) => app.settings.flag('landSplit') && phoneSideways(context);
 
   /// Graph height: fit the screen (on a computer by default), or the fixed size.
   static bool fitsGraph(BuildContext context) {
@@ -395,6 +444,8 @@ class _DayViewState extends State<DayView> {
       g.removeWhere((c) => !c.show);
     }
     groups.removeWhere((g) => g.isEmpty);
+    if (widget.part == 1) groups.removeWhere((g) => g.first.id == 'graph');
+    if (widget.part == 2) groups.removeWhere((g) => g.first.id != 'graph');
 
     final icons = Row(mainAxisSize: MainAxisSize.min, children: [
       IconButton(
@@ -466,10 +517,10 @@ class _DayViewState extends State<DayView> {
         ));
         continue;
       }
-      rows.add(line(g, first: gi == 0));
-      if (gi == 0 && errorBox != null) rows.add(errorBox);
+      rows.add(line(g, first: gi == 0 && widget.part != 2));
+      if (gi == 0 && errorBox != null && widget.part != 2) rows.add(errorBox);
     }
-    if (groups.isEmpty) rows.add(Align(alignment: Alignment.centerRight, child: icons));
+    if (groups.isEmpty && widget.part != 2) rows.add(Align(alignment: Alignment.centerRight, child: icons));
     return Column(
       mainAxisSize: filled ? MainAxisSize.max : MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
