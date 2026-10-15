@@ -32,4 +32,11 @@ return [
 
     // Delete data older than this many days (0 = keep forever).
     'keep_days' => 0,
+
+    // Copy CGM readings from Nightscout (needed when Loop's CGM is "Nightscout":
+    // Loop never uploads those readings to a service). Runs from a cron job:
+    // see README.md. Leave '' to turn it off.
+    'nightscout_url' => '',            // e.g. 'https://mysite.herokuapp.com'
+    'nightscout_secret' => '',         // your Nightscout API secret
+    'copy_first_hours' => 30,          // the first copy fetches this many hours
 ];
