@@ -33,6 +33,15 @@ return [
     // Delete data older than this many days (0 = keep forever).
     'keep_days' => 0,
 
+    // Read the Libre 3 / Libre 3 Plus readings straight from LibreLinkUp (no
+    // Nightscout needed). Use a LibreLinkUp FOLLOWER account that the sensor
+    // user has invited, opened once in the LibreLinkUp app (terms accepted).
+    // Runs from a cron job: see README.md. Leave '' to turn it off.
+    'libre_email' => '',
+    'libre_password' => '',
+    'libre_patient' => '',             // first name, only if the account follows several people
+    'libre_version' => '4.16.0',       // raise it if LibreLinkUp starts refusing ("version" errors)
+
     // Copy CGM readings from Nightscout (needed when Loop's CGM is "Nightscout":
     // Loop never uploads those readings to a service). Runs from a cron job:
     // see README.md. Leave '' to turn it off.

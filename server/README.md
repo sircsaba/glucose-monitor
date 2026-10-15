@@ -14,7 +14,7 @@ It must live at the **root of its own address**, for example `https://bg.inforap
 | `bg/.htaccess` | `bg.inforap.com` document root, e.g. `/home/CPANELUSER/bg.inforap.com/.htaccess` |
 | `bg/index.php` | same folder |
 | `bg/config.sample.php` | same folder, then copied to `config.php` and filled in |
-| `bg/lib/server.php`, `bg/lib/copy.php` and `bg/lib/.htaccess` | `lib/` sub-folder of that folder |
+| `bg/lib/server.php`, `bg/lib/libre.php`, `bg/lib/copy.php` and `bg/lib/.htaccess` | `lib/` sub-folder of that folder |
 | `install.sql` | not uploaded: pasted once into phpMyAdmin |
 
 ## Steps (cPanel at WHC)
@@ -47,6 +47,34 @@ It must live at the **root of its own address**, for example `https://bg.inforap
 2. Install the new Loop build from TestFlight.
 3. Loop › Settings › Services › **Add Service** › **Glucose Monitor Service** › Site URL `https://bg.inforap.com`, API Secret = your `api_secret` › Login.
    Keep the Nightscout service as it is: both upload at the same time.
+
+## Libre 3 readings straight from LibreLinkUp (recommended)
+
+`lib/libre.php` logs in to LibreLinkUp, the same service the LibreLinkUp app and Nightscout's
+LibreLinkUp bridge use, and stores every new reading here, each minute. Nightscout is not needed.
+
+1. **Follower account:** the Libre 3 user invites a LibreLinkUp follower (Libre app › *Connected apps* ›
+   *LibreLinkUp*). Install **LibreLinkUp** on a phone, log in with that follower account once and accept
+   the terms. You can use the same follower account your Nightscout already uses.
+2. Upload `lib/libre.php` to the `lib/` folder (next to `server.php`).
+3. In `config.php`, add (before the last `];`):
+   ```php
+   'libre_email' => 'FOLLOWER-EMAIL',
+   'libre_password' => 'FOLLOWER-PASSWORD',
+   'libre_patient' => '',
+   'libre_version' => '4.16.0',
+   ```
+4. cPanel › *Cron Jobs* › *Add New Cron Job* › *Once Per Minute* › command:
+   ```
+   /usr/local/bin/php /home/CPANELUSER/bg.inforap.com/lib/libre.php >/dev/null 2>&1
+   ```
+5. After 2 minutes, `https://bg.inforap.com/api/v1/entries/sgv.json?token=YOUR-READ-TOKEN` shows readings
+   with `"device":"librelinkup-direct"`. The first run also brings in the last 12 hours (one every 15 min).
+6. **Loop reads from here instead of Nightscout:** Loop › Settings › CGM › *Nightscout Remote CGM* ›
+   change the site to `https://bg.inforap.com` and the API secret to your `api_secret`.
+
+The login is kept in `lib/.libre-session.json` (blocked from the web) and renewed when it expires, so
+LibreLinkUp sees about one login a day, not one a minute.
 
 ## Glucose readings when Loop's CGM is "Nightscout"
 
