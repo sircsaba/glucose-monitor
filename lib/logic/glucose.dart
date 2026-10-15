@@ -158,12 +158,17 @@ class ArrowIcon extends StatelessWidget {
   final String direction;
   final double size;
   final Color color;
-  const ArrowIcon({super.key, required this.direction, required this.size, required this.color});
+  final double length; // 1 = the standard arrow icon; more = a longer drawn arrow
+  const ArrowIcon({super.key, required this.direction, required this.size, required this.color, this.length = 1.0});
 
   @override
   Widget build(BuildContext context) {
     final a = arrowAngle(direction);
     if (a == null) return SizedBox(width: size * 0.2);
+    if (length > 1.01) {
+      final side = size * length;
+      return CustomPaint(size: Size(side, side), painter: _ArrowPainter(a, isDoubleArrow(direction), color, size, length));
+    }
     final one = Transform.rotate(angle: a, child: Icon(Icons.arrow_forward_rounded, size: size, color: color));
     if (!isDoubleArrow(direction)) return one;
     return Row(mainAxisSize: MainAxisSize.min, children: [
@@ -171,4 +176,42 @@ class ArrowIcon extends StatelessWidget {
       Transform.translate(offset: Offset(-size * 0.45, 0), child: one),
     ]);
   }
+}
+
+/// A long arrow: a shaft and a pointed head, turned to the trend direction.
+class _ArrowPainter extends CustomPainter {
+  final double angle;
+  final bool twin;
+  final Color color;
+  final double size;
+  final double length;
+  _ArrowPainter(this.angle, this.twin, this.color, this.size, this.length);
+
+  @override
+  void paint(Canvas canvas, Size box) {
+    final half = size * length * 0.42;
+    final head = size * 0.34;
+    final stroke = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size * 0.13
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.save();
+    canvas.translate(box.width / 2, box.height / 2);
+    canvas.rotate(angle);
+    for (final off in twin ? [-size * 0.2, size * 0.2] : [0.0]) {
+      canvas.drawLine(Offset(-half, off), Offset(half - stroke.strokeWidth * 0.4, off), stroke);
+      final p = Path()
+        ..moveTo(half - head, off - head * 0.85)
+        ..lineTo(half, off)
+        ..lineTo(half - head, off + head * 0.85);
+      canvas.drawPath(p, stroke);
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _ArrowPainter old) =>
+      old.angle != angle || old.color != color || old.size != size || old.length != length || old.twin != twin;
 }

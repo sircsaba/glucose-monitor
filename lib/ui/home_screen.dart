@@ -281,7 +281,8 @@ class _DayViewState extends State<DayView> {
               if (l != null && (s.flag('dayArrow') || s.flag('dayBgDelta'))) ...[
                 SizedBox(width: size * 0.095),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                  if (s.flag('dayArrow')) ArrowIcon(direction: l.direction, size: size * 0.48, color: col),
+                  if (s.flag('dayArrow'))
+                    ArrowIcon(direction: l.direction, size: size * 0.48, color: col, length: s.integer('arrowLen') / 100.0),
                   if (s.flag('dayBgDelta')) ...[
                     Text(delta == null ? '' : fmtDelta(delta, mmol), style: kMono.copyWith(fontSize: size * 0.2, color: kText)),
                     Text(unitLabel(mmol), style: TextStyle(color: kMuted, fontSize: size * 0.14)),
@@ -368,7 +369,7 @@ class _DayViewState extends State<DayView> {
     // worked out with hidden elements too, so hiding one doesn't move the others.
     final groups = <List<LineCfg>>[];
     for (final c in s.dayFor(wide)) {
-      final canJoin = c.join && groups.isNotEmpty && c.id != 'graph' && groups.last.first.id != 'graph';
+      final canJoin = (c.join || c.under) && groups.isNotEmpty && c.id != 'graph' && groups.last.first.id != 'graph';
       if (canJoin) {
         groups.last.add(c);
       } else {
@@ -396,10 +397,28 @@ class _DayViewState extends State<DayView> {
     ]);
 
     Widget line(List<LineCfg> g, {bool first = false}) {
+      // Elements marked "under the element before" share its spot, one above the other.
+      final spots = <List<LineCfg>>[];
+      for (final c in g) {
+        if (c.under && spots.isNotEmpty) {
+          spots.last.add(c);
+        } else {
+          spots.add([c]);
+        }
+      }
       final children = <Widget>[];
-      for (var i = 0; i < g.length; i++) {
+      for (var i = 0; i < spots.length; i++) {
         if (i > 0) children.add(SizedBox(width: wide ? 10 : 6));
-        children.add(Expanded(flex: g[i].flex, child: cell(g[i])));
+        final sp = spots[i];
+        children.add(Expanded(
+          flex: sp.first.flex,
+          child: sp.length == 1
+              ? cell(sp.first)
+              : Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  for (var k = 0; k < sp.length; k++)
+                    Padding(padding: EdgeInsets.only(top: k == 0 ? 0 : sp[k].space), child: cell(sp[k])),
+                ]),
+        ));
       }
       if (first) children.add(icons);
       return Padding(
