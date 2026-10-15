@@ -66,7 +66,17 @@ class DayView extends StatefulWidget {
   final bool preview;
   final String? highlight;
   final ValueChanged<String>? onSelect;
-  const DayView({super.key, this.preview = false, this.highlight, this.onSelect});
+  final bool? wide; // preview: which layout to show
+  const DayView({super.key, this.preview = false, this.highlight, this.onSelect, this.wide});
+
+  /// Two columns (values left, graph right) on a wide screen, or as set.
+  static bool isWide(BuildContext context, {double? width}) {
+    final cols = app.settings.integer('dayColumns');
+    if (cols == 1) return false;
+    if (cols == 2) return true;
+    final size = MediaQuery.of(context).size;
+    return (width ?? size.width) >= 900 && size.width > size.height;
+  }
 
   @override
   State<DayView> createState() => _DayViewState();
@@ -94,9 +104,12 @@ class _DayViewState extends State<DayView> {
   static Alignment _align(String a) => a == 'left' ? Alignment.centerLeft : (a == 'right' ? Alignment.centerRight : Alignment.center);
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(listenable: app, builder: (c, _) => _content(c));
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: app,
+        builder: (c, _) => LayoutBuilder(builder: (c, box) => _content(c, widget.wide ?? DayView.isWide(c, width: box.maxWidth))),
+      );
 
-  Widget _content(BuildContext context) {
+  Widget _content(BuildContext context, bool wide) {
     final s = app.settings;
     final mmol = s.mmol;
     final l = app.latest;
@@ -124,26 +137,53 @@ class _DayViewState extends State<DayView> {
       return '–';
     }
 
+    // In two columns the graph fills the window's height.
+    double graphHeight(double size) {
+      if (!wide || widget.preview) return size;
+      final h = MediaQuery.of(context).size.height - 150;
+      return h > size ? h : size;
+    }
+
     String ageOf(DateTime? t) => t == null ? '–' : fmtAge(now.difference(t));
 
     Widget content(LineCfg c) {
       final col = c.zoneColor ? zc : Color(c.color);
       final size = c.size;
-      final weight = c.bold ? FontWeight.w700 : FontWeight.w500;
+      final weight = c.bold ? FontWeight.w600 : FontWeight.w400;
       final align = _align(c.align);
 
-      // "Label value" on one line, shrinking rather than wrapping.
-      Widget pair(String label, String value, {Color? labelColor}) => FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: align,
-            child: Text.rich(
-              TextSpan(children: [
-                TextSpan(text: '$label ', style: TextStyle(color: labelColor ?? kMuted, fontSize: size * 0.85)),
-                TextSpan(text: value, style: kMono.copyWith(color: col, fontSize: size, fontWeight: weight)),
-              ]),
-              maxLines: 1,
-            ),
-          );
+      // "Label value" on one line, or the label above the value (stack).
+      Widget pair(String label, String value, {Color? labelColor, String? sub}) {
+        final valueStyle = kMono.copyWith(color: col, fontSize: size, fontWeight: weight);
+        if (c.stack) {
+          final cross = c.align == 'left'
+              ? CrossAxisAlignment.start
+              : (c.align == 'right' ? CrossAxisAlignment.end : CrossAxisAlignment.center);
+          return Column(crossAxisAlignment: cross, mainAxisSize: MainAxisSize.min, children: [
+            Text(label, maxLines: 1, style: TextStyle(color: labelColor ?? kMuted, fontSize: size < 18 ? 12 : size * 0.66)),
+            const SizedBox(height: 2),
+            FittedBox(fit: BoxFit.scaleDown, alignment: align, child: Text(value, maxLines: 1, style: valueStyle)),
+            if (sub != null)
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: align,
+                child: Text(sub, maxLines: 1, style: TextStyle(color: kAmber, fontSize: size < 18 ? 11 : size * 0.6)),
+              ),
+          ]);
+        }
+        return FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: align,
+          child: Text.rich(
+            TextSpan(children: [
+              TextSpan(text: '$label ', style: TextStyle(color: labelColor ?? kMuted, fontSize: size * 0.85)),
+              TextSpan(text: value, style: valueStyle),
+            ]),
+            maxLines: 1,
+          ),
+        );
+      }
+
       Widget text(String t, {Color? color}) => FittedBox(
             fit: BoxFit.scaleDown,
             alignment: align,
@@ -173,12 +213,12 @@ class _DayViewState extends State<DayView> {
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Text(l == null ? '---' : fmtBg(l.mg, mmol), style: valueStyle),
               if (l != null && (s.flag('dayArrow') || s.flag('dayBgDelta'))) ...[
-                SizedBox(width: size * 0.06),
+                SizedBox(width: size * 0.095),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                  if (s.flag('dayArrow')) ArrowIcon(direction: l.direction, size: size * 0.4, color: col),
+                  if (s.flag('dayArrow')) ArrowIcon(direction: l.direction, size: size * 0.48, color: col),
                   if (s.flag('dayBgDelta')) ...[
-                    Text(delta == null ? '' : fmtDelta(delta, mmol), style: kMono.copyWith(fontSize: size * 0.17, color: kText)),
-                    Text(unitLabel(mmol), style: TextStyle(color: kMuted, fontSize: size * 0.11)),
+                    Text(delta == null ? '' : fmtDelta(delta, mmol), style: kMono.copyWith(fontSize: size * 0.2, color: kText)),
+                    Text(unitLabel(mmol), style: TextStyle(color: kMuted, fontSize: size * 0.14)),
                   ],
                 ]),
               ],
@@ -192,12 +232,13 @@ class _DayViewState extends State<DayView> {
           return pair('COB', d?.cob == null ? '–' : '${d!.cob!.round()}g');
         case 'basal':
           final temp = (d?.basalMinLeft ?? 0) > 0;
-          return pair(temp ? 'Temp' : 'Basal', d?.basal == null ? '–' : '${d!.basal!.toStringAsFixed(2)}U/h',
-              labelColor: temp ? kAmber : null);
+          final rate = d?.basal == null ? '–' : '${d!.basal!.toStringAsFixed(2)}U/h';
+          if (c.stack) return pair('Basal', rate, sub: temp ? 'Temp · ${d!.basalMinLeft!.round()} min' : null);
+          return pair(temp ? 'Temp' : 'Basal', rate, labelColor: temp ? kAmber : null);
         case 'reservoir':
-          return pair('Res', reservoir());
+          return pair(c.stack ? 'Reservoir' : 'Res', reservoir());
         case 'battery':
-          return pair('Batt', battery());
+          return pair(c.stack ? 'Pump battery' : 'Batt', battery());
         case 'bolus':
           return text(bolus == null ? 'No bolus in 24 h' : 'Bolus ${bolus.insulin!.toStringAsFixed(1)}U · ${fmtAge(now.difference(bolus.t))} ago');
         case 'carbs':
@@ -207,7 +248,8 @@ class _DayViewState extends State<DayView> {
         case 'cannula':
           return pair('Cannula', ageOf(app.siteChange));
         case 'phone':
-          return pair('Phone', d?.phoneBattery == null ? '–' : '${d!.phoneBattery}%');
+          if (d?.phoneBattery == null) return const SizedBox.shrink();
+          return pair(c.stack ? 'Looping phone' : 'Looping phone battery', '${d!.phoneBattery}%');
         case 'graph':
           return Container(
             padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
@@ -223,7 +265,7 @@ class _DayViewState extends State<DayView> {
                   ),
               ]),
               const SizedBox(height: 6),
-              BgChart(hours: hours, height: size),
+              BgChart(hours: hours, height: graphHeight(size)),
             ]),
           );
       }
@@ -254,9 +296,10 @@ class _DayViewState extends State<DayView> {
       return w;
     }
 
-    // Elements marked "same line as the one before" share a line.
+    // Elements marked "same line as the one before" share a line. Lines are
+    // worked out with hidden elements too, so hiding one doesn't move the others.
     final groups = <List<LineCfg>>[];
-    for (final c in s.day.where((c) => c.show)) {
+    for (final c in s.dayFor(wide)) {
       final canJoin = c.join && groups.isNotEmpty && c.id != 'graph' && groups.last.first.id != 'graph';
       if (canJoin) {
         groups.last.add(c);
@@ -264,6 +307,10 @@ class _DayViewState extends State<DayView> {
         groups.add([c]);
       }
     }
+    for (final g in groups) {
+      g.removeWhere((c) => !c.show);
+    }
+    groups.removeWhere((g) => g.isEmpty);
 
     final icons = Row(mainAxisSize: MainAxisSize.min, children: [
       IconButton(
@@ -280,27 +327,52 @@ class _DayViewState extends State<DayView> {
       ),
     ]);
 
-    final rows = <Widget>[];
-    for (var gi = 0; gi < groups.length; gi++) {
-      final g = groups[gi];
+    Widget line(List<LineCfg> g, {bool first = false}) {
       final children = <Widget>[];
       for (var i = 0; i < g.length; i++) {
-        if (i > 0) children.add(const SizedBox(width: 6));
+        if (i > 0) children.add(SizedBox(width: wide ? 10 : 6));
         children.add(Expanded(flex: g[i].flex, child: cell(g[i])));
       }
-      if (gi == 0) children.add(icons);
-      rows.add(Padding(
+      if (first) children.add(icons);
+      return Padding(
         padding: EdgeInsets.only(top: g.first.space),
         child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: children),
-      ));
-      if (gi == 0 && app.error != null && !widget.preview) {
-        rows.add(Container(
-          margin: const EdgeInsets.only(top: 4),
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: const Color(0xFF2A1F0E), borderRadius: BorderRadius.circular(10)),
-          child: Text(app.error!, style: const TextStyle(color: kAmber, fontSize: 13)),
-        ));
+      );
+    }
+
+    final errorBox = app.error == null || widget.preview
+        ? null
+        : Container(
+            margin: const EdgeInsets.only(top: 4),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: const Color(0xFF2A1F0E), borderRadius: BorderRadius.circular(10)),
+            child: Text(app.error!, style: const TextStyle(color: kAmber, fontSize: 13)),
+          );
+
+    final graphGroups = groups.where((g) => g.first.id == 'graph').toList();
+    final valueGroups = groups.where((g) => g.first.id != 'graph').toList();
+
+    if (wide && graphGroups.isNotEmpty) {
+      // Values on the left, graph on the right.
+      final left = <Widget>[];
+      for (var gi = 0; gi < valueGroups.length; gi++) {
+        left.add(line(valueGroups[gi], first: gi == 0));
+        if (gi == 0 && errorBox != null) left.add(errorBox);
       }
+      if (valueGroups.isEmpty) left.add(Align(alignment: Alignment.centerRight, child: icons));
+      return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(flex: 2, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: left)),
+          const SizedBox(width: 20),
+          Expanded(flex: 3, child: Column(mainAxisSize: MainAxisSize.min, children: [for (final g in graphGroups) cell(g.first)])),
+        ]),
+      ]);
+    }
+
+    final rows = <Widget>[];
+    for (var gi = 0; gi < groups.length; gi++) {
+      rows.add(line(groups[gi], first: gi == 0));
+      if (gi == 0 && errorBox != null) rows.add(errorBox);
     }
     if (groups.isEmpty) rows.add(Align(alignment: Alignment.centerRight, child: icons));
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: rows);
