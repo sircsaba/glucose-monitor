@@ -253,7 +253,12 @@ class _DayViewState extends State<DayView> {
 
       switch (c.id) {
         case 'ago':
-          return text(age == null ? 'No readings yet' : fmtAgo(age), color: stale ? kAmber : null);
+          // Like the loop status: a dot, flashing bright when the reading is old.
+          if (age == null) return text('No readings yet', color: kAmber);
+          return Align(
+            alignment: align,
+            child: LoopBadge(age: age, late: stale, size: size, text: fmtAgo(age), color: col),
+          );
         case 'loop':
           if (loopAge == null) return const SizedBox.shrink();
           return Align(alignment: align, child: LoopBadge(age: loopAge, late: loopAge.inMinutes >= s.integer('loopMin'), size: size));
@@ -478,7 +483,9 @@ class LoopBadge extends StatefulWidget {
   final Duration age;
   final bool late;
   final double size;
-  const LoopBadge({super.key, required this.age, required this.late, this.size = 13});
+  final String? text; // instead of "Loop 3 min"
+  final Color color; // text colour while on time
+  const LoopBadge({super.key, required this.age, required this.late, this.size = 13, this.text, this.color = kMuted});
   @override
   State<LoopBadge> createState() => _LoopBadgeState();
 }
@@ -525,9 +532,9 @@ class _LoopBadgeState extends State<LoopBadge> with SingleTickerProviderStateMix
       ),
       const SizedBox(width: 6),
       Text(
-        'Loop ${fmtAge(widget.age)}',
+        widget.text ?? 'Loop ${fmtAge(widget.age)}',
         style: TextStyle(
-          color: widget.late ? bright : kMuted,
+          color: widget.late ? bright : widget.color,
           fontSize: widget.size * (widget.late ? 1.15 : 1.0),
           fontWeight: widget.late ? FontWeight.w700 : FontWeight.w400,
         ),
