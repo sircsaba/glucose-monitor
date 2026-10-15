@@ -66,16 +66,13 @@ class DayView extends StatefulWidget {
   final bool preview;
   final String? highlight;
   final ValueChanged<String>? onSelect;
-  final bool? wide; // preview: which layout to show
+  final bool? wide; // preview: which default to show
   const DayView({super.key, this.preview = false, this.highlight, this.onSelect, this.wide});
 
-  /// Two columns (values left, graph right) on a wide screen, or as set.
-  static bool isWide(BuildContext context, {double? width}) {
-    final cols = app.settings.integer('dayColumns');
-    if (cols == 1) return false;
-    if (cols == 2) return true;
+  /// A computer screen or a wide window: picks the compact, larger default.
+  static bool isWide(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    return (width ?? size.width) >= 900 && size.width > size.height;
+    return size.width >= 900 && size.width > size.height;
   }
 
   @override
@@ -106,7 +103,7 @@ class _DayViewState extends State<DayView> {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: app,
-        builder: (c, _) => LayoutBuilder(builder: (c, box) => _content(c, widget.wide ?? DayView.isWide(c, width: box.maxWidth))),
+        builder: (c, _) => _content(c, widget.wide ?? DayView.isWide(c)),
       );
 
   Widget _content(BuildContext context, bool wide) {
@@ -135,13 +132,6 @@ class _DayViewState extends State<DayView> {
       if (d?.pumpBattery != null) return '${d!.pumpBattery}%';
       if (d?.pumpVolts != null) return '${d!.pumpVolts!.toStringAsFixed(2)}V';
       return '–';
-    }
-
-    // In two columns the graph fills the window's height.
-    double graphHeight(double size) {
-      if (!wide || widget.preview) return size;
-      final h = MediaQuery.of(context).size.height - 150;
-      return h > size ? h : size;
     }
 
     String ageOf(DateTime? t) => t == null ? '–' : fmtAge(now.difference(t));
@@ -265,7 +255,7 @@ class _DayViewState extends State<DayView> {
                   ),
               ]),
               const SizedBox(height: 6),
-              BgChart(hours: hours, height: graphHeight(size)),
+              BgChart(hours: hours, height: size),
             ]),
           );
       }
@@ -348,26 +338,6 @@ class _DayViewState extends State<DayView> {
             decoration: BoxDecoration(color: const Color(0xFF2A1F0E), borderRadius: BorderRadius.circular(10)),
             child: Text(app.error!, style: const TextStyle(color: kAmber, fontSize: 13)),
           );
-
-    final graphGroups = groups.where((g) => g.first.id == 'graph').toList();
-    final valueGroups = groups.where((g) => g.first.id != 'graph').toList();
-
-    if (wide && graphGroups.isNotEmpty) {
-      // Values on the left, graph on the right.
-      final left = <Widget>[];
-      for (var gi = 0; gi < valueGroups.length; gi++) {
-        left.add(line(valueGroups[gi], first: gi == 0));
-        if (gi == 0 && errorBox != null) left.add(errorBox);
-      }
-      if (valueGroups.isEmpty) left.add(Align(alignment: Alignment.centerRight, child: icons));
-      return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(flex: 2, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: left)),
-          const SizedBox(width: 20),
-          Expanded(flex: 3, child: Column(mainAxisSize: MainAxisSize.min, children: [for (final g in graphGroups) cell(g.first)])),
-        ]),
-      ]);
-    }
 
     final rows = <Widget>[];
     for (var gi = 0; gi < groups.length; gi++) {

@@ -45,7 +45,7 @@ class _DayLayoutScreenState extends State<DayLayoutScreen> {
           // The first change saves the layout shown (phone or wide default) as yours.
           void own(Settings x) {
             if (!x.flag('dayCustom')) {
-              x.day = Settings.defaultDay(wide: wide);
+              x.day = Settings.defaultDay(compact: wide, big: wide);
               x.set('dayCustom', true);
             }
           }
@@ -99,10 +99,41 @@ class _DayLayoutScreenState extends State<DayLayoutScreen> {
             const SizedBox(height: 8),
             Text(
               wide
-                  ? 'Wide screen layout: values on the left, graph on the right (fills the window height).'
-                  : 'Phone layout. On a computer or a wide window, the values and graph sit side by side.',
+                  ? 'Wide screen: the preview is drawn at computer width.'
+                  : 'Phone screen.',
               style: const TextStyle(color: kMuted, fontSize: 12),
             ),
+            const SizedBox(height: 12),
+            Section(title: 'Start from', padding: const EdgeInsets.all(12), children: [
+              Row(children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => app.change((x) {
+                      x.day = Settings.defaultDay();
+                      x.set('dayCustom', true);
+                    }),
+                    child: const Text('Original layout', textAlign: TextAlign.center),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => app.change((x) {
+                      x.day = Settings.defaultDay(compact: true, big: wide);
+                      x.set('dayCustom', true);
+                    }),
+                    child: const Text('Compact: one line, big BG', textAlign: TextAlign.center),
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 8),
+              const Text(
+                'Original: labels above the values, as on the phone. Compact: IOB, COB, basal, reservoir and pump '
+                'battery on one line with the name beside the value, the clock left of a bigger glucose value. '
+                'Then change anything below.',
+                style: TextStyle(color: kMuted, fontSize: 12, height: 1.4),
+              ),
+            ]),
             const SizedBox(height: 16),
             Wrap(spacing: 6, runSpacing: 6, children: [
               for (final l in list)
@@ -179,10 +210,10 @@ class _DayLayoutScreenState extends State<DayLayoutScreen> {
               ],
               RowBox(
                 child: Row(children: [
-                  const Expanded(child: Text('Order')),
-                  OutlinedButton(onPressed: () => move(-1), child: const Text('Move up')),
+                  const Expanded(child: Text('Position', style: TextStyle(fontSize: 15))),
+                  OutlinedButton(onPressed: () => move(-1), child: const Text('Earlier')),
                   const SizedBox(width: 8),
-                  OutlinedButton(onPressed: () => move(1), child: const Text('Move down')),
+                  OutlinedButton(onPressed: () => move(1), child: const Text('Later')),
                 ]),
               ),
               StepRow(
@@ -200,9 +231,6 @@ class _DayLayoutScreenState extends State<DayLayoutScreen> {
                 setSwitch('Temp basal under graph', 'showBasal'),
                 setChoice('Dot size', 'dotSize', const ['Small', 'Medium', 'Large']),
               ],
-            ]),
-            Section(title: 'Whole screen', children: [
-              setChoice('Columns', 'dayColumns', const ['Auto (two on a wide screen)', 'Always one column', 'Always two columns']),
             ]),
             const Text(
               'Each phone, tablet and browser keeps its own layout. '
