@@ -154,6 +154,7 @@ class _DayLayoutScreenState extends State<DayLayoutScreen> {
                 setInt('Flash when the loop has not run for', 'loopMin', step: 5, min: 10, max: 120, unit: 'min',
                     hint: 'Same as the loop alarm setting'),
               if (cur.id == 'bg') ...[
+                setInt('Arrow length', 'arrowLen', step: 10, min: 100, max: 250, unit: '%', hint: '100 % is the short arrow'),
                 setSwitch('Trend arrow next to the value', 'dayArrow'),
                 setSwitch('Change and units next to the value', 'dayBgDelta'),
               ],
@@ -169,6 +170,12 @@ class _DayLayoutScreenState extends State<DayLayoutScreen> {
                   hint: 'Elements on one line share its width',
                   value: cur.join,
                   onChanged: (v) => upd((c) => c.join = v),
+                ),
+                SwitchRow(
+                  label: 'Under the element before',
+                  hint: 'Same spot on the line, one above the other (like last bolus over last carbs)',
+                  value: cur.under,
+                  onChanged: (v) => upd((c) => c.under = v),
                 ),
                 StepRow(
                   label: 'Width on its line',

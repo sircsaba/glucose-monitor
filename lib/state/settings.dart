@@ -130,6 +130,7 @@ class LineCfg {
   bool join; // on the same line as the element before
   bool box; // drawn on a card
   bool stack; // label above the value (instead of beside it)
+  bool under; // under the element before, in the same spot on its line
 
   LineCfg({
     required this.id,
@@ -144,6 +145,7 @@ class LineCfg {
     this.join = false,
     this.box = false,
     this.stack = false,
+    this.under = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -159,6 +161,7 @@ class LineCfg {
         'join': join,
         'box': box,
         'stack': stack,
+        'under': under,
       };
 
   factory LineCfg.fromJson(Map<String, dynamic> j) => LineCfg(
@@ -174,6 +177,7 @@ class LineCfg {
         join: j['join'] == true,
         box: j['box'] == true,
         stack: j['stack'] == true,
+        under: j['under'] == true,
       );
 }
 
@@ -263,6 +267,7 @@ class Settings {
     'tipTreat': 2, // mouse over a treatment: same choices
     'navCompact': 0, // bottom bar: 0 thin on a computer, 1 always thin, 2 always normal
     'graphFit': 0, // 0 fit the screen on a computer, 1 always fit the screen, 2 fixed height
+    'arrowLen': 150, // day view trend arrow length, percent
     'dayArrow': true,
     'dayBgDelta': true, // change and units next to the glucose value
     'dayCustom': false, // false = default layout for the screen (original on phones, compact on wide screens)
@@ -404,6 +409,8 @@ class Settings {
         LineCfg(id: 'clock', size: 44, zoneColor: false, color: blue, align: 'left', space: 12, flex: 3),
         LineCfg(id: 'bg', size: 170, align: 'center', space: 12, bold: true, flex: 7, join: true),
         LineCfg(id: 'delta', size: 24, zoneColor: false, color: white, align: 'right', space: 0, flex: 2, join: true, show: false),
+        LineCfg(id: 'bolus', size: 20, zoneColor: false, color: soft, align: 'left', space: 0, flex: 3, join: true),
+        LineCfg(id: 'carbs', size: 20, zoneColor: false, color: soft, align: 'left', space: 8, flex: 3, under: true),
         LineCfg(id: 'iob', size: 22, zoneColor: false, color: white, space: 16, flex: 2, box: true),
         LineCfg(id: 'cob', size: 22, zoneColor: false, color: white, space: 16, flex: 2, box: true, join: true),
         LineCfg(id: 'basal', size: 22, zoneColor: false, color: white, space: 16, flex: 3, box: true, join: true),
@@ -412,8 +419,6 @@ class Settings {
         LineCfg(id: 'sensor', size: 22, zoneColor: false, color: white, space: 16, flex: 3, box: true, join: true),
         LineCfg(id: 'cannula', size: 22, zoneColor: false, color: white, space: 16, flex: 3, box: true, join: true),
         LineCfg(id: 'phone', size: 22, zoneColor: false, color: white, space: 16, flex: 2, box: true, join: true),
-        LineCfg(id: 'bolus', size: 20, zoneColor: false, color: soft, align: 'left', space: 18),
-        LineCfg(id: 'carbs', size: 20, zoneColor: false, color: soft, align: 'right', space: 18, join: true),
         LineCfg(id: 'graph', size: 420, space: 14),
       ];
     }
