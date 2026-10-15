@@ -95,6 +95,8 @@ class DisplaySettingsScreen extends StatelessWidget {
             index: s.integer('dotSize'),
             onChanged: (i) => app.change((x) => x.set('dotSize', i)),
           ),
+          setChoice('Bottom bar (Live, Treat…)', 'navCompact', const ['Thin on a computer', 'Always thin', 'Always normal'],
+              hint: 'Thin leaves more room for the graph'),
           ...graphGridSettings(),
           setSwitch('Prediction', 'showPrediction'),
           setSwitch('Temp basal under graph', 'showBasal'),

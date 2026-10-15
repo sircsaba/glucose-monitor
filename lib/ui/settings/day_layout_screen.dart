@@ -227,6 +227,8 @@ class _DayLayoutScreenState extends State<DayLayoutScreen> {
               if (isGraph) ...[
                 setChoice('Graph height', 'graphFit', const ['Fit the screen on a computer', 'Always fit the screen', 'Fixed (Graph height above)'],
                     hint: 'Fit: the graph uses the room left, so the whole page shows without scrolling'),
+                setChoice('Bottom bar (Live, Treat…)', 'navCompact', const ['Thin on a computer', 'Always thin', 'Always normal'],
+                    hint: 'Thin leaves more room for the graph'),
                 ...graphGridSettings(),
                 setSwitch('Treatments on the graph', 'showTreatments', hint: 'Boluses and carbs'),
                 setInt('Treatment size', 'treatSize', step: 10, min: 50, max: 300, unit: '%'),
