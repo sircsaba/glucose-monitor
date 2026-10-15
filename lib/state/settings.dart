@@ -257,6 +257,10 @@ class Settings {
     'showTreatments': true,
     'treatSize': 100, // treatment markers on the graph, percent
     'treatPlace': 0, // 0 = top of the graph, 1 = on the glucose line
+    'gridLines': true, // dotted grid on the graph
+    'gridMinutes': [15, 15, 15, 30, 60], // minutes between time lines, for each graph button
+    'tipBg': 2, // mouse over a reading: 0 nothing, 1 value, 2 value and time, 3 time
+    'tipTreat': 2, // mouse over a treatment: same choices
     'graphFit': 0, // 0 fit the screen on a computer, 1 always fit the screen, 2 fixed height
     'dayArrow': true,
     'dayBgDelta': true, // change and units next to the glucose value

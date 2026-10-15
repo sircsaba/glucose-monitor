@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../state/app_state.dart';
 import '../../state/settings.dart';
+import '../bg_chart.dart';
 import '../common.dart';
 
 /// Hours a graph button can show.
@@ -94,6 +95,7 @@ class DisplaySettingsScreen extends StatelessWidget {
             index: s.integer('dotSize'),
             onChanged: (i) => app.change((x) => x.set('dotSize', i)),
           ),
+          ...graphGridSettings(),
           setSwitch('Prediction', 'showPrediction'),
           setSwitch('Temp basal under graph', 'showBasal'),
           setSwitch('Treatments on the graph', 'showTreatments', hint: 'Boluses and carbs'),
