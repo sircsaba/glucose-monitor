@@ -408,12 +408,12 @@ class Settings {
         LineCfg(id: 'basal', size: 22, zoneColor: false, color: white, space: 16, flex: 3, box: true, join: true),
         LineCfg(id: 'reservoir', size: 22, zoneColor: false, color: white, space: 16, flex: 2, box: true, join: true),
         LineCfg(id: 'battery', size: 22, zoneColor: false, color: white, space: 16, flex: 2, box: true, join: true),
+        LineCfg(id: 'sensor', size: 22, zoneColor: false, color: white, space: 16, flex: 3, box: true, join: true),
+        LineCfg(id: 'cannula', size: 22, zoneColor: false, color: white, space: 16, flex: 3, box: true, join: true),
+        LineCfg(id: 'phone', size: 22, zoneColor: false, color: white, space: 16, flex: 2, box: true, join: true),
         LineCfg(id: 'bolus', size: 20, zoneColor: false, color: soft, align: 'left', space: 18),
         LineCfg(id: 'carbs', size: 20, zoneColor: false, color: soft, align: 'right', space: 18, join: true),
         LineCfg(id: 'graph', size: 420, space: 14),
-        LineCfg(id: 'sensor', size: 20, zoneColor: false, color: soft, align: 'left', space: 16),
-        LineCfg(id: 'cannula', size: 20, zoneColor: false, color: soft, space: 16, join: true),
-        LineCfg(id: 'phone', size: 20, zoneColor: false, color: soft, align: 'right', space: 16, join: true),
       ];
     }
     const k = 1.0;
