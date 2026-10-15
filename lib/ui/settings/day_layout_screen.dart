@@ -147,6 +147,12 @@ class _DayLayoutScreenState extends State<DayLayoutScreen> {
             const SizedBox(height: 14),
             Section(title: kDayNames[cur.id], children: [
               SwitchRow(label: 'Show', value: cur.show, onChanged: (v) => upd((c) => c.show = v)),
+              if (cur.id == 'ago')
+                setInt('Flash when the reading is older than', 'nightStaleMin', step: 1, min: 5, max: 30, unit: 'min',
+                    hint: 'Also marks the reading as old in the night view'),
+              if (cur.id == 'loop')
+                setInt('Flash when the loop has not run for', 'loopMin', step: 5, min: 10, max: 120, unit: 'min',
+                    hint: 'Same as the loop alarm setting'),
               if (cur.id == 'bg') ...[
                 setSwitch('Trend arrow next to the value', 'dayArrow'),
                 setSwitch('Change and units next to the value', 'dayBgDelta'),
