@@ -154,7 +154,21 @@ class _DayLayoutScreenState extends State<DayLayoutScreen> {
                 setInt('Flash when the loop has not run for', 'loopMin', step: 5, min: 10, max: 120, unit: 'min',
                     hint: 'Same as the loop alarm setting'),
               if (cur.id == 'bg') ...[
-                setInt('Arrow length', 'arrowLen', step: 10, min: 100, max: 250, unit: '%', hint: '100 % is the short arrow'),
+                StepRow(
+                  label: 'Arrow length',
+                  hint: '100 % is the short arrow. Auto: 150 % on a computer, 100 % on a phone',
+                  value: s.integer('arrowLen') <= 0 ? 'Auto' : '${s.integer('arrowLen')} %',
+                  onMinus: () => app.change((x) {
+                    final v = x.integer('arrowLen');
+                    x.set('arrowLen', v <= 0 ? 0 : (v - 10 < 100 ? 0 : v - 10));
+                  }),
+                  onPlus: () => app.change((x) {
+                    final v = x.integer('arrowLen');
+                    x.set('arrowLen', v <= 0 ? 100 : (v + 10).clamp(100, 250));
+                  }),
+                ),
+                setChoice('Arrow and change', 'bgSide', const ['Auto (side by side on a computer)', 'Stacked beside the value', 'Side by side'],
+                    hint: 'Side by side keeps this line no taller than the number'),
                 setSwitch('Trend arrow next to the value', 'dayArrow'),
                 setSwitch('Change and units next to the value', 'dayBgDelta'),
               ],
