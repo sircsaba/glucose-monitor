@@ -78,6 +78,7 @@ class _BgChartState extends State<BgChart> {
           treatScale: (s.integer('treatSize') / 100.0).clamp(0.5, 3.0),
           treatOnLine: s.integer('treatPlace') == 1,
           grid: s.flag('gridLines'),
+          basalLabels: s.flag('basalLabels'),
           gridMin: gridMin,
           hover: _pos,
           tipBg: tipBg,
@@ -125,6 +126,7 @@ class _BgPainter extends CustomPainter {
   final double treatScale;
   final bool treatOnLine;
   final bool grid;
+  final bool basalLabels;
   final int gridMin;
   final Offset? hover;
   final int tipBg; // 0 nothing, 1 value, 2 value and time, 3 time
@@ -147,6 +149,7 @@ class _BgPainter extends CustomPainter {
     required this.treatScale,
     required this.treatOnLine,
     required this.grid,
+    required this.basalLabels,
     required this.gridMin,
     required this.hover,
     required this.tipBg,
@@ -181,7 +184,7 @@ class _BgPainter extends CustomPainter {
     final k = treatScale;
     final top = showTreat && !treatOnLine ? 30.0 * k : (showTreat ? 8.0 + 14 * k : 8.0);
     const bottomLabels = 16.0;
-    final basalH = showBasal ? 30.0 : 0.0;
+    final basalH = showBasal ? (basalLabels ? 42.0 : 30.0) : 0.0;
     final plotBottom = size.height - bottomLabels - basalH - 4;
     final w = size.width - left - right;
     final plotH = plotBottom - top;
@@ -272,6 +275,8 @@ class _BgPainter extends CustomPainter {
         maxRate = math.max(maxRate, t.absolute!);
       }
       final fill = Paint()..color = const Color(0xFF2B4A63);
+      final barMax = basalH - (basalLabels ? 16 : 4);
+      final runs = <List<double>>[]; // x1, x2, rate, bar top
       for (var i = 0; i < temps.length; i++) {
         final t = temps[i];
         var end = t.t.add(Duration(seconds: (t.duration! * 60).round()));
@@ -279,8 +284,27 @@ class _BgPainter extends CustomPainter {
         if (end.isBefore(tStart) || t.t.isAfter(tEnd)) continue;
         final x1 = math.max(left, x(t.t));
         final x2 = math.min(left + w, x(end));
-        final hh = t.absolute! / maxRate * (basalH - 4);
+        final hh = t.absolute! / maxRate * barMax;
         canvas.drawRect(Rect.fromLTRB(x1, base - hh, x2, base), fill);
+        // Neighbouring bars with the same rate get one label.
+        final r = (t.absolute! * 100).round() / 100;
+        if (runs.isNotEmpty && runs.last[2] == r && (x1 - runs.last[1]).abs() < 1.5) {
+          runs.last[1] = x2;
+        } else {
+          runs.add([x1, x2, r, base - hh]);
+        }
+      }
+      // The rate (U/h) on top of each bar, where it fits.
+      if (basalLabels) {
+        for (final run in runs) {
+          final label = run[2].toStringAsFixed(2);
+          final tp = TextPainter(
+            text: TextSpan(text: label, style: const TextStyle(color: Color(0xFF9CC3E0), fontSize: 9.5)),
+            textDirection: TextDirection.ltr,
+          )..layout();
+          if (run[1] - run[0] < tp.width + 4) continue;
+          tp.paint(canvas, Offset((run[0] + run[1]) / 2 - tp.width / 2, run[3] - tp.height - 1));
+        }
       }
       _text(canvas, 'basal', Offset(left + 2, base - basalH + 8), size: 9);
     }
@@ -517,6 +541,7 @@ List<Widget> graphGridSettings() {
   const tips = ['Nothing', 'Value', 'Value and time', 'Time only'];
   return [
     setSwitch('Grid lines', 'gridLines', hint: 'Dotted lines across and down the graph'),
+    setSwitch('Basal rate on the bars', 'basalLabels', hint: 'U/h written on top of the temp basal bars, where there is room'),
     for (var i = 0; i < 5 && i < buttons.length; i++)
       StepRow(
         label: 'Time lines on the ${buttons[i]} h graph',
