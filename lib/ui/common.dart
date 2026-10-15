@@ -356,6 +356,8 @@ const Map<String, int> kSwatches = {
   'Grey': 0xFF9AA4B2,
   'Dark grey': 0xFF5C6672,
   'Blue': 0xFF5BC0EB,
+  'Light blue': 0xFF9CC3E0,
+  'Navy': 0xFF2B4A63,
   'Deep blue': 0xFF3D7BF7,
   'Teal': 0xFF2EC4B6,
   'Green': 0xFF3DBE7A,

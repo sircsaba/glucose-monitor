@@ -79,6 +79,10 @@ class _BgChartState extends State<BgChart> {
           treatOnLine: s.integer('treatPlace') == 1,
           grid: s.flag('gridLines'),
           basalLabels: s.flag('basalLabels'),
+          basalBar: Color(s.integer('basalBarColor')),
+          basalText: Color(s.integer('basalTextColor')),
+          basalSize: s.number('basalTextSize').clamp(7.0, 30.0),
+          basalBold: s.flag('basalTextBold'),
           gridMin: gridMin,
           hover: _pos,
           tipBg: tipBg,
@@ -127,6 +131,10 @@ class _BgPainter extends CustomPainter {
   final bool treatOnLine;
   final bool grid;
   final bool basalLabels;
+  final Color basalBar;
+  final Color basalText;
+  final double basalSize;
+  final bool basalBold;
   final int gridMin;
   final Offset? hover;
   final int tipBg; // 0 nothing, 1 value, 2 value and time, 3 time
@@ -150,6 +158,10 @@ class _BgPainter extends CustomPainter {
     required this.treatOnLine,
     required this.grid,
     required this.basalLabels,
+    required this.basalBar,
+    required this.basalText,
+    required this.basalSize,
+    required this.basalBold,
     required this.gridMin,
     required this.hover,
     required this.tipBg,
@@ -184,7 +196,7 @@ class _BgPainter extends CustomPainter {
     final k = treatScale;
     final top = showTreat && !treatOnLine ? 30.0 * k : (showTreat ? 8.0 + 14 * k : 8.0);
     const bottomLabels = 16.0;
-    final basalH = showBasal ? (basalLabels ? 42.0 : 30.0) : 0.0;
+    final basalH = showBasal ? (basalLabels ? 30.0 + basalSize * 1.3 : 30.0) : 0.0;
     final plotBottom = size.height - bottomLabels - basalH - 4;
     final w = size.width - left - right;
     final plotH = plotBottom - top;
@@ -274,8 +286,8 @@ class _BgPainter extends CustomPainter {
       for (final t in temps) {
         maxRate = math.max(maxRate, t.absolute!);
       }
-      final fill = Paint()..color = const Color(0xFF2B4A63);
-      final barMax = basalH - (basalLabels ? 16 : 4);
+      final fill = Paint()..color = basalBar;
+      final barMax = basalH - (basalLabels ? basalSize * 1.3 + 4 : 4);
       final runs = <List<double>>[]; // x1, x2, rate, bar top
       for (var i = 0; i < temps.length; i++) {
         final t = temps[i];
@@ -299,7 +311,10 @@ class _BgPainter extends CustomPainter {
         for (final run in runs) {
           final label = run[2].toStringAsFixed(2);
           final tp = TextPainter(
-            text: TextSpan(text: label, style: const TextStyle(color: Color(0xFF9CC3E0), fontSize: 9.5)),
+            text: TextSpan(
+              text: label,
+              style: TextStyle(color: basalText, fontSize: basalSize, fontWeight: basalBold ? FontWeight.w700 : FontWeight.w400),
+            ),
             textDirection: TextDirection.ltr,
           )..layout();
           if (run[1] - run[0] < tp.width + 4) continue;
@@ -542,6 +557,15 @@ List<Widget> graphGridSettings() {
   return [
     setSwitch('Grid lines', 'gridLines', hint: 'Dotted lines across and down the graph'),
     setSwitch('Basal rate on the bars', 'basalLabels', hint: 'U/h written on top of the temp basal bars, where there is room'),
+    StepRow(
+      label: 'Basal numbers size',
+      value: '${app.settings.number('basalTextSize').toStringAsFixed(app.settings.number('basalTextSize') % 1 == 0 ? 0 : 1)} px',
+      onMinus: () => app.change((x) => x.set('basalTextSize', (x.number('basalTextSize') - 1).clamp(7.0, 30.0).roundToDouble())),
+      onPlus: () => app.change((x) => x.set('basalTextSize', (x.number('basalTextSize') + 1).clamp(7.0, 30.0).roundToDouble())),
+    ),
+    setSwitch('Basal numbers bold', 'basalTextBold'),
+    _colorRow('Basal numbers colour', 'basalTextColor'),
+    _colorRow('Basal bars colour', 'basalBarColor'),
     for (var i = 0; i < 5 && i < buttons.length; i++)
       StepRow(
         label: 'Time lines on the ${buttons[i]} h graph',
@@ -553,3 +577,12 @@ List<Widget> graphGridSettings() {
     setChoice('Mouse over a treatment shows', 'tipTreat', tips),
   ];
 }
+
+Widget _colorRow(String label, String key) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(label, style: const TextStyle(fontSize: 15)),
+        const SizedBox(height: 8),
+        ColorPick(dot: 32, value: app.settings.integer(key), onPick: (v) => app.change((x) => x.set(key, v))),
+      ]),
+    );
