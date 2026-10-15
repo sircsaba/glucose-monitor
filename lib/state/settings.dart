@@ -267,7 +267,8 @@ class Settings {
     'tipTreat': 2, // mouse over a treatment: same choices
     'navCompact': 0, // bottom bar: 0 thin on a computer, 1 always thin, 2 always normal
     'graphFit': 0, // 0 fit the screen on a computer, 1 always fit the screen, 2 fixed height
-    'arrowLen': 150, // day view trend arrow length, percent
+    'arrowLen': 0, // day view trend arrow length, percent (0 = auto: 150 on a computer, 100 on a phone)
+    'bgSide': 0, // arrow and change: 0 auto (side by side on a computer), 1 stacked, 2 side by side
     'dayArrow': true,
     'dayBgDelta': true, // change and units next to the glucose value
     'dayCustom': false, // false = default layout for the screen (original on phones, compact on wide screens)
@@ -406,12 +407,12 @@ class Settings {
       return [
         LineCfg(id: 'ago', size: 18, zoneColor: false, color: grey, align: 'left', space: 0),
         LineCfg(id: 'loop', size: 18, zoneColor: false, color: grey, align: 'right', space: 0, join: true),
-        LineCfg(id: 'clock', size: 44, zoneColor: false, color: blue, align: 'left', space: 12, flex: 3),
-        LineCfg(id: 'bg', size: 170, align: 'center', space: 12, bold: true, flex: 7, join: true),
+        LineCfg(id: 'clock', size: 44, zoneColor: false, color: blue, align: 'left', space: 0, flex: 3),
+        LineCfg(id: 'bg', size: 170, align: 'center', space: 0, bold: true, flex: 7, join: true),
         LineCfg(id: 'delta', size: 24, zoneColor: false, color: white, align: 'right', space: 0, flex: 2, join: true, show: false),
         LineCfg(id: 'bolus', size: 20, zoneColor: false, color: soft, align: 'left', space: 0, flex: 3, join: true),
         LineCfg(id: 'carbs', size: 20, zoneColor: false, color: soft, align: 'left', space: 8, flex: 3, under: true),
-        LineCfg(id: 'iob', size: 22, zoneColor: false, color: white, space: 16, flex: 2, box: true),
+        LineCfg(id: 'iob', size: 22, zoneColor: false, color: white, space: 8, flex: 2, box: true),
         LineCfg(id: 'cob', size: 22, zoneColor: false, color: white, space: 16, flex: 2, box: true, join: true),
         LineCfg(id: 'basal', size: 22, zoneColor: false, color: white, space: 16, flex: 3, box: true, join: true),
         LineCfg(id: 'reservoir', size: 22, zoneColor: false, color: white, space: 16, flex: 2, box: true, join: true),

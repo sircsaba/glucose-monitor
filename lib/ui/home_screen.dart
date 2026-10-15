@@ -265,28 +265,43 @@ class _DayViewState extends State<DayView> {
         case 'clock':
           return text(fmtClock(now, s.flag('time24')));
         case 'bg':
+          // Side by side (computer): value, arrow, then change over units; the
+          // row is no taller than the number. Stacked (phone): arrow over change and units.
+          final sideMode = s.integer('bgSide');
+          final inRow = sideMode == 2 || (sideMode == 0 && wide);
+          final lenSet = s.integer('arrowLen');
+          final arrowLen = (lenSet <= 0 ? (wide ? 150 : 100) : lenSet) / 100.0;
           final valueStyle = kMono.copyWith(
             fontSize: size,
-            height: 1,
+            height: inRow ? 0.86 : 1,
             fontWeight: weight,
             color: col,
             letterSpacing: -size * 0.02,
             decoration: stale && l != null ? TextDecoration.lineThrough : null,
           );
+          final showArrow = l != null && s.flag('dayArrow');
+          final showDelta = l != null && s.flag('dayBgDelta');
+          final deltaText = Text(delta == null ? '' : fmtDelta(delta, mmol), style: kMono.copyWith(fontSize: size * 0.2, color: kText, height: 1.1));
+          final unitText = Text(unitLabel(mmol), style: TextStyle(color: kMuted, fontSize: size * 0.14, height: 1.1));
           return FittedBox(
             fit: BoxFit.scaleDown,
             alignment: align,
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
+            child: Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.center, children: [
               Text(l == null ? '---' : fmtBg(l.mg, mmol), style: valueStyle),
-              if (l != null && (s.flag('dayArrow') || s.flag('dayBgDelta'))) ...[
+              if (inRow) ...[
+                if (showArrow) ...[
+                  SizedBox(width: size * 0.06),
+                  ArrowIcon(direction: l.direction, size: size * 0.48, color: col, length: arrowLen),
+                ],
+                if (showDelta) ...[
+                  SizedBox(width: size * 0.06),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [deltaText, unitText]),
+                ],
+              ] else if (showArrow || showDelta) ...[
                 SizedBox(width: size * 0.095),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                  if (s.flag('dayArrow'))
-                    ArrowIcon(direction: l.direction, size: size * 0.48, color: col, length: s.integer('arrowLen') / 100.0),
-                  if (s.flag('dayBgDelta')) ...[
-                    Text(delta == null ? '' : fmtDelta(delta, mmol), style: kMono.copyWith(fontSize: size * 0.2, color: kText)),
-                    Text(unitLabel(mmol), style: TextStyle(color: kMuted, fontSize: size * 0.14)),
-                  ],
+                  if (showArrow) ArrowIcon(direction: l.direction, size: size * 0.48, color: col, length: arrowLen),
+                  if (showDelta) ...[deltaText, unitText],
                 ]),
               ],
             ]),
