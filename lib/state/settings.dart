@@ -257,6 +257,7 @@ class Settings {
     'showTreatments': true,
     'treatSize': 100, // treatment markers on the graph, percent
     'treatPlace': 0, // 0 = top of the graph, 1 = on the glucose line
+    'graphFit': 0, // 0 fit the screen on a computer, 1 always fit the screen, 2 fixed height
     'dayArrow': true,
     'dayBgDelta': true, // change and units next to the glucose value
     'dayCustom': false, // false = default layout for the screen (original on phones, compact on wide screens)

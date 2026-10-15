@@ -49,12 +49,28 @@ class LiveScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: () => app.refresh(),
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(12, 2, 12, 20),
-        children: const [DayView()],
-      ),
+    return ListenableBuilder(
+      listenable: app,
+      builder: (context, _) {
+        const pad = EdgeInsets.fromLTRB(12, 2, 12, 12);
+        if (!DayView.fitsGraph(context)) {
+          return RefreshIndicator(
+            onRefresh: () => app.refresh(),
+            child: ListView(padding: pad, children: const [DayView()]),
+          );
+        }
+        // The graph takes the room that is left, so everything fits the screen.
+        // On a screen too small for that, the page scrolls instead.
+        return RefreshIndicator(
+          onRefresh: () => app.refresh(),
+          child: const CustomScrollView(slivers: [
+            SliverPadding(
+              padding: pad,
+              sliver: SliverFillRemaining(hasScrollBody: false, child: DayView(fill: true)),
+            ),
+          ]),
+        );
+      },
     );
   }
 }
@@ -67,7 +83,14 @@ class DayView extends StatefulWidget {
   final String? highlight;
   final ValueChanged<String>? onSelect;
   final bool? wide; // preview: which default to show
-  const DayView({super.key, this.preview = false, this.highlight, this.onSelect, this.wide});
+  final bool fill; // the graph takes the height that is left
+  const DayView({super.key, this.preview = false, this.highlight, this.onSelect, this.wide, this.fill = false});
+
+  /// Graph height: fit the screen (on a computer by default), or the fixed size.
+  static bool fitsGraph(BuildContext context) {
+    final mode = app.settings.integer('graphFit');
+    return mode == 1 || (mode == 0 && isWide(context));
+  }
 
   /// A computer screen or a wide window: picks the compact, larger default.
   static bool isWide(BuildContext context) {
@@ -255,7 +278,7 @@ class _DayViewState extends State<DayView> {
                   ),
               ]),
               const SizedBox(height: 6),
-              BgChart(hours: hours, height: size),
+              if (widget.fill) Expanded(child: BgChart(hours: hours, height: null)) else BgChart(hours: hours, height: size),
             ]),
           );
       }
@@ -340,12 +363,29 @@ class _DayViewState extends State<DayView> {
           );
 
     final rows = <Widget>[];
+    var filled = false;
     for (var gi = 0; gi < groups.length; gi++) {
-      rows.add(line(groups[gi], first: gi == 0));
+      final g = groups[gi];
+      if (widget.fill && !filled && g.first.id == 'graph') {
+        // The graph stretches into the free height (at least 180 px).
+        filled = true;
+        rows.add(Expanded(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 180),
+            child: Padding(padding: EdgeInsets.only(top: g.first.space), child: cell(g.first)),
+          ),
+        ));
+        continue;
+      }
+      rows.add(line(g, first: gi == 0));
       if (gi == 0 && errorBox != null) rows.add(errorBox);
     }
     if (groups.isEmpty) rows.add(Align(alignment: Alignment.centerRight, child: icons));
-    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: rows);
+    return Column(
+      mainAxisSize: filled ? MainAxisSize.max : MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: rows,
+    );
   }
 }
 

@@ -11,7 +11,7 @@ import 'common.dart';
 /// Glucose graph: dots by zone, prediction, treatments and temp basal.
 class BgChart extends StatelessWidget {
   final int hours;
-  final double height;
+  final double? height; // null: take the height it is given (graph fits the screen)
   const BgChart({super.key, required this.hours, this.height = 260});
 
   @override
