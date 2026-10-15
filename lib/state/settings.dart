@@ -259,8 +259,7 @@ class Settings {
     'treatPlace': 0, // 0 = top of the graph, 1 = on the glucose line
     'dayArrow': true,
     'dayBgDelta': true, // change and units next to the glucose value
-    'dayCustom': false, // false = default layout for the screen shape (phone or wide)
-    'dayColumns': 0, // 0 auto (two columns on wide screens), 1 one column, 2 two columns
+    'dayCustom': false, // false = default layout for the screen (original on phones, compact on wide screens)
     'tirLo': 70.0,
     'tirHi': 180.0,
     // Other alarms
@@ -362,17 +361,20 @@ class Settings {
         LineCfg(id: 'graph', size: 70, space: 20),
       ];
 
-  /// Default day view. Phone: the original layout. Wide (computer, tablet in
-  /// landscape): bigger values on the left, the graph on the right.
-  static List<LineCfg> defaultDay({bool wide = false}) {
+  /// Day view presets. Original: the first phone layout (labels above values).
+  /// Compact: IOB, COB, basal, reservoir and pump battery on one line with the
+  /// label beside the value, the clock left of a bigger glucose value.
+  /// [big] makes everything larger for a computer screen.
+  static List<LineCfg> defaultDay({bool compact = false, bool big = false}) {
     const white = 0xFFE6EDF3;
     const grey = 0xFF9AA4B2;
     const soft = 0xFFC4CCD6;
-    if (!wide) {
+    const blue = 0xFF5BC0EB;
+    if (!compact) {
       return [
         LineCfg(id: 'ago', size: 13, zoneColor: false, color: grey, align: 'left', space: 0),
         LineCfg(id: 'loop', size: 13, zoneColor: false, color: grey, align: 'right', space: 0, join: true),
-        LineCfg(id: 'clock', size: 20, zoneColor: false, color: 0xFF5BC0EB, align: 'left', space: 8, flex: 2, show: false),
+        LineCfg(id: 'clock', size: 20, zoneColor: false, color: blue, align: 'left', space: 8, flex: 2, show: false),
         LineCfg(id: 'bg', size: 84, align: 'center', space: 8, bold: true, flex: 8, join: true),
         LineCfg(id: 'delta', size: 18, zoneColor: false, color: white, align: 'right', space: 0, flex: 2, join: true, show: false),
         LineCfg(id: 'iob', size: 18, zoneColor: false, color: white, align: 'left', space: 8, box: true, stack: true, bold: true),
@@ -388,29 +390,31 @@ class Settings {
         LineCfg(id: 'phone', size: 12, zoneColor: false, color: grey, space: 8),
       ];
     }
+    final k = big ? 1.7 : 1.0;
+    double z(double v) => (v * k).roundToDouble();
     return [
-      LineCfg(id: 'ago', size: 18, zoneColor: false, color: grey, align: 'left', space: 0),
-      LineCfg(id: 'loop', size: 18, zoneColor: false, color: grey, align: 'right', space: 0, join: true),
-      LineCfg(id: 'clock', size: 44, zoneColor: false, color: 0xFF5BC0EB, align: 'left', space: 12, flex: 3),
-      LineCfg(id: 'bg', size: 170, align: 'center', space: 12, bold: true, flex: 7, join: true),
-      LineCfg(id: 'delta', size: 24, zoneColor: false, color: white, align: 'right', space: 0, flex: 2, join: true, show: false),
-      LineCfg(id: 'iob', size: 22, zoneColor: false, color: white, space: 16, box: true),
-      LineCfg(id: 'cob', size: 22, zoneColor: false, color: white, space: 16, box: true, join: true),
-      LineCfg(id: 'basal', size: 22, zoneColor: false, color: white, space: 16, flex: 2, box: true, join: true),
-      LineCfg(id: 'reservoir', size: 22, zoneColor: false, color: white, space: 10, box: true),
-      LineCfg(id: 'battery', size: 22, zoneColor: false, color: white, space: 10, box: true, join: true),
-      LineCfg(id: 'phone', size: 22, zoneColor: false, color: white, space: 10, box: true, join: true),
-      LineCfg(id: 'bolus', size: 20, zoneColor: false, color: soft, align: 'left', space: 18),
-      LineCfg(id: 'carbs', size: 20, zoneColor: false, color: soft, align: 'left', space: 8),
-      LineCfg(id: 'sensor', size: 20, zoneColor: false, color: soft, align: 'left', space: 18),
-      LineCfg(id: 'cannula', size: 20, zoneColor: false, color: soft, align: 'left', space: 18, join: true),
-      LineCfg(id: 'graph', size: 420, space: 0),
+      LineCfg(id: 'ago', size: z(13), zoneColor: false, color: grey, align: 'left', space: 0),
+      LineCfg(id: 'loop', size: z(13), zoneColor: false, color: grey, align: 'right', space: 0, join: true),
+      LineCfg(id: 'clock', size: z(26), zoneColor: false, color: blue, align: 'left', space: z(4), flex: 2),
+      LineCfg(id: 'bg', size: z(110), align: 'center', space: z(4), bold: true, flex: 8, join: true),
+      LineCfg(id: 'delta', size: z(18), zoneColor: false, color: white, align: 'right', space: 0, flex: 2, join: true, show: false),
+      LineCfg(id: 'iob', size: z(14), zoneColor: false, color: white, space: z(8), flex: 2, box: true, bold: true),
+      LineCfg(id: 'cob', size: z(14), zoneColor: false, color: white, space: z(8), flex: 2, box: true, bold: true, join: true),
+      LineCfg(id: 'basal', size: z(14), zoneColor: false, color: white, space: z(8), flex: 3, box: true, bold: true, join: true),
+      LineCfg(id: 'reservoir', size: z(14), zoneColor: false, color: white, space: z(8), flex: 2, box: true, bold: true, join: true),
+      LineCfg(id: 'battery', size: z(14), zoneColor: false, color: white, space: z(8), flex: 2, box: true, bold: true, join: true),
+      LineCfg(id: 'bolus', size: z(13), zoneColor: false, color: soft, align: 'left', space: z(8)),
+      LineCfg(id: 'carbs', size: z(13), zoneColor: false, color: soft, align: 'right', space: z(8), join: true),
+      LineCfg(id: 'graph', size: big ? 380 : 260, space: z(8)),
+      LineCfg(id: 'sensor', size: z(13), zoneColor: false, color: soft, space: z(8)),
+      LineCfg(id: 'cannula', size: z(13), zoneColor: false, color: soft, space: z(8), join: true),
+      LineCfg(id: 'phone', size: z(13), zoneColor: false, color: soft, space: z(8), join: true),
     ];
   }
 
-  /// The day layout in use: the saved one once edited, else the default for
-  /// the screen shape.
-  List<LineCfg> dayFor(bool wide) => flag('dayCustom') ? day : defaultDay(wide: wide);
+  /// The day layout in use: the saved one once edited or chosen, else the
+  /// default for the screen (original on a phone, compact on a wide screen).
+  List<LineCfg> dayFor(bool wide) => flag('dayCustom') ? day : defaultDay(compact: wide, big: wide);
 
   dynamic raw(String k) => v.containsKey(k) ? v[k] : defaults[k];
   String str(String k) => (raw(k) ?? '').toString();
