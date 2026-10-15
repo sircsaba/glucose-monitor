@@ -129,6 +129,7 @@ class LineCfg {
   int flex; // share of the line's width
   bool join; // on the same line as the element before
   bool box; // drawn on a card
+  bool stack; // label above the value (instead of beside it)
 
   LineCfg({
     required this.id,
@@ -142,6 +143,7 @@ class LineCfg {
     this.flex = 1,
     this.join = false,
     this.box = false,
+    this.stack = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -156,6 +158,7 @@ class LineCfg {
         'flex': flex,
         'join': join,
         'box': box,
+        'stack': stack,
       };
 
   factory LineCfg.fromJson(Map<String, dynamic> j) => LineCfg(
@@ -170,6 +173,7 @@ class LineCfg {
         flex: (j['flex'] as num? ?? 1).toInt().clamp(1, 12),
         join: j['join'] == true,
         box: j['box'] == true,
+        stack: j['stack'] == true,
       );
 }
 
@@ -255,6 +259,8 @@ class Settings {
     'treatPlace': 0, // 0 = top of the graph, 1 = on the glucose line
     'dayArrow': true,
     'dayBgDelta': true, // change and units next to the glucose value
+    'dayCustom': false, // false = default layout for the screen shape (phone or wide)
+    'dayColumns': 0, // 0 auto (two columns on wide screens), 1 one column, 2 two columns
     'tirLo': 70.0,
     'tirHi': 180.0,
     // Other alarms
@@ -356,29 +362,55 @@ class Settings {
         LineCfg(id: 'graph', size: 70, space: 20),
       ];
 
-  static List<LineCfg> defaultDay() {
+  /// Default day view. Phone: the original layout. Wide (computer, tablet in
+  /// landscape): bigger values on the left, the graph on the right.
+  static List<LineCfg> defaultDay({bool wide = false}) {
     const white = 0xFFE6EDF3;
     const grey = 0xFF9AA4B2;
     const soft = 0xFFC4CCD6;
+    if (!wide) {
+      return [
+        LineCfg(id: 'ago', size: 13, zoneColor: false, color: grey, align: 'left', space: 0),
+        LineCfg(id: 'loop', size: 13, zoneColor: false, color: grey, align: 'right', space: 0, join: true),
+        LineCfg(id: 'clock', size: 20, zoneColor: false, color: 0xFF5BC0EB, align: 'left', space: 8, flex: 2, show: false),
+        LineCfg(id: 'bg', size: 84, align: 'center', space: 8, bold: true, flex: 8, join: true),
+        LineCfg(id: 'delta', size: 18, zoneColor: false, color: white, align: 'right', space: 0, flex: 2, join: true, show: false),
+        LineCfg(id: 'iob', size: 18, zoneColor: false, color: white, align: 'left', space: 8, box: true, stack: true, bold: true),
+        LineCfg(id: 'cob', size: 18, zoneColor: false, color: white, align: 'left', space: 8, box: true, stack: true, bold: true, join: true),
+        LineCfg(id: 'basal', size: 18, zoneColor: false, color: white, align: 'left', space: 8, box: true, stack: true, bold: true, join: true),
+        LineCfg(id: 'bolus', size: 13, zoneColor: false, color: soft, align: 'left', space: 10),
+        LineCfg(id: 'carbs', size: 13, zoneColor: false, color: soft, align: 'right', space: 10, join: true),
+        LineCfg(id: 'graph', size: 260, space: 12),
+        LineCfg(id: 'reservoir', size: 13, zoneColor: false, color: white, space: 14, stack: true),
+        LineCfg(id: 'battery', size: 13, zoneColor: false, color: white, space: 14, stack: true, join: true),
+        LineCfg(id: 'sensor', size: 13, zoneColor: false, color: white, space: 14, stack: true, join: true),
+        LineCfg(id: 'cannula', size: 13, zoneColor: false, color: white, space: 14, stack: true, join: true),
+        LineCfg(id: 'phone', size: 12, zoneColor: false, color: grey, space: 8),
+      ];
+    }
     return [
-      LineCfg(id: 'ago', size: 13, zoneColor: false, color: grey, align: 'left', space: 0),
-      LineCfg(id: 'loop', size: 13, zoneColor: false, color: grey, align: 'right', space: 0, join: true),
-      LineCfg(id: 'clock', size: 24, zoneColor: false, color: 0xFF5BC0EB, align: 'left', space: 0, flex: 2),
-      LineCfg(id: 'bg', size: 110, align: 'center', space: 0, bold: true, flex: 8, join: true),
-      LineCfg(id: 'delta', size: 18, zoneColor: false, color: white, align: 'right', space: 0, flex: 2, join: true, show: false),
-      LineCfg(id: 'iob', size: 14, zoneColor: false, color: white, space: 8, flex: 2, box: true),
-      LineCfg(id: 'cob', size: 14, zoneColor: false, color: white, space: 8, flex: 2, box: true, join: true),
-      LineCfg(id: 'basal', size: 14, zoneColor: false, color: white, space: 8, flex: 3, box: true, join: true),
-      LineCfg(id: 'reservoir', size: 14, zoneColor: false, color: white, space: 8, flex: 2, box: true, join: true),
-      LineCfg(id: 'battery', size: 14, zoneColor: false, color: white, space: 8, flex: 2, box: true, join: true),
-      LineCfg(id: 'bolus', size: 13, zoneColor: false, color: soft, align: 'left', space: 8),
-      LineCfg(id: 'carbs', size: 13, zoneColor: false, color: soft, align: 'right', space: 8, join: true),
-      LineCfg(id: 'graph', size: 260, space: 8),
-      LineCfg(id: 'sensor', size: 13, zoneColor: false, color: soft, space: 10),
-      LineCfg(id: 'cannula', size: 13, zoneColor: false, color: soft, space: 10, join: true),
-      LineCfg(id: 'phone', size: 13, zoneColor: false, color: soft, space: 10, join: true),
+      LineCfg(id: 'ago', size: 18, zoneColor: false, color: grey, align: 'left', space: 0),
+      LineCfg(id: 'loop', size: 18, zoneColor: false, color: grey, align: 'right', space: 0, join: true),
+      LineCfg(id: 'clock', size: 44, zoneColor: false, color: 0xFF5BC0EB, align: 'left', space: 12, flex: 3),
+      LineCfg(id: 'bg', size: 170, align: 'center', space: 12, bold: true, flex: 7, join: true),
+      LineCfg(id: 'delta', size: 24, zoneColor: false, color: white, align: 'right', space: 0, flex: 2, join: true, show: false),
+      LineCfg(id: 'iob', size: 22, zoneColor: false, color: white, space: 16, box: true),
+      LineCfg(id: 'cob', size: 22, zoneColor: false, color: white, space: 16, box: true, join: true),
+      LineCfg(id: 'basal', size: 22, zoneColor: false, color: white, space: 16, flex: 2, box: true, join: true),
+      LineCfg(id: 'reservoir', size: 22, zoneColor: false, color: white, space: 10, box: true),
+      LineCfg(id: 'battery', size: 22, zoneColor: false, color: white, space: 10, box: true, join: true),
+      LineCfg(id: 'phone', size: 22, zoneColor: false, color: white, space: 10, box: true, join: true),
+      LineCfg(id: 'bolus', size: 20, zoneColor: false, color: soft, align: 'left', space: 18),
+      LineCfg(id: 'carbs', size: 20, zoneColor: false, color: soft, align: 'left', space: 8),
+      LineCfg(id: 'sensor', size: 20, zoneColor: false, color: soft, align: 'left', space: 18),
+      LineCfg(id: 'cannula', size: 20, zoneColor: false, color: soft, align: 'left', space: 18, join: true),
+      LineCfg(id: 'graph', size: 420, space: 0),
     ];
   }
+
+  /// The day layout in use: the saved one once edited, else the default for
+  /// the screen shape.
+  List<LineCfg> dayFor(bool wide) => flag('dayCustom') ? day : defaultDay(wide: wide);
 
   dynamic raw(String k) => v.containsKey(k) ? v[k] : defaults[k];
   String str(String k) => (raw(k) ?? '').toString();

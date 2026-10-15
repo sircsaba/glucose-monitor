@@ -24,6 +24,7 @@ class _DayLayoutScreenState extends State<DayLayoutScreen> {
         TextButton(
           onPressed: () => app.change((s) {
             s.day = Settings.defaultDay();
+            s.set('dayCustom', false);
             s.set('dayArrow', true);
             s.set('dayBgDelta', true);
           }),
@@ -34,12 +35,27 @@ class _DayLayoutScreenState extends State<DayLayoutScreen> {
         listenable: app,
         builder: (context, _) {
           final s = app.settings;
-          var idx = s.day.indexWhere((l) => l.id == _sel);
+          final screen = MediaQuery.of(context).size;
+          final wide = DayView.isWide(context);
+          final list = s.dayFor(wide);
+          var idx = list.indexWhere((l) => l.id == _sel);
           if (idx < 0) idx = 0;
-          final cur = s.day[idx];
+          final cur = list[idx];
           final isGraph = cur.id == 'graph';
-          void upd(void Function(LineCfg c) f) => app.change((x) => f(x.day.firstWhere((l) => l.id == cur.id)));
+          // The first change saves the layout shown (phone or wide default) as yours.
+          void own(Settings x) {
+            if (!x.flag('dayCustom')) {
+              x.day = Settings.defaultDay(wide: wide);
+              x.set('dayCustom', true);
+            }
+          }
+
+          void upd(void Function(LineCfg c) f) => app.change((x) {
+                own(x);
+                f(x.day.firstWhere((l) => l.id == cur.id));
+              });
           void move(int dir) => app.change((x) {
+                own(x);
                 final i = x.day.indexWhere((l) => l.id == cur.id);
                 final j = i + dir;
                 if (i < 0 || j < 0 || j >= x.day.length) return;
@@ -52,33 +68,44 @@ class _DayLayoutScreenState extends State<DayLayoutScreen> {
           return ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 40), children: [
             const Text('Tap an element in the preview, or pick it below.', style: TextStyle(color: kMuted, fontSize: 13)),
             const SizedBox(height: 10),
-            // Phone-sized preview with your live data.
+            // Preview with your live data, in the shape of this screen.
             Center(
-              child: Container(
-                width: 320,
-                padding: const EdgeInsets.fromLTRB(8, 14, 8, 14),
-                decoration: BoxDecoration(color: kBg, borderRadius: BorderRadius.circular(30), border: Border.all(color: kLine, width: 6)),
-                child: ClipRect(
-                  child: SizedBox(
-                    height: 560,
-                    child: FittedBox(
-                      fit: BoxFit.fitWidth,
-                      alignment: Alignment.topCenter,
-                      child: SizedBox(
-                        width: 390,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: DayView(preview: true, highlight: _sel, onSelect: (id) => setState(() => _sel = id)),
+              child: Builder(builder: (context) {
+                final frameW = wide ? (screen.width - 32).clamp(320.0, 1100.0) : 320.0;
+                final innerW = wide ? 1300.0 : 390.0;
+                return Container(
+                  width: frameW,
+                  padding: const EdgeInsets.fromLTRB(8, 14, 8, 14),
+                  decoration: BoxDecoration(color: kBg, borderRadius: BorderRadius.circular(wide ? 14 : 30), border: Border.all(color: kLine, width: 6)),
+                  child: ClipRect(
+                    child: SizedBox(
+                      height: wide ? frameW * 0.5 : 560,
+                      child: FittedBox(
+                        fit: BoxFit.fitWidth,
+                        alignment: Alignment.topCenter,
+                        child: SizedBox(
+                          width: innerW,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: DayView(preview: true, wide: wide, highlight: _sel, onSelect: (id) => setState(() => _sel = id)),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ),
+                );
+              }),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              wide
+                  ? 'Wide screen layout: values on the left, graph on the right (fills the window height).'
+                  : 'Phone layout. On a computer or a wide window, the values and graph sit side by side.',
+              style: const TextStyle(color: kMuted, fontSize: 12),
             ),
             const SizedBox(height: 16),
             Wrap(spacing: 6, runSpacing: 6, children: [
-              for (final l in s.day)
+              for (final l in list)
                 ChoiceChip(
                   label: Text(kDayNames[l.id] ?? l.id, style: TextStyle(color: l.show ? null : kMuted)),
                   selected: l.id == _sel,
@@ -174,7 +201,11 @@ class _DayLayoutScreenState extends State<DayLayoutScreen> {
                 setChoice('Dot size', 'dotSize', const ['Small', 'Medium', 'Large']),
               ],
             ]),
+            Section(title: 'Whole screen', children: [
+              setChoice('Columns', 'dayColumns', const ['Auto (two on a wide screen)', 'Always one column', 'Always two columns']),
+            ]),
             const Text(
+              'Each phone, tablet and browser keeps its own layout. '
               'Zone colours come from BG zones & time ranges, where each range can have its own colours. '
               'The night and settings buttons always stay at the end of the first line.',
               style: TextStyle(color: kMuted, fontSize: 12, height: 1.45),
