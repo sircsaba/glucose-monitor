@@ -86,6 +86,8 @@ class DisplaySettingsScreen extends StatelessWidget {
             index: topIndex,
             onChanged: (i) => app.change((x) => x.set('graphTop', tops[i])),
           ),
+          setChoice('Graph height', 'graphFit', const ['Fit the screen on a computer', 'Always fit the screen', 'Fixed (set in Day view layout)'],
+              hint: 'Fit: the graph uses the room left, so the whole page shows without scrolling'),
           ChoiceRow(
             label: 'Dot size',
             options: const ['Small', 'Medium', 'Large'],
