@@ -21,8 +21,56 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _tab = 0;
 
+  static const _tabs = [
+    (Icons.show_chart, 'Live'),
+    (Icons.add_circle_outline, 'Treat'),
+    (Icons.bar_chart, 'Reports'),
+    (Icons.notifications_none, 'Alarms'),
+  ];
+
+  /// Thin bottom bar: on a computer by default, or as set.
+  bool _compactNav(BuildContext context) {
+    final mode = app.settings.integer('navCompact');
+    return mode == 1 || (mode == 0 && DayView.isWide(context));
+  }
+
+  /// About 40 px high instead of 80: icon and name side by side.
+  Widget _thinBar() {
+    return Material(
+      color: const Color(0xFF11161D),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 40,
+          child: Row(children: [
+            for (var i = 0; i < _tabs.length; i++)
+              Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _tab = i),
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: _tab == i ? const Color(0xFF12303D) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(_tabs[i].$1, size: 18, color: _tab == i ? kText : kMuted),
+                      const SizedBox(width: 6),
+                      Text(_tabs[i].$2, style: TextStyle(fontSize: 13, color: _tab == i ? kText : kMuted)),
+                    ]),
+                  ),
+                ),
+              ),
+          ]),
+        ),
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(listenable: app, builder: (c, _) => _scaffold(c));
+
+  Widget _scaffold(BuildContext context) {
     return Scaffold(
       body: SafeArea(
         child: IndexedStack(
@@ -30,7 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: const [LiveScreen(), TreatScreen(), ReportsScreen(), QuickAlarmsScreen()],
         ),
       ),
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: _compactNav(context) ? _thinBar() : NavigationBar(
         selectedIndex: _tab,
         onDestinationSelected: (i) => setState(() => _tab = i),
         destinations: const [
@@ -275,7 +323,7 @@ class _DayViewState extends State<DayView> {
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: _RangeButton(label: '${h}h', selected: hours == h, onTap: () => setState(() => _hours = h)),
+                      child: _RangeButton(label: '${h}h', selected: hours == h, short: wide, onTap: () => setState(() => _hours = h)),
                     ),
                   ),
               ]),
@@ -395,7 +443,8 @@ class _RangeButton extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  const _RangeButton({required this.label, required this.selected, required this.onTap});
+  final bool short;
+  const _RangeButton({required this.label, required this.selected, required this.onTap, this.short = false});
 
   @override
   Widget build(BuildContext context) {
@@ -412,7 +461,7 @@ class _RangeButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           onTap: onTap,
           child: SizedBox(
-            height: 38,
+            height: short ? 30 : 38,
             child: Center(
               child: Text(label, style: TextStyle(color: selected ? kText : kMuted, fontSize: 14, fontWeight: selected ? FontWeight.w600 : FontWeight.w400)),
             ),
