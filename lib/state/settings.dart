@@ -267,10 +267,16 @@ class Settings {
     'basalTextBold': false,
     'basalTextColor': 0xFF9CC3E0,
     'basalBarColor': 0xFF2B4A63,
+    'presetShow': true, // Loop overrides / Trio temp targets on the graph
+    'presetColor': 0xFFB39DFF,
+    'presetTextSize': 11.0,
+    'presetBold': false,
     'gridMinutes': [15, 15, 15, 30, 60], // minutes between time lines, for each graph button
     'tipBg': 2, // mouse over a reading: 0 nothing, 1 value, 2 value and time, 3 time
     'tipTreat': 2, // mouse over a treatment: same choices
     'navCompact': 0, // bottom bar: 0 thin on a computer, 1 always thin, 2 always normal
+    'landSplit': true, // phone on its side: values left, graph right
+    'splitLeft': 40, // percent of the width for the values
     'graphFit': 0, // 0 fit the screen on a computer, 1 always fit the screen, 2 fixed height
     'arrowLen': 0, // day view trend arrow length, percent (0 = auto: 150 on a computer, 100 on a phone)
     'bgSide': 0, // arrow and change: 0 auto (side by side on a computer), 1 stacked, 2 side by side
@@ -290,6 +296,16 @@ class Settings {
     'reservoirU': 20,
     'pumpBatOn': true,
     'pumpBatPct': 20,
+    // One-time target alert (Target tab)
+    'tgtMg': 83.0, // 4.6 mmol/L
+    'tgtSoundOn': true,
+    'tgtSound': 6, // Gentle bell
+    'tgtVolume': 80,
+    'tgtVibrate': true,
+    'tgtFlash': true,
+    'tgtColor': 0xFF3DBE7A,
+    'tgtTimerMin': 30, // 0 = no countdown
+    'tgtTimerAction': 0, // 0 alert me to take action, 1 just cancel
     // Gentle wake-up
     'gentleOn': true,
     'flashSec': 15,

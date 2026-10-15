@@ -254,6 +254,8 @@ class _DayLayoutScreenState extends State<DayLayoutScreen> {
               if (isGraph) ...[
                 setChoice('Graph height', 'graphFit', const ['Fit the screen on a computer', 'Always fit the screen', 'Fixed (Graph height above)'],
                     hint: 'Fit: the graph uses the room left, so the whole page shows without scrolling'),
+                setSwitch('Phone on its side: split the screen', 'landSplit', hint: 'Values on the left, graph on the right'),
+                setInt('Width of the values side', 'splitLeft', step: 5, min: 25, max: 70, unit: '%'),
                 setChoice('Bottom bar (Live, Treat…)', 'navCompact', const ['Thin on a computer', 'Always thin', 'Always normal'],
                     hint: 'Thin leaves more room for the graph'),
                 ...graphGridSettings(),

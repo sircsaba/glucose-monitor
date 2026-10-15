@@ -83,6 +83,10 @@ class _BgChartState extends State<BgChart> {
           basalText: Color(s.integer('basalTextColor')),
           basalSize: s.number('basalTextSize').clamp(7.0, 30.0),
           basalBold: s.flag('basalTextBold'),
+          presets: s.flag('presetShow'),
+          presetColor: Color(s.integer('presetColor')),
+          presetSize: s.number('presetTextSize').clamp(7.0, 30.0),
+          presetBold: s.flag('presetBold'),
           gridMin: gridMin,
           hover: _pos,
           tipBg: tipBg,
@@ -135,6 +139,10 @@ class _BgPainter extends CustomPainter {
   final Color basalText;
   final double basalSize;
   final bool basalBold;
+  final bool presets;
+  final Color presetColor;
+  final double presetSize;
+  final bool presetBold;
   final int gridMin;
   final Offset? hover;
   final int tipBg; // 0 nothing, 1 value, 2 value and time, 3 time
@@ -162,6 +170,10 @@ class _BgPainter extends CustomPainter {
     required this.basalText,
     required this.basalSize,
     required this.basalBold,
+    required this.presets,
+    required this.presetColor,
+    required this.presetSize,
+    required this.presetBold,
     required this.gridMin,
     required this.hover,
     required this.tipBg,
@@ -266,6 +278,41 @@ class _BgPainter extends CustomPainter {
       final minutesOfDay = t.hour * 60 + t.minute;
       if ((minutesOfDay ~/ math.max(1, gridMin)) % labelEvery == 0) {
         _text(canvas, fmtClock(t, h24), Offset(gx, size.height - bottomLabels / 2), center: true);
+      }
+    }
+
+    // Presets (Loop overrides, Trio temp targets): their target range shaded
+    // over the time they run, a line along the top and their name.
+    if (presets) {
+      final list = treatments.where((t) => t.isPreset).toList()..sort((a, b) => a.t.compareTo(b.t));
+      for (var i = 0; i < list.length; i++) {
+        final p = list[i];
+        final mins = p.duration ?? 0;
+        if (mins <= 0 && !p.indefinite) continue; // a cancel
+        var end = p.indefinite || mins > 60 * 24 * 7 ? tEnd : p.t.add(Duration(seconds: (mins * 60).round()));
+        if (i + 1 < list.length && list[i + 1].t.isBefore(end)) end = list[i + 1].t;
+        if (!end.isAfter(tStart) || p.t.isAfter(tEnd)) continue;
+        final x1 = math.max(left, x(p.t));
+        final x2 = math.min(left + w, x(end));
+        if (x2 - x1 < 1) continue;
+        if (p.targetLo != null && p.targetHi != null) {
+          final yHi = y(math.max(p.targetHi!, p.targetLo! + 2));
+          final yLo = y(p.targetLo!);
+          canvas.drawRect(Rect.fromLTRB(x1, yHi, x2, yLo), Paint()..color = presetColor.withValues(alpha: 0.16));
+        }
+        canvas.drawRect(Rect.fromLTRB(x1, top, x2, top + 3), Paint()..color = presetColor);
+        var name = p.reason.trim().isEmpty ? (p.type == 'Temporary Override' ? 'Override' : 'Temp target') : p.reason.trim();
+        if (p.scale != null && (p.scale! - 1).abs() > 0.001) name += ' ${(p.scale! * 100).round()}%';
+        final tp = TextPainter(
+          text: TextSpan(
+            text: name,
+            style: TextStyle(color: presetColor, fontSize: presetSize, fontWeight: presetBold ? FontWeight.w700 : FontWeight.w500),
+          ),
+          textDirection: TextDirection.ltr,
+          maxLines: 1,
+          ellipsis: '…',
+        )..layout(maxWidth: math.max(0, x2 - x1 - 4));
+        if (tp.width > 8) tp.paint(canvas, Offset(x1 + 3, top + 5));
       }
     }
 
@@ -566,6 +613,15 @@ List<Widget> graphGridSettings() {
     setSwitch('Basal numbers bold', 'basalTextBold'),
     _colorRow('Basal numbers colour', 'basalTextColor'),
     _colorRow('Basal bars colour', 'basalBarColor'),
+    setSwitch('Presets on the graph', 'presetShow', hint: 'Loop overrides and Trio temp targets: name, target range and time'),
+    StepRow(
+      label: 'Preset name size',
+      value: '${app.settings.number('presetTextSize').round()} px',
+      onMinus: () => app.change((x) => x.set('presetTextSize', (x.number('presetTextSize') - 1).clamp(7.0, 30.0).roundToDouble())),
+      onPlus: () => app.change((x) => x.set('presetTextSize', (x.number('presetTextSize') + 1).clamp(7.0, 30.0).roundToDouble())),
+    ),
+    setSwitch('Preset name bold', 'presetBold'),
+    _colorRow('Preset colour', 'presetColor'),
     for (var i = 0; i < 5 && i < buttons.length; i++)
       StepRow(
         label: 'Time lines on the ${buttons[i]} h graph',
