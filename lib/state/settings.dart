@@ -390,7 +390,28 @@ class Settings {
         LineCfg(id: 'phone', size: 12, zoneColor: false, color: grey, space: 8),
       ];
     }
-    final k = big ? 1.7 : 1.0;
+    if (big) {
+      // Computer screen: the sizes of the earlier wide layout, in one column.
+      return [
+        LineCfg(id: 'ago', size: 18, zoneColor: false, color: grey, align: 'left', space: 0),
+        LineCfg(id: 'loop', size: 18, zoneColor: false, color: grey, align: 'right', space: 0, join: true),
+        LineCfg(id: 'clock', size: 44, zoneColor: false, color: blue, align: 'left', space: 12, flex: 3),
+        LineCfg(id: 'bg', size: 170, align: 'center', space: 12, bold: true, flex: 7, join: true),
+        LineCfg(id: 'delta', size: 24, zoneColor: false, color: white, align: 'right', space: 0, flex: 2, join: true, show: false),
+        LineCfg(id: 'iob', size: 22, zoneColor: false, color: white, space: 16, flex: 2, box: true),
+        LineCfg(id: 'cob', size: 22, zoneColor: false, color: white, space: 16, flex: 2, box: true, join: true),
+        LineCfg(id: 'basal', size: 22, zoneColor: false, color: white, space: 16, flex: 3, box: true, join: true),
+        LineCfg(id: 'reservoir', size: 22, zoneColor: false, color: white, space: 16, flex: 2, box: true, join: true),
+        LineCfg(id: 'battery', size: 22, zoneColor: false, color: white, space: 16, flex: 2, box: true, join: true),
+        LineCfg(id: 'bolus', size: 20, zoneColor: false, color: soft, align: 'left', space: 18),
+        LineCfg(id: 'carbs', size: 20, zoneColor: false, color: soft, align: 'right', space: 18, join: true),
+        LineCfg(id: 'graph', size: 420, space: 14),
+        LineCfg(id: 'sensor', size: 20, zoneColor: false, color: soft, align: 'left', space: 16),
+        LineCfg(id: 'cannula', size: 20, zoneColor: false, color: soft, space: 16, join: true),
+        LineCfg(id: 'phone', size: 20, zoneColor: false, color: soft, align: 'right', space: 16, join: true),
+      ];
+    }
+    const k = 1.0;
     double z(double v) => (v * k).roundToDouble();
     return [
       LineCfg(id: 'ago', size: z(13), zoneColor: false, color: grey, align: 'left', space: 0),
