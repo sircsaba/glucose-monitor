@@ -261,8 +261,10 @@ class _DayViewState extends State<DayView> {
         case 'cannula':
           return pair('Cannula', ageOf(app.siteChange));
         case 'phone':
-          if (d?.phoneBattery == null) return const SizedBox.shrink();
-          return pair(c.stack ? 'Looping phone' : 'Looping phone battery', '${d!.phoneBattery}%');
+          if (d?.phoneBattery == null && !c.box) return const SizedBox.shrink();
+          final pct = d?.phoneBattery == null ? '–' : '${d!.phoneBattery}%';
+          if (c.box) return pair('Phone', pct);
+          return pair(c.stack ? 'Looping phone' : 'Looping phone battery', pct);
         case 'graph':
           return Container(
             padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
