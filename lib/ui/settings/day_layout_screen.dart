@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../state/app_state.dart';
 import '../../state/settings.dart';
+import '../bg_chart.dart';
 import '../common.dart';
 import '../home_screen.dart';
 
@@ -226,6 +227,7 @@ class _DayLayoutScreenState extends State<DayLayoutScreen> {
               if (isGraph) ...[
                 setChoice('Graph height', 'graphFit', const ['Fit the screen on a computer', 'Always fit the screen', 'Fixed (Graph height above)'],
                     hint: 'Fit: the graph uses the room left, so the whole page shows without scrolling'),
+                ...graphGridSettings(),
                 setSwitch('Treatments on the graph', 'showTreatments', hint: 'Boluses and carbs'),
                 setInt('Treatment size', 'treatSize', step: 10, min: 50, max: 300, unit: '%'),
                 setChoice('Treatments placed', 'treatPlace', const ['At the top of the graph', 'On the glucose line']),
