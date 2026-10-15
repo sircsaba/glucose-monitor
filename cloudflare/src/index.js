@@ -475,34 +475,40 @@ function webAppBase(env) {
   return opt(env.WEB_APP_URL).replace(/\/+$/, '');
 }
 
-// Files that say which version to load: checked often, so updates show quickly.
-const WEB_SHORT_CACHE = /(^\/index\.html|flutter_bootstrap\.js|flutter_service_worker\.js|version\.json|manifest\.json)$/;
-
+// Flutter's file names stay the same from one version to the next (main.dart.js,
+// flutter_bootstrap.js...), so nothing may be kept for long: Cloudflare keeps a
+// copy for one minute at most, and browsers check for a newer one every time
+// (a quick "not changed" answer when it is the same).
 async function serveWebApp(request, env, url) {
   const base = webAppBase(env);
   if (!base) return null;
-  let p = url.pathname === '/' ? '/index.html' : url.pathname;
+  const p = url.pathname === '/' ? '/index.html' : url.pathname;
   if (p.includes('..') || p.includes('//')) return null;
-  const short = WEB_SHORT_CACHE.test(p);
+  // The minute in the address makes Cloudflare's copy expire within a minute.
+  const q = new URLSearchParams(url.search);
+  q.set('gm', String(Math.floor(Date.now() / 60000)));
+  const headers = new Headers();
+  for (const k of ['if-none-match', 'if-modified-since']) {
+    const v = request.headers.get(k);
+    if (v) headers.set(k, v);
+  }
   let res;
   try {
-    res = await fetch(base + p + url.search, {
-      redirect: 'follow',
-      cf: { cacheEverything: true, cacheTtl: short ? 60 : 3600 },
-    });
+    res = await fetch(`${base}${p}?${q}`, { headers, redirect: 'follow', cf: { cacheEverything: true, cacheTtl: 60 } });
   } catch (e) {
     console.log('web app not reachable', e && e.message);
     return null;
   }
-  if (!res.ok) return null;
-  const headers = new Headers();
+  const out = new Headers();
   for (const k of ['content-type', 'etag', 'last-modified']) {
     const v = res.headers.get(k);
-    if (v) headers.set(k, v);
+    if (v) out.set(k, v);
   }
-  headers.set('cache-control', `public, max-age=${short ? 60 : 3600}`);
-  headers.set('x-content-type-options', 'nosniff');
-  return new Response(request.method === 'HEAD' ? null : res.body, { status: 200, headers });
+  out.set('cache-control', 'no-cache');
+  out.set('x-content-type-options', 'nosniff');
+  if (res.status === 304) return new Response(null, { status: 304, headers: out });
+  if (!res.ok) return null;
+  return new Response(request.method === 'HEAD' ? null : res.body, { status: 200, headers: out });
 }
 
 // ---------------------------------------------------------------- Nightscout link
