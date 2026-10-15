@@ -479,9 +479,22 @@ function webAppBase(env) {
 // flutter_bootstrap.js...), so nothing may be kept for long: Cloudflare keeps a
 // copy for one minute at most, and browsers check for a newer one every time
 // (a quick "not changed" answer when it is the same).
+// Older builds installed a service worker that keeps its own copy of the app.
+// This replacement deletes that copy and removes itself.
+const KILL_SERVICE_WORKER = `self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (e) => e.waitUntil((async () => {
+  for (const k of await caches.keys()) await caches.delete(k);
+  await self.registration.unregister();
+})()));`;
+
 async function serveWebApp(request, env, url) {
   const base = webAppBase(env);
   if (!base) return null;
+  if (url.pathname === '/flutter_service_worker.js') {
+    return new Response(KILL_SERVICE_WORKER, {
+      headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' },
+    });
+  }
   const p = url.pathname === '/' ? '/index.html' : url.pathname;
   if (p.includes('..') || p.includes('//')) return null;
   // The minute in the address makes Cloudflare's copy expire within a minute.

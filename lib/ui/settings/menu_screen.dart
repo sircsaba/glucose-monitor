@@ -45,6 +45,11 @@ class MenuScreen extends StatelessWidget {
         'Every value here is saved on the phone. Use Data & general › Copy settings to move them to another phone.',
         style: TextStyle(color: kMuted, fontSize: 12, height: 1.5),
       ),
+      if (const String.fromEnvironment('BUILD').isNotEmpty)
+        const Padding(
+          padding: EdgeInsets.only(top: 8),
+          child: Text('Version ${String.fromEnvironment('BUILD')}', style: TextStyle(color: kMuted, fontSize: 12)),
+        ),
     ]);
   }
 }
