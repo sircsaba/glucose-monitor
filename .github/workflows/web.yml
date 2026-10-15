@@ -47,7 +47,7 @@ jobs:
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Build the web app
-        run: scripts/step.sh "Web build" flutter build web --release --base-href / --build-number=${{ github.run_number }}
+        run: scripts/step.sh "Web build" flutter build web --release --base-href / --build-number=${{ github.run_number }} --dart-define=BUILD=web-${{ github.run_number }}
 
       - name: Make it work from any folder
         run: python3 scripts/patch_web.py build

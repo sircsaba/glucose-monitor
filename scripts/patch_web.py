@@ -45,4 +45,13 @@ elif step == "build":
         sys.exit("base href not found in build/web/index.html")
     open(p, "w").write(s)
     open("build/web/.nojekyll", "w").close()
+    # No service worker: it keeps its own copy of the app in the browser, so an
+    # update could stay hidden. The server always has the latest files.
+    bp = "build/web/flutter_bootstrap.js"
+    if os.path.exists(bp):
+        b = open(bp).read()
+        b2 = re.sub(r"serviceWorkerSettings\s*:\s*\{[^{}]*\}\s*,?", "", b)
+        if b2 != b:
+            open(bp, "w").write(b2)
+            print("service worker registration removed")
     print("build patched")
