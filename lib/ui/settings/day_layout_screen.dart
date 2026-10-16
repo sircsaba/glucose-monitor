@@ -265,6 +265,7 @@ class _DayLayoutScreenState extends State<DayLayoutScreen> {
                 setSwitch('Prediction', 'showPrediction'),
                 setSwitch('Temp basal under graph', 'showBasal'),
                 setChoice('Dot size', 'dotSize', const ['Small', 'Medium', 'Large']),
+                ...ttirSettings(),
               ],
             ]),
             const Text(

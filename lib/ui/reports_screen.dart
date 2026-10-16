@@ -42,6 +42,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final mmol = s.mmol;
     final lo = s.number('tirLo');
     final hi = s.number('tirHi');
+    final ttirOn = s.flag('ttirOn');
+    final tightHi = s.number('ttirHi');
+    final tightColor = Color(s.integer('ttirColor'));
+    // Range bar: below | tight (green) | rest of the range (TTIR colour) | above.
+    List<Widget> bar(double below, double inRange, double above, double? tight) => [
+          Expanded(flex: math.max(1, (below * 1000).round()), child: Container(color: kRed)),
+          if (tight != null) ...[
+            Expanded(flex: math.max(1, (tight * 1000).round()), child: Container(color: kGreen)),
+            Expanded(flex: math.max(1, ((inRange - tight) * 1000).round()), child: Container(color: tightColor)),
+          ] else
+            Expanded(flex: math.max(1, (inRange * 1000).round()), child: Container(color: kGreen)),
+          Expanded(flex: math.max(1, (above * 1000).round()), child: Container(color: kYellow)),
+        ];
     return FutureBuilder<List<Entry>>(
       future: _future,
       builder: (context, snap) {
@@ -59,7 +72,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         } else if (snap.hasError) {
           body = Padding(padding: const EdgeInsets.all(20), child: Text(snap.error.toString(), style: const TextStyle(color: kAmber)));
         } else {
-          final st = computeStats(snap.data ?? const [], lo, hi, _days);
+          final st = computeStats(snap.data ?? const [], lo, hi, _days, tightHi: ttirOn ? tightHi : null);
           if (st == null) {
             body = const Padding(padding: EdgeInsets.all(20), child: Text('No readings in this period.'));
           } else {
@@ -72,22 +85,30 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     const Expanded(child: Text('Time in range', style: TextStyle(color: kMuted, fontSize: 13))),
                     Text('${(st.inRange * 100).round()}%', style: kMono.copyWith(fontSize: 30, fontWeight: FontWeight.w600, color: kGreen)),
                   ]),
+                  if (st.tight != null)
+                    Row(children: [
+                      Expanded(
+                        child: Text('Time in tight range (${fmtBg(lo, mmol)}–${fmtBg(tightHi, mmol)})',
+                            style: const TextStyle(color: kMuted, fontSize: 13)),
+                      ),
+                      Text('${(st.tight! * 100).round()}%', style: kMono.copyWith(fontSize: 24, fontWeight: FontWeight.w600, color: kGreen)),
+                    ]),
                   const SizedBox(height: 8),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(7),
                     child: SizedBox(
                       height: 14,
-                      child: Row(children: [
-                        Expanded(flex: math.max(1, (st.below * 1000).round()), child: Container(color: kRed)),
-                        Expanded(flex: math.max(1, (st.inRange * 1000).round()), child: Container(color: kGreen)),
-                        Expanded(flex: math.max(1, (st.above * 1000).round()), child: Container(color: kYellow)),
-                      ]),
+                      child: Row(children: bar(st.below, st.inRange, st.above, st.tight)),
                     ),
                   ),
                   const SizedBox(height: 6),
                   Row(children: [
                     Expanded(child: Text('Below ${(st.below * 100).round()}%', style: const TextStyle(color: kMuted, fontSize: 12))),
-                    Text('${fmtBg(lo, mmol)}–${fmtBg(hi, mmol)}', style: const TextStyle(color: kMuted, fontSize: 12)),
+                    Text(
+                        st.tight == null
+                            ? '${fmtBg(lo, mmol)}–${fmtBg(hi, mmol)}'
+                            : '${fmtBg(lo, mmol)}–${fmtBg(tightHi, mmol)}–${fmtBg(hi, mmol)}',
+                        style: const TextStyle(color: kMuted, fontSize: 12)),
                     Expanded(
                       child: Text('Above ${(st.above * 100).round()}%',
                           textAlign: TextAlign.right, style: const TextStyle(color: kMuted, fontSize: 12)),
@@ -121,11 +142,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     padding: EdgeInsets.only(left: 8, bottom: 6),
                     child: Text('Profile by time of day', style: TextStyle(color: kMuted, fontSize: 13)),
                   ),
-                  SizedBox(height: 200, child: CustomPaint(painter: _AgpPainter(st.agp, lo, hi, mmol), size: Size.infinite)),
+                  SizedBox(
+                    height: 200,
+                    child: CustomPaint(painter: _AgpPainter(st.agp, lo, hi, mmol, ttirOn ? tightHi : null, tightColor), size: Size.infinite),
+                  ),
                 ]),
               ),
               const SizedBox(height: 10),
-              Section(title: 'Each day', padding: const EdgeInsets.all(12), children: [
+              Section(title: st.tight == null ? 'Each day' : 'Each day · TIR · TTIR', padding: const EdgeInsets.all(12), children: [
                 for (final d in st.days.reversed)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
@@ -136,17 +160,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           borderRadius: BorderRadius.circular(4),
                           child: SizedBox(
                             height: 12,
-                            child: Row(children: [
-                              Expanded(flex: math.max(1, (d.below * 1000).round()), child: Container(color: kRed)),
-                              Expanded(flex: math.max(1, (d.inRange * 1000).round()), child: Container(color: kGreen)),
-                              Expanded(flex: math.max(1, (d.above * 1000).round()), child: Container(color: kYellow)),
-                            ]),
+                            child: Row(children: bar(d.below, d.inRange, d.above, d.tight)),
                           ),
                         ),
                       ),
                       SizedBox(
-                        width: 44,
-                        child: Text('${(d.inRange * 100).round()}%', textAlign: TextAlign.right, style: kMono.copyWith(fontSize: 12)),
+                        width: d.tight == null ? 44 : 78,
+                        child: Text(
+                            d.tight == null ? '${(d.inRange * 100).round()}%' : '${(d.inRange * 100).round()}% · ${(d.tight! * 100).round()}%',
+                            textAlign: TextAlign.right,
+                            style: kMono.copyWith(fontSize: 12)),
                       ),
                     ]),
                   ),
@@ -168,7 +191,9 @@ class _AgpPainter extends CustomPainter {
   final double lo;
   final double hi;
   final bool mmol;
-  _AgpPainter(this.agp, this.lo, this.hi, this.mmol);
+  final double? tightHi;
+  final Color tightColor;
+  _AgpPainter(this.agp, this.lo, this.hi, this.mmol, this.tightHi, this.tightColor);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -184,6 +209,10 @@ class _AgpPainter extends CustomPainter {
     double y(double mg) => (1 - (mg - minMg) / (maxMg - minMg)) * h;
     double x(int slot) => left + (slot + 0.5) / 48 * w;
     canvas.drawRect(Rect.fromLTRB(left, y(hi), left + w, y(lo)), Paint()..color = kGreen.withValues(alpha: 0.08));
+    final th = tightHi;
+    if (th != null && th > lo && th < hi) {
+      canvas.drawRect(Rect.fromLTRB(left, y(hi), left + w, y(th)), Paint()..color = tightColor.withValues(alpha: 0.13));
+    }
 
     void band(int a, int b, Color c) {
       final path = Path();

@@ -10,6 +10,8 @@ class GlucoseStats {
   final double below; // fraction
   final double inRange;
   final double above;
+  /// Time in tight range (low limit to [tightHi]); null when not asked for.
+  final double? tight;
   final double sensorUse; // fraction of expected readings
   /// 48 half-hour slots, each [p5, p25, p50, p75, p95] in mg/dL (empty if no data).
   final List<List<double>> agp;
@@ -23,6 +25,7 @@ class GlucoseStats {
     required this.below,
     required this.inRange,
     required this.above,
+    this.tight,
     required this.sensorUse,
     required this.agp,
     required this.days,
@@ -34,7 +37,8 @@ class DayTir {
   final double below;
   final double inRange;
   final double above;
-  DayTir(this.day, this.below, this.inRange, this.above);
+  final double? tight;
+  DayTir(this.day, this.below, this.inRange, this.above, [this.tight]);
 }
 
 double _pct(List<double> sorted, double p) {
@@ -46,7 +50,7 @@ double _pct(List<double> sorted, double p) {
   return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
 }
 
-GlucoseStats? computeStats(List<Entry> entries, double lo, double hi, int days) {
+GlucoseStats? computeStats(List<Entry> entries, double lo, double hi, int days, {double? tightHi}) {
   if (entries.isEmpty) return null;
   final vals = entries.map((e) => e.mg).toList();
   final n = vals.length;
@@ -55,6 +59,7 @@ GlucoseStats? computeStats(List<Entry> entries, double lo, double hi, int days) 
   final sd = math.sqrt(varc);
   final below = vals.where((v) => v < lo).length / n;
   final above = vals.where((v) => v > hi).length / n;
+  double? tightOf(List<double> v) => tightHi == null ? null : v.where((x) => x >= lo && x <= tightHi).length / v.length;
 
   // Expected readings: work out the sensor interval from the data (1 or 5 min).
   var gaps = <int>[];
@@ -85,7 +90,7 @@ GlucoseStats? computeStats(List<Entry> entries, double lo, double hi, int days) 
     final v = byDay[d]!;
     final b = v.where((x) => x < lo).length / v.length;
     final a = v.where((x) => x > hi).length / v.length;
-    return DayTir(d, b, 1 - a - b, a);
+    return DayTir(d, b, 1 - a - b, a, tightOf(v));
   }).toList();
 
   return GlucoseStats(
@@ -96,6 +101,7 @@ GlucoseStats? computeStats(List<Entry> entries, double lo, double hi, int days) 
     below: below,
     inRange: 1 - below - above,
     above: above,
+    tight: tightOf(vals),
     sensorUse: math.min(1.0, n / expected),
     agp: agp,
     days: dayTir,
