@@ -69,13 +69,13 @@ $err = curl_error($ch);
 curl_close($ch);
 
 if ($body === false || $code !== 200) {
-    fwrite(STDERR, "Nightscout did not answer: HTTP $code $err\n");
+    fwrite(STDERR, date('Y-m-d H:i:s ') . "Nightscout did not answer: HTTP $code $err\n");
     saveStatus($code === 401 || $code === 403 ? 'Nightscout refused access: check nightscout_secret' : "Nightscout did not answer (HTTP $code)");
     exit(1);
 }
 $docs = json_decode($body);
 if (!is_array($docs)) {
-    fwrite(STDERR, "Nightscout sent something that is not a list of readings\n");
+    fwrite(STDERR, date('Y-m-d H:i:s ') . "Nightscout sent something that is not a list of readings\n");
     saveStatus('Nightscout sent something that is not a list of readings');
     exit(1);
 }
@@ -109,4 +109,4 @@ foreach ($docs as $doc) {
 }
 $db->commit();
 saveStatus(null, $added);
-echo "Copied $added new reading(s) from Nightscout\n";
+echo date('Y-m-d H:i:s ') . "Copied $added new reading(s) from Nightscout\n";

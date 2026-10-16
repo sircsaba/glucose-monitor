@@ -250,9 +250,9 @@ try {
     }
     $db->commit();
     saveStatus(null, $added);
-    echo "LibreLinkUp: $added new reading(s)\n";
+    echo date('Y-m-d H:i:s ') . "LibreLinkUp: $added new reading(s)\n";
 } catch (Throwable $e) {
-    fwrite(STDERR, $e->getMessage() . "\n");
+    fwrite(STDERR, date('Y-m-d H:i:s ') . $e->getMessage() . "\n");
     saveStatus($e instanceof LibreError ? $e->getMessage() : 'Error: ' . $e->getMessage());
     if ($e instanceof LibreError && in_array($e->getCode(), [401, 403, 405], true)) @unlink($cacheFile);
     exit(1);
