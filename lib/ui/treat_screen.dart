@@ -124,7 +124,7 @@ class _TreatScreenState extends State<TreatScreen> {
               if (t.insulin)
                 StepRow(
                   label: 'Insulin',
-                  value: '${_insulin.toStringAsFixed(1)} U',
+                  value: '${fmtU(_insulin)} U',
                   onMinus: () => setState(() => _insulin = (_insulin - 0.5).clamp(0.0, 30.0)),
                   onPlus: () => setState(() => _insulin = (_insulin + 0.5).clamp(0.0, 30.0)),
                 ),

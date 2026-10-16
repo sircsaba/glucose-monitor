@@ -101,10 +101,10 @@ class NightView extends StatelessWidget {
         case 'since':
           final b = preview != null
               ? 'Bolus 4.5 U · 2h 31m ago'
-              : (bolus == null ? 'No bolus in 24 h' : 'Bolus ${bolus.insulin!.toStringAsFixed(1)} U · ${fmtAge(now.difference(bolus.t))} ago');
+              : (bolus == null ? 'No bolus in 24 h' : 'Bolus ${fmtU(bolus.insulin!)} U · ${fmtAgo(now.difference(bolus.t))}');
           final cb = preview != null
               ? 'Carbs 45 g · 2h 31m ago'
-              : (carbs == null ? '' : 'Carbs ${carbs.carbs!.round()} g · ${fmtAge(now.difference(carbs.t))} ago');
+              : (carbs == null ? '' : 'Carbs ${carbs.carbs!.round()} g · ${fmtAgo(now.difference(carbs.t))}');
           child = Text(cb.isEmpty ? b : '$b\n$cb', style: st(color), textAlign: _talign(c.align));
           break;
         case 'iob':
