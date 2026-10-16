@@ -260,11 +260,39 @@ final class Server
         throw new HttpError(404, 'Not found');
     }
 
+    /**
+     * A problem with the job that brings in the readings (LibreLinkUp or the
+     * Nightscout copy), in words for the apps; null when all is well.
+     */
+    private function feedProblem(): ?string
+    {
+        if (trim((string)($this->cfg['libre_email'] ?? '')) !== '') {
+            [$name, $file] = ['LibreLinkUp', __DIR__ . '/.libre-status.json'];
+        } elseif (trim((string)($this->cfg['nightscout_url'] ?? '')) !== '') {
+            [$name, $file] = ['Nightscout copy', __DIR__ . '/.copy-status.json'];
+        } else {
+            return null;
+        }
+        if (!is_file($file)) return "$name: the job has not run yet. Check the cron job in cPanel";
+        $s = json_decode((string)file_get_contents($file), true) ?: [];
+        $idle = intdiv(time() - (int)($s['at'] ?? 0), 60);
+        if ($idle >= 10) return "$name: the job has not run for $idle min. Check the cron job in cPanel";
+        // One failed minute is normal (network); two in a row is a problem.
+        if (empty($s['ok']) && (int)($s['fails'] ?? 0) >= 2) {
+            $mins = intdiv(time() - (int)($s['since'] ?? time()), 60);
+            $err = (string)($s['error'] ?? 'error');
+            if (strncmp($err, $name, strlen($name)) !== 0) $err = "$name: $err";
+            return $err . ($mins >= 2 ? " (for $mins min)" : '');
+        }
+        return null;
+    }
+
     private function status(): array
     {
         $units = ($this->cfg['units'] ?? 'mmol') === 'mmol' ? 'mmol' : 'mg/dl';
         return [
             'status' => 'ok',
+            'feedProblem' => $this->feedProblem(),
             'name' => 'nightscout',
             'version' => '15.0.0-inforap',
             'serverTime' => self::iso((int)round(microtime(true) * 1000)),

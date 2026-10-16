@@ -149,6 +149,15 @@ class NightscoutClient {
     }
   }
 
+  /// A problem with the job that brings readings into your own server
+  /// (e.g. LibreLinkUp asking to accept new terms); null when all is well or
+  /// when the site does not report it (Nightscout).
+  Future<String?> feedProblem() async {
+    final s = await _get('/api/v1/status.json');
+    if (s is Map && s['feedProblem'] is String && (s['feedProblem'] as String).isNotEmpty) return s['feedProblem'] as String;
+    return null;
+  }
+
   /// Checks the address and token. Returns the site name.
   Future<String> test() async {
     final s = await _get('/api/v1/status.json');

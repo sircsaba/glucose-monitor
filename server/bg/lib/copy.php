@@ -16,6 +16,18 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $cfg = require __DIR__ . '/../config.php';
+
+// The last result, shown by the apps when something is wrong (see server.php).
+function saveStatus(?string $error, int $added = 0): void
+{
+    $file = __DIR__ . '/.copy-status.json';
+    $old = is_file($file) ? (json_decode((string)file_get_contents($file), true) ?: []) : [];
+    $s = $error === null
+        ? ['ok' => true, 'at' => time(), 'added' => $added, 'fails' => 0]
+        : ['ok' => false, 'at' => time(), 'error' => $error, 'fails' => (int)($old['fails'] ?? 0) + 1,
+           'since' => (int)(($old['ok'] ?? true) ? time() : ($old['since'] ?? time()))];
+    @file_put_contents($file, json_encode($s), LOCK_EX);
+}
 $ns = rtrim(trim((string)($cfg['nightscout_url'] ?? '')), '/');
 if ($ns === '') {
     exit(0); // copying is turned off
@@ -58,11 +70,13 @@ curl_close($ch);
 
 if ($body === false || $code !== 200) {
     fwrite(STDERR, "Nightscout did not answer: HTTP $code $err\n");
+    saveStatus($code === 401 || $code === 403 ? 'Nightscout refused access: check nightscout_secret' : "Nightscout did not answer (HTTP $code)");
     exit(1);
 }
 $docs = json_decode($body);
 if (!is_array($docs)) {
     fwrite(STDERR, "Nightscout sent something that is not a list of readings\n");
+    saveStatus('Nightscout sent something that is not a list of readings');
     exit(1);
 }
 
@@ -94,4 +108,5 @@ foreach ($docs as $doc) {
     $added++;
 }
 $db->commit();
+saveStatus(null, $added);
 echo "Copied $added new reading(s) from Nightscout\n";
