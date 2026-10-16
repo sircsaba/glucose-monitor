@@ -33,6 +33,18 @@ if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) exit(0);
 
 final class LibreError extends Exception {}
 
+// The last result, shown by the apps when something is wrong (see server.php).
+function saveStatus(?string $error, int $added = 0): void
+{
+    $file = __DIR__ . '/.libre-status.json';
+    $old = is_file($file) ? (json_decode((string)file_get_contents($file), true) ?: []) : [];
+    $s = $error === null
+        ? ['ok' => true, 'at' => time(), 'added' => $added, 'fails' => 0]
+        : ['ok' => false, 'at' => time(), 'error' => $error, 'fails' => (int)($old['fails'] ?? 0) + 1,
+           'since' => (int)(($old['ok'] ?? true) ? time() : ($old['since'] ?? time()))];
+    @file_put_contents($file, json_encode($s), LOCK_EX);
+}
+
 function llu(string $method, string $url, array $headers, ?array $body = null): array
 {
     $ch = curl_init($url);
@@ -180,9 +192,11 @@ try {
         $added++;
     }
     $db->commit();
+    saveStatus(null, $added);
     echo "LibreLinkUp: $added new reading(s)\n";
 } catch (Throwable $e) {
     fwrite(STDERR, $e->getMessage() . "\n");
+    saveStatus($e instanceof LibreError ? $e->getMessage() : 'Error: ' . $e->getMessage());
     if ($e instanceof LibreError && in_array($e->getCode(), [401, 403], true)) @unlink($cacheFile);
     exit(1);
 }

@@ -503,13 +503,18 @@ class _DayViewState extends State<DayView> {
       );
     }
 
-    final errorBox = app.error == null || widget.preview
+    final problem = app.error ?? app.feedProblem;
+    final errorBox = problem == null || widget.preview
         ? null
         : Container(
             margin: const EdgeInsets.only(top: 4),
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(color: const Color(0xFF2A1F0E), borderRadius: BorderRadius.circular(10)),
-            child: Text(app.error!, style: const TextStyle(color: kAmber, fontSize: 13)),
+            child: Row(children: [
+              const Icon(Icons.warning_amber_rounded, color: kAmber, size: 18),
+              const SizedBox(width: 8),
+              Expanded(child: Text(problem, style: const TextStyle(color: kAmber, fontSize: 13))),
+            ]),
           );
 
     final rows = <Widget>[];

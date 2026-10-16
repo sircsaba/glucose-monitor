@@ -123,6 +123,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   DateTime? insulinChange;
   DateTime? pumpBatteryChange;
   String? error;
+  /// From your own server: why no readings are coming in (shown in a bar).
+  String? feedProblem;
   DateTime? lastFetch;
   bool loading = false;
 
@@ -280,6 +282,11 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
           siteChange = await c.lastOfTypes(['Site Change']) ?? siteChange;
           insulinChange = await c.lastOfTypes(['Insulin Change']) ?? insulinChange;
           pumpBatteryChange = await c.lastOfTypes(['Pump Battery Change']) ?? pumpBatteryChange;
+        } catch (_) {}
+      }
+      if (full || _n % 2 == 0) {
+        try {
+          feedProblem = await c.feedProblem();
         } catch (_) {}
       }
       error = null;
