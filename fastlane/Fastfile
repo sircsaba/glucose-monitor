@@ -18,7 +18,8 @@ platform :ios do
     )
 
     widget_id = "#{bundle_id}.BGWidget"
-    has_widget = File.exist?("ios/BGWidget/Info.plist")
+    # Plain Ruby here runs inside the fastlane folder, hence "..".
+    has_widget = File.exist?("../ios/BGWidget/Info.plist")
 
     # The home-screen widget needs its own App ID: create it the first time.
     if has_widget
