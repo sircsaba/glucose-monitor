@@ -17,10 +17,23 @@ platform :ios do
       in_house: false
     )
 
+    widget_id = "#{bundle_id}.BGWidget"
+    has_widget = File.exist?("ios/BGWidget/Info.plist")
+
+    # The home-screen widget needs its own App ID: create it the first time.
+    if has_widget
+      Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.from(hash: api_key)
+      unless Spaceship::ConnectAPI::BundleId.find(widget_id)
+        UI.message("Creating the App ID #{widget_id}")
+        Spaceship::ConnectAPI::BundleId.create(name: "Glucose Monitor Widget", identifier: widget_id, platform: "IOS")
+      end
+    end
+    ids = has_widget ? [bundle_id, widget_id] : [bundle_id]
+
     # Certificates and profiles live, encrypted, in your private Match-Secrets repository.
     match(
       type: "appstore",
-      app_identifier: bundle_id,
+      app_identifier: ids,
       team_id: team_id,
       api_key: api_key,
       git_url: "https://github.com/#{owner}/Match-Secrets",
@@ -41,6 +54,21 @@ platform :ios do
       profile_name: profile
     )
 
+    profiles = { bundle_id => profile }
+    if has_widget
+      widget_profile = ENV["sigh_#{widget_id}_appstore_profile-name"]
+      update_code_signing_settings(
+        path: "ios/Runner.xcodeproj",
+        use_automatic_signing: false,
+        team_id: team_id,
+        targets: ["BGWidget"],
+        bundle_identifier: widget_id,
+        code_sign_identity: "Apple Distribution",
+        profile_name: widget_profile
+      )
+      profiles[widget_id] = widget_profile
+    end
+
     build_app(
       workspace: "ios/Runner.xcworkspace",
       scheme: "Runner",
@@ -48,7 +76,7 @@ platform :ios do
       export_method: "app-store",
       output_directory: "build/ios",
       export_options: {
-        provisioningProfiles: { bundle_id => profile }
+        provisioningProfiles: profiles
       }
     )
 

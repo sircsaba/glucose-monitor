@@ -6,6 +6,7 @@ Uses the APP_NAME and BUNDLE_ID environment variables.
 import os
 import plistlib
 import re
+import shutil
 import sys
 
 APP_NAME = os.environ.get('APP_NAME') or 'Glucose Monitor'
@@ -20,13 +21,43 @@ def patch_android():
         'android.permission.INTERNET',
         'android.permission.WAKE_LOCK',
         'android.permission.VIBRATE',
+        'android.permission.RECEIVE_BOOT_COMPLETED',
     ]
     add = ''.join(f'<uses-permission android:name="{p}"/>\n    ' for p in perms if p not in text)
     if add:
         text = text.replace('<application', add + '<application', 1)
     text = re.sub(r'android:label="[^"]*"', f'android:label="{APP_NAME}"', text, count=1)
+    # Home-screen widget with the latest glucose (native/android).
+    if 'BgWidget' not in text:
+        receiver = '''<receiver android:name=".BgWidget" android:exported="false" android:label="Glucose">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/bg_widget_info"/>
+        </receiver>
+    '''
+        text = text.replace('</application>', receiver + '</application>', 1)
     with open(man, 'w') as f:
         f.write(text)
+    main_act = None
+    for root, _, files in os.walk('android/app/src/main'):
+        for n in files:
+            if n in ('MainActivity.kt', 'MainActivity.java'):
+                main_act = os.path.join(root, n)
+    if main_act:
+        with open(main_act) as f:
+            pkg = re.search(r'^package\s+([\w.]+)', f.read(), re.M).group(1)
+        with open('native/android/BgWidget.kt') as f:
+            kt = f.read().replace('PACKAGE_NAME', pkg, 1)
+        with open(os.path.join(os.path.dirname(main_act), 'BgWidget.kt'), 'w') as f:
+            f.write(kt)
+        for sub in ('layout', 'xml', 'drawable'):
+            dst = f'android/app/src/main/res/{sub}'
+            os.makedirs(dst, exist_ok=True)
+            for n in os.listdir(f'native/android/res/{sub}'):
+                shutil.copy(f'native/android/res/{sub}/{n}', dst)
 
     for gradle in ['android/app/build.gradle.kts', 'android/app/build.gradle']:
         if not os.path.exists(gradle):
