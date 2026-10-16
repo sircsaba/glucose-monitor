@@ -45,7 +45,7 @@ class DisplaySettingsScreen extends StatelessWidget {
         if ((tops[i] - s.number('graphTop')).abs() < 1) topIndex = i;
       }
 
-      const scales = [0, 100, 115, 130, 150, 175, 200];
+      const scales = [0, 60, 70, 80, 90, 100, 115, 130, 150, 175, 200];
       final scaleIndex = scales.indexOf(s.integer('uiScale')).clamp(0, scales.length - 1);
 
       return [
@@ -111,10 +111,13 @@ class DisplaySettingsScreen extends StatelessWidget {
           ChoiceRow(
             label: 'Size of everything',
             hint: 'Auto makes the app larger on a tablet',
-            options: const ['Auto', '100%', '115%', '130%', '150%', '175%', '200%'],
+            options: const ['Auto', '60%', '70%', '80%', '90%', '100%', '115%', '130%', '150%', '175%', '200%'],
             index: scaleIndex,
             onChanged: (i) => app.change((x) => x.set('uiScale', scales[i])),
           ),
+          setChoice('Layout', 'screenMode', const ['Auto', 'Computer', 'Phone'],
+              hint: 'Computer: one wide page that fits the screen (big glucose, cards on one line, graph filling the rest). '
+                  'Auto picks Computer on a laptop or desktop in landscape'),
         ]),
         Section(title: 'Reports: time in range', children: [
           setMg('Range from', 'tirLo', min: 54, max: 140),
