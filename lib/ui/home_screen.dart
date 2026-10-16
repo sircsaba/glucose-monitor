@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../logic/glucose.dart';
@@ -174,8 +175,17 @@ class DayView extends StatefulWidget {
   final int part; // 0 everything, 1 everything but the graph, 2 the graph only
   const DayView({super.key, this.preview = false, this.highlight, this.onSelect, this.wide, this.fill = false, this.part = 0});
 
-  /// A phone turned on its side (short screen, wider than tall).
+  /// A computer (Windows, Mac, Linux), also in a browser.
+  static bool get onComputer =>
+      defaultTargetPlatform == TargetPlatform.windows ||
+      defaultTargetPlatform == TargetPlatform.macOS ||
+      defaultTargetPlatform == TargetPlatform.linux;
+
+  /// A phone turned on its side (short screen, wider than tall). Never on a
+  /// computer, even a small laptop screen, unless the phone layout is chosen.
   static bool phoneSideways(BuildContext context) {
+    final mode = app.settings.integer('screenMode');
+    if (mode == 1 || (mode == 0 && onComputer)) return false;
     final size = MediaQuery.of(context).size;
     return size.width > size.height && size.shortestSide < 600;
   }
@@ -191,7 +201,12 @@ class DayView extends StatefulWidget {
 
   /// A computer screen or a wide window: picks the compact, larger default.
   static bool isWide(BuildContext context) {
+    final mode = app.settings.integer('screenMode');
+    if (mode == 1) return true;
+    if (mode == 2) return false;
     final size = MediaQuery.of(context).size;
+    // A computer in landscape is a computer, even with a small window.
+    if (onComputer && size.width > size.height && size.width >= 600) return true;
     return size.width >= 900 && size.width > size.height;
   }
 

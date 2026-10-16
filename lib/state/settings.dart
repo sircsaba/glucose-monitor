@@ -255,6 +255,7 @@ class Settings {
     'graphButtons': [1, 2, 3, 6, 12], // the 5 buttons above the graph, in hours
     'graphTop': 0, // 0 = auto, else the top of the graph in mg/dL
     'dotSize': 0, // 0 small, 1 medium, 2 large
+    'screenMode': 0, // 0 auto, 1 computer layout, 2 phone layout
     'dotBright': 100, // % brightness of the glucose dots
     // Time in tight range (TTIR): 70–140 mg/dL (3.9–7.8 mmol/L). The part of the
     // range above it is tinted on graphs and shown on reports.
