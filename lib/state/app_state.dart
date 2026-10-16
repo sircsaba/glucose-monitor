@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../alarm/alarm_player.dart';
 import '../data/nightscout.dart';
+import '../logic/profile.dart';
 import '../logic/glucose.dart';
 import '../ui/alert_screen.dart';
 import '../ui/checklist_screen.dart';
@@ -123,6 +124,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   DateTime? insulinChange;
   DateTime? pumpBatteryChange;
   String? error;
+  /// Therapy profiles from the site, newest first.
+  List<ProfileDoc> profiles = [];
   /// From your own server: why no readings are coming in (shown in a bar).
   String? feedProblem;
   DateTime? lastFetch;
@@ -282,6 +285,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
           siteChange = await c.lastOfTypes(['Site Change']) ?? siteChange;
           insulinChange = await c.lastOfTypes(['Insulin Change']) ?? insulinChange;
           pumpBatteryChange = await c.lastOfTypes(['Pump Battery Change']) ?? pumpBatteryChange;
+        } catch (_) {}
+        try {
+          profiles = await c.profiles();
         } catch (_) {}
       }
       if (full || _n % 2 == 0) {
