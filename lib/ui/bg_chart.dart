@@ -91,6 +91,9 @@ class _BgChartState extends State<BgChart> {
           hover: _pos,
           tipBg: tipBg,
           tipTreat: tipTreat,
+          ttirHi: s.flag('ttirOn') ? s.number('ttirHi') : null,
+          ttirColor: Color(s.integer('ttirColor')),
+          dotBright: s.integer('dotBright') / 100.0,
         ),
       ),
     );
@@ -147,6 +150,9 @@ class _BgPainter extends CustomPainter {
   final Offset? hover;
   final int tipBg; // 0 nothing, 1 value, 2 value and time, 3 time
   final int tipTreat;
+  final double? ttirHi; // null = TTIR off
+  final Color ttirColor;
+  final double dotBright;
 
   _BgPainter({
     required this.entries,
@@ -178,6 +184,9 @@ class _BgPainter extends CustomPainter {
     required this.hover,
     required this.tipBg,
     required this.tipTreat,
+    required this.ttirHi,
+    required this.ttirColor,
+    required this.dotBright,
   });
 
   static void _dotted(Canvas c, Offset a, Offset b, Paint p, {double on = 2, double off = 3}) {
@@ -239,8 +248,18 @@ class _BgPainter extends CustomPainter {
     double y(double mg) => top + (1 - (mg.clamp(minMg, maxMg) - minMg) / (maxMg - minMg)) * plotH;
 
     final r = rr;
-    // Green band and zone lines, in this range's colours.
-    canvas.drawRect(Rect.fromLTRB(left, y(r.yelHi), left + w, y(r.yelLo)), Paint()..color = Color(r.cGreen).withValues(alpha: 0.08));
+    // Green band and zone lines, in this range's colours. With TTIR on, the
+    // part of the range above the tight range has its own tint.
+    final tightTop = ttirHi;
+    if (tightTop != null && tightTop > r.yelLo && tightTop < r.yelHi) {
+      canvas.drawRect(Rect.fromLTRB(left, y(tightTop), left + w, y(r.yelLo)), Paint()..color = Color(r.cGreen).withValues(alpha: 0.08));
+      canvas.drawRect(Rect.fromLTRB(left, y(r.yelHi), left + w, y(tightTop)), Paint()..color = ttirColor.withValues(alpha: 0.13));
+      _dotted(canvas, Offset(left, y(tightTop)), Offset(left + w, y(tightTop)), Paint()
+        ..color = ttirColor.withValues(alpha: 0.45)
+        ..strokeWidth = 1);
+    } else {
+      canvas.drawRect(Rect.fromLTRB(left, y(r.yelHi), left + w, y(r.yelLo)), Paint()..color = Color(r.cGreen).withValues(alpha: 0.08));
+    }
     final line = Paint()..strokeWidth = 1;
     for (final v in [r.yelLo, r.yelHi]) {
       line.color = Color(r.cYel).withValues(alpha: 0.35);
@@ -448,7 +467,7 @@ class _BgPainter extends CustomPainter {
     final rad = (hours <= 2 ? 1.9 : (hours <= 3 ? 1.7 : (hours <= 6 ? 1.5 : (hours <= 12 ? 1.25 : 1.0)))) * dotScale;
     for (final e in visible) {
       final er = activeRange(ranges, e.t);
-      final c = zoneColorIn(zoneOf(e.mg, er), er);
+      final c = brighten(zoneColorIn(zoneOf(e.mg, er), er), dotBright);
       canvas.drawCircle(Offset(x(e.t), y(e.mg)), rad, Paint()..color = c);
     }
 
@@ -564,6 +583,11 @@ class _SparkPainter extends CustomPainter {
     double y(double mg) => size.height - (mg.clamp(lo, hi) - lo) / (hi - lo) * size.height;
     double x(DateTime t) => t.difference(start).inSeconds / (hours * 3600) * size.width;
     canvas.drawRect(Rect.fromLTRB(0, y(range.yelHi), size.width, y(range.yelLo)), Paint()..color = color.withValues(alpha: 0.08));
+    final s = app.settings;
+    final tightTop = s.number('ttirHi');
+    if (s.flag('ttirOn') && tightTop > range.yelLo && tightTop < range.yelHi) {
+      canvas.drawRect(Rect.fromLTRB(0, y(range.yelHi), size.width, y(tightTop)), Paint()..color = Color(s.integer('ttirColor')).withValues(alpha: 0.13));
+    }
     if (pts.length < 2) return;
     final path = Path()..moveTo(x(pts.first.t), y(pts.first.mg));
     for (final e in pts.skip(1)) {
@@ -633,6 +657,24 @@ List<Widget> graphGridSettings() {
     setChoice('Mouse over a treatment shows', 'tipTreat', tips),
   ];
 }
+
+/// [c] made brighter (f > 1: more vivid and lighter) or dimmer (f < 1).
+Color brighten(Color c, double f) {
+  if ((f - 1).abs() < 0.01) return c;
+  final h = HSLColor.fromColor(c);
+  final sat = (h.saturation * (f > 1 ? 1 + (f - 1) * 0.6 : f)).clamp(0.0, 1.0);
+  final light = f > 1 ? (h.lightness + (1 - h.lightness) * (f - 1) * 0.35).clamp(0.0, 0.92) : (h.lightness * f).clamp(0.05, 1.0);
+  return h.withSaturation(sat).withLightness(light).toColor();
+}
+
+/// Settings rows for TTIR and the dots (used in two screens).
+List<Widget> ttirSettings() => [
+      setInt('Dot brightness', 'dotBright', step: 10, min: 50, max: 200, unit: '%', hint: 'Above 100 % makes the glucose dots brighter and more vivid'),
+      setSwitch('Time in tight range (TTIR)', 'ttirOn',
+          hint: 'Tints the part of your range above the tight range on graphs, and shows TTIR on reports and the main screen'),
+      setMg('Tight range up to', 'ttirHi', min: 100, max: 180, hint: 'Usual: 7.8 mmol/L (140 mg/dL). It starts at the low end of your range'),
+      _colorRow('Colour above the tight range', 'ttirColor'),
+    ];
 
 Widget _colorRow(String label, String key) => Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),

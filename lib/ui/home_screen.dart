@@ -383,6 +383,16 @@ class _DayViewState extends State<DayView> {
           final pct = d?.phoneBattery == null ? '–' : '${d!.phoneBattery}%';
           if (c.box) return pair('Phone', pct);
           return pair(c.stack ? 'Looping phone' : 'Looping phone battery', pct);
+        case 'ttir':
+          // Time in range over the last 24 h, and in tight range when TTIR is on.
+          final since = now.subtract(const Duration(hours: 24));
+          final day = app.entries.where((e) => e.t.isAfter(since)).map((e) => e.mg).toList();
+          if (day.isEmpty) return pair('TIR 24 h', '–');
+          final lo = s.number('tirLo'), hi = s.number('tirHi'), th = s.number('ttirHi');
+          final tir = (day.where((v) => v >= lo && v <= hi).length * 100 / day.length).round();
+          if (!s.flag('ttirOn')) return pair('TIR 24 h', '$tir%');
+          final ttir = (day.where((v) => v >= lo && v <= th).length * 100 / day.length).round();
+          return pair(c.stack ? 'TIR · TTIR 24 h' : 'TIR / TTIR', '$tir% · $ttir%');
         case 'graph':
           return Container(
             padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
