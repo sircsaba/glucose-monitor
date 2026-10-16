@@ -21,7 +21,7 @@ jobs:
       - run: python3 scripts/patch_platforms.py ios
       - run: flutter pub get
       - run: flutter build ios --release --config-only --no-codesign --build-number=$BUILD_NUMBER
-      - run: cd ios && pod install
+      - run: if [ -f ios/Podfile ]; then cd ios && pod install; fi
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.3'
