@@ -192,6 +192,38 @@ class NightscoutClient {
     return out;
   }
 
+  /// Readings over a long period, a few days at a time (a sensor sending every
+  /// minute gives 1,440 readings a day).
+  Future<List<Entry>> entriesBetween(DateTime from, DateTime to) async {
+    final out = <Entry>[];
+    var a = from;
+    while (a.isBefore(to)) {
+      final b = a.add(const Duration(days: 5)).isAfter(to) ? to : a.add(const Duration(days: 5));
+      final j = await _get('/api/v1/entries/sgv.json', {
+        'find[date][\$gte]': '${a.millisecondsSinceEpoch}',
+        'find[date][\$lt]': '${b.millisecondsSinceEpoch}',
+        'count': '10000',
+      });
+      if (j is List) {
+        for (final e in j) {
+          if (e is! Map) continue;
+          final mg = _d(e['sgv']);
+          final ms = e['date'];
+          if (mg == null || mg < 20 || ms is! num) continue;
+          out.add(Entry(DateTime.fromMillisecondsSinceEpoch(ms.toInt()), mg, (e['direction'] ?? '').toString()));
+        }
+      }
+      a = b;
+    }
+    out.sort((x, y) => x.t.compareTo(y.t));
+    // The same reading twice (two sources a few seconds apart): keep one per minute.
+    final dedup = <Entry>[];
+    for (final e in out) {
+      if (dedup.isEmpty || e.t.difference(dedup.last.t).inSeconds >= 30) dedup.add(e);
+    }
+    return dedup;
+  }
+
   Treatment? _treatment(dynamic e) {
     if (e is! Map) return null;
     final t = _time(e['created_at']) ?? _time(e['mills']) ?? _time(e['date']);
