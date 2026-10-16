@@ -48,4 +48,8 @@ return [
     'nightscout_url' => '',            // e.g. 'https://mysite.herokuapp.com'
     'nightscout_secret' => '',         // your Nightscout API secret
     'copy_first_hours' => 30,          // the first copy fetches this many hours
+
+    // The web app at this site's address (https://your-site/). '' = the
+    // published Glucose Monitor app; 'none' = only the API, no web app.
+    'web_app_url' => '',
 ];

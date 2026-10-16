@@ -103,6 +103,15 @@ status from Loop, but no glucose. `lib/copy.php` fetches the readings from Night
 To test the command once by hand: cPanel › *Terminal* (if your plan has it) and run the same
 command without `>/dev/null 2>&1`: it prints `Copied N new reading(s) from Nightscout`.
 
+## Web app at your own address
+
+Opening your site (for example `https://bg.inforap.com`) in a browser shows the
+Glucose Monitor web app, the same as on the phone. The first time, enter your
+site address and your read token. The data stays under `/api/v1/...`.
+The app files come from the published copy on GitHub Pages and are refreshed
+every minute (a copy is kept in `lib/.webcache/`, so it still opens if GitHub is
+down). To turn it off, put `'web_app_url' => 'none',` in `config.php`.
+
 ## Glucose Monitor app
 
 Settings › Data & general › tap the site address › `https://bg.inforap.com`, then either
