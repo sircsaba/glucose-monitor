@@ -425,7 +425,7 @@ class _BgPainter extends CustomPainter {
           if (t.isSmb) {
             final cy = lineY == null ? top - 3 * k : math.max(top, lineY - 5 * k);
             canvas.drawCircle(Offset(tx, cy), 2 * k, Paint()..color = kAccent);
-            hits.add(_Hit(Offset(tx, cy), 'SMB ${t.insulin!.toStringAsFixed(2)} U', t.t));
+            hits.add(_Hit(Offset(tx, cy), 'SMB ${fmtU(t.insulin!)} U', t.t));
           } else {
             final hw = 5 * k;
             final hh = 9 * k;
@@ -437,8 +437,8 @@ class _BgPainter extends CustomPainter {
               ..lineTo(tx, tipY)
               ..close();
             canvas.drawPath(p, Paint()..color = kAccent);
-            hits.add(_Hit(Offset(tx, tipY - hh / 2), 'Bolus ${t.insulin!.toStringAsFixed(2)} U', t.t));
-            final label = '${t.insulin!.toStringAsFixed(1)}U';
+            hits.add(_Hit(Offset(tx, tipY - hh / 2), 'Bolus ${fmtU(t.insulin!)} U', t.t));
+            final label = '${fmtU(t.insulin!)}U';
             if (lineY == null) {
               _text(canvas, label, Offset(tx + hw + 2, tipY - hh / 2), color: kText, size: fs);
             } else {

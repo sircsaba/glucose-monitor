@@ -79,15 +79,22 @@ String fmtMinutesOfDay(int m, bool h24) {
   return fmtClock(DateTime(2000, 1, 1, mm ~/ 60, mm % 60), h24);
 }
 
+/// Insulin units with as many decimals as needed: 0.05, 0.1, 1.25, 2.
+String fmtU(double u) {
+  var s = u.toStringAsFixed(2);
+  if (s.contains('.')) s = s.replaceFirst(RegExp(r'\.?0+$'), '');
+  return s;
+}
+
 String fmtAge(Duration d) {
-  if (d.inMinutes < 1) return 'just now';
+  if (d.inMinutes < 1) return 'now';
   if (d.inMinutes < 60) return '${d.inMinutes} min';
   if (d.inHours < 48) return '${d.inHours}h ${d.inMinutes % 60}m';
   return '${d.inDays}d ${d.inHours % 24}h';
 }
 
 String fmtAgo(Duration d) {
-  if (d.inMinutes < 1) return 'just now';
+  if (d.inMinutes < 1) return 'Now';
   if (d.inMinutes == 1) return '1 min ago';
   if (d.inMinutes < 60) return '${d.inMinutes} min ago';
   return '${fmtAge(d)} ago';

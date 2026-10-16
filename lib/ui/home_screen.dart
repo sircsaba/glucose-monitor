@@ -386,9 +386,9 @@ class _DayViewState extends State<DayView> {
         case 'battery':
           return pair(c.stack ? 'Pump battery' : 'Batt', battery());
         case 'bolus':
-          return text(bolus == null ? 'No bolus in 24 h' : 'Bolus ${bolus.insulin!.toStringAsFixed(1)}U · ${fmtAge(now.difference(bolus.t))} ago');
+          return text(bolus == null ? 'No bolus in 24 h' : 'Bolus ${fmtU(bolus.insulin!)}U · ${fmtAgo(now.difference(bolus.t))}');
         case 'carbs':
-          return text(carbs == null ? '' : 'Carbs ${carbs.carbs!.round()}g · ${fmtAge(now.difference(carbs.t))} ago');
+          return text(carbs == null ? '' : 'Carbs ${carbs.carbs!.round()}g · ${fmtAgo(now.difference(carbs.t))}');
         case 'sensor':
           return pair('Sensor', ageOf(app.sensorStart));
         case 'cannula':
