@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../data/nightscout.dart';
 import '../logic/glucose.dart';
+import '../logic/insulin.dart';
+import '../logic/profile.dart';
 import '../state/app_state.dart';
 import '../state/settings.dart';
 import 'common.dart';
@@ -94,6 +96,7 @@ class _BgChartState extends State<BgChart> {
           ttirHi: s.flag('ttirOn') ? s.number('ttirHi') : null,
           ttirColor: Color(s.integer('ttirColor')),
           dotBright: s.integer('dotBright') / 100.0,
+          profiles: s.flag('profileShow') ? app.profiles : null,
         ),
       ),
     );
@@ -153,6 +156,7 @@ class _BgPainter extends CustomPainter {
   final double? ttirHi; // null = TTIR off
   final Color ttirColor;
   final double dotBright;
+  final List<ProfileDoc>? profiles; // null = profile not shown
 
   _BgPainter({
     required this.entries,
@@ -187,6 +191,7 @@ class _BgPainter extends CustomPainter {
     required this.ttirHi,
     required this.ttirColor,
     required this.dotBright,
+    required this.profiles,
   });
 
   static void _dotted(Canvas c, Offset a, Offset b, Paint p, {double on = 2, double off = 3}) {
@@ -332,6 +337,22 @@ class _BgPainter extends CustomPainter {
           ellipsis: '…',
         )..layout(maxWidth: math.max(0, x2 - x1 - 4));
         if (tp.width > 8) tp.paint(canvas, Offset(x1 + 3, top + 5));
+      }
+    }
+
+    // Profile: its name at the bottom left, and a marker where it changed.
+    final profs = profiles;
+    if (profs != null && (profs.isNotEmpty || treatments.any((t) => t.type == 'Profile Switch'))) {
+      final style = TextStyle(color: kMuted.withValues(alpha: 0.9), fontSize: 10);
+      final cur = profileNameAt(treatments, profs, tStart.isAfter(now) ? now : tStart);
+      if (cur.isNotEmpty) _text(canvas, 'Profile: $cur', Offset(left + 4, plotBottom - 8), color: style.color!);
+      final pen = Paint()
+        ..color = kMuted.withValues(alpha: 0.6)
+        ..strokeWidth = 1;
+      for (final ch in profileChanges(treatments, profs, tStart, tEnd)) {
+        final cx = x(ch.key);
+        _dotted(canvas, Offset(cx, top), Offset(cx, plotBottom), pen, on: 4, off: 3);
+        _text(canvas, ch.value, Offset(cx + 3, plotBottom - 20), color: style.color!);
       }
     }
 
@@ -674,6 +695,7 @@ List<Widget> ttirSettings() => [
           hint: 'Tints the part of your range above the tight range on graphs, and shows TTIR on reports and the main screen'),
       setMg('Tight range up to', 'ttirHi', min: 100, max: 180, hint: 'Usual: 7.8 mmol/L (140 mg/dL). It starts at the low end of your range'),
       _colorRow('Colour above the tight range', 'ttirColor'),
+      setSwitch('Profile on the graph', 'profileShow', hint: 'Name of the profile in use, and a line where it changed'),
     ];
 
 Widget _colorRow(String label, String key) => Padding(

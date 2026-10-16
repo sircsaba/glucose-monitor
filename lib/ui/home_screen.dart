@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatf
 import 'package:flutter/material.dart';
 
 import '../logic/glucose.dart';
+import '../logic/insulin.dart';
+import '../logic/profile.dart';
 import '../state/app_state.dart';
 import '../state/settings.dart';
 import 'bg_chart.dart';
@@ -408,6 +410,11 @@ class _DayViewState extends State<DayView> {
           if (!s.flag('ttirOn')) return pair('TIR 24 h', '$tir%');
           final ttir = (day.where((v) => v >= lo && v <= th).length * 100 / day.length).round();
           return pair(c.stack ? 'TIR · TTIR 24 h' : 'TIR / TTIR', '$tir% · $ttir%');
+        case 'profile':
+          final name = profileNameAt(app.treatments, app.profiles, now);
+          return pair('Profile', name.isEmpty ? '–' : name);
+        case 'today':
+          return TodayTotals(size: size, color: col, bold: c.bold, align: align);
         case 'graph':
           return Container(
             padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
@@ -658,4 +665,57 @@ class _LoopBadgeState extends State<LoopBadge> with SingleTickerProviderStateMix
     if (!widget.late) return text;
     return FadeTransition(opacity: Tween<double>(begin: 0.25, end: 1.0).animate(_blink), child: text);
   }
+}
+
+
+/// Today so far (since midnight): carbs, boluses, basal, total insulin, and the
+/// carb ratio and sensitivity they work out to, next to the profile's values.
+class TodayTotals extends StatelessWidget {
+  final double size;
+  final Color color;
+  final bool bold;
+  final Alignment align;
+  const TodayTotals({super.key, required this.size, required this.color, this.bold = false, this.align = Alignment.center});
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final midnight = DateTime(now.year, now.month, now.day);
+    final t = insulinTotals(app.treatments, app.profiles, midnight, now);
+    final p = profileAt(app.profiles, now);
+    final mmol = app.mmol;
+    String isf(double mgPerU) => mmol ? (mgPerU / mgPerMmol).toStringAsFixed(1) : mgPerU.round().toString();
+    final unit = mmol ? 'mmol/L/U' : 'mg/dL/U';
+    final items = <(String, String)>[
+      ('Carbs', '${t.carbs.round()} g'),
+      ('Bolus', '${fmtU(_r1(t.bolus))} U${t.autoBolus > 0 ? ' (auto ${fmtU(_r1(t.autoBolus))})' : ''}'),
+      ('Base basal', '${fmtU(_r1(t.baseBasal))} U'),
+      ('Basal', '${fmtU(_r1(t.totalBasal))} U'),
+      ('Total', '${fmtU(_r1(t.total))} U'),
+      if (t.icrManual != null) ('ICR', '1:${t.icrManual!.toStringAsFixed(1)}${t.icrAll != null && t.autoBolus > 0 ? ' (all 1:${t.icrAll!.toStringAsFixed(1)})' : ''}'),
+      if (t.isfRule != null && t.hours >= 6) ('ISF est.', '${isf(t.isfRule!)} $unit'),
+      if (p?.carbRatioAt(now) != null) ('Profile ICR', '1:${fmtU(p!.carbRatioAt(now)!)}'),
+      if (p?.sensAt(now) != null) ('Profile ISF', isf(p!.sensAt(now)!)),
+    ];
+    final value = kMono.copyWith(color: color, fontSize: size, fontWeight: bold ? FontWeight.w600 : FontWeight.w400);
+    final label = TextStyle(color: kMuted, fontSize: size * 0.85);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+      Text('Today so far', style: TextStyle(color: kMuted, fontSize: size * 0.85, fontWeight: FontWeight.w600)),
+      SizedBox(height: size * 0.3),
+      Wrap(
+        alignment: align.x < 0 ? WrapAlignment.start : (align.x > 0 ? WrapAlignment.end : WrapAlignment.center),
+        spacing: size * 1.2,
+        runSpacing: size * 0.35,
+        children: [
+          for (final it in items)
+            Text.rich(TextSpan(children: [
+              TextSpan(text: '${it.$1} ', style: label),
+              TextSpan(text: it.$2, style: value),
+            ])),
+        ],
+      ),
+    ]);
+  }
+
+  static double _r1(double v) => (v * 10).round() / 10;
 }

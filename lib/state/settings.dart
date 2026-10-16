@@ -211,6 +211,8 @@ const Map<String, String> kDayNames = {
   'cannula': 'Cannula age',
   'phone': 'Looping phone battery',
   'ttir': 'Time in range, 24 h (TIR / TTIR)',
+  'today': 'Today so far (carbs, insulin, ICR, ISF)',
+  'profile': 'Profile in use',
 };
 
 /// Alarm sounds bundled with the app (assets/sounds/<file>.wav).
@@ -259,6 +261,7 @@ class Settings {
     'dotBright': 100, // % brightness of the glucose dots
     // Time in tight range (TTIR): 70–140 mg/dL (3.9–7.8 mmol/L). The part of the
     // range above it is tinted on graphs and shown on reports.
+    'profileShow': true, // profile name and changes on the graph
     'ttirOn': true,
     'ttirHi': 140.0,
     'ttirColor': 0xFFFFF3A0,
@@ -430,6 +433,8 @@ class Settings {
         LineCfg(id: 'cannula', size: 13, zoneColor: false, color: white, space: 14, stack: true, join: true),
         LineCfg(id: 'phone', size: 12, zoneColor: false, color: grey, space: 8),
         LineCfg(id: 'ttir', size: 13, zoneColor: false, color: white, space: 8, box: true),
+        LineCfg(id: 'profile', size: 13, zoneColor: false, color: white, space: 8, box: true, join: true),
+        LineCfg(id: 'today', size: 13, zoneColor: false, color: white, space: 8, box: true, align: 'left'),
       ];
     }
     if (big) {
@@ -452,6 +457,8 @@ class Settings {
         LineCfg(id: 'phone', size: 22, zoneColor: false, color: white, space: 16, flex: 2, box: true, join: true),
         LineCfg(id: 'ttir', size: 22, zoneColor: false, color: white, space: 16, flex: 4, box: true, join: true),
         LineCfg(id: 'graph', size: 420, space: 14),
+        LineCfg(id: 'profile', size: 16, zoneColor: false, color: white, space: 10, flex: 1, box: true),
+        LineCfg(id: 'today', size: 16, zoneColor: false, color: white, space: 10, flex: 5, box: true, join: true, align: 'left'),
       ];
     }
     const k = 1.0;
@@ -474,6 +481,8 @@ class Settings {
       LineCfg(id: 'cannula', size: z(13), zoneColor: false, color: soft, space: z(8), join: true),
       LineCfg(id: 'phone', size: z(13), zoneColor: false, color: soft, space: z(8), join: true),
       LineCfg(id: 'ttir', size: z(13), zoneColor: false, color: white, space: z(8), box: true),
+      LineCfg(id: 'profile', size: z(13), zoneColor: false, color: white, space: z(8), box: true, join: true),
+      LineCfg(id: 'today', size: z(13), zoneColor: false, color: white, space: z(8), box: true, align: 'left'),
     ];
   }
 
@@ -513,7 +522,7 @@ class Settings {
       final dayList = (day == null || day.isEmpty) ? init.day : day;
       for (final d in init.day) {
         // New elements appear hidden in a layout you made, except time in range.
-        if (!dayList.any((l) => l.id == d.id)) dayList.add(d..show = d.id == 'ttir');
+        if (!dayList.any((l) => l.id == d.id)) dayList.add(d..show = const ['ttir', 'today', 'profile'].contains(d.id));
       }
       final presets = (j['snoozePresets'] as List?)?.map((e) => (e as num).toInt()).toList();
       // Add any night-view line that is missing (for older saved settings).

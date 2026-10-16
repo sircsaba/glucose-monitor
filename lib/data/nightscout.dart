@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 
+import '../logic/profile.dart';
+
 class NsException implements Exception {
   final String message;
   NsException(this.message);
@@ -26,8 +28,9 @@ class Treatment {
   final double? carbs;
   final double? absolute; // temp basal rate U/h
   final double? duration; // minutes
-  final bool isSmb;
+  final bool isSmb; // SMB, or a bolus the loop gave by itself (Loop: automatic)
   final String notes;
+  final String profile; // Profile Switch: the profile's name
   // Presets: Loop "Temporary Override", Trio / AAPS "Temporary Target".
   final String reason;
   final double? targetLo; // mg/dL
@@ -43,6 +46,7 @@ class Treatment {
     this.duration,
     this.isSmb = false,
     this.notes = '',
+    this.profile = '',
     this.reason = '',
     this.targetLo,
     this.targetHi,
@@ -199,7 +203,8 @@ class NightscoutClient {
       carbs: _d(e['carbs']),
       absolute: _d(e['absolute']) ?? _d(e['rate']),
       duration: _d(e['duration']),
-      isSmb: e['isSMB'] == true || (e['type'] ?? '').toString() == 'SMB',
+      isSmb: e['isSMB'] == true || (e['type'] ?? '').toString() == 'SMB' || e['automatic'] == true,
+      profile: (e['profile'] ?? e['profileName'] ?? '').toString(),
       notes: (e['notes'] ?? '').toString(),
       reason: (e['reason'] ?? e['notes'] ?? '').toString(),
       targetLo: _presetTarget(e, true),
@@ -220,10 +225,11 @@ class NightscoutClient {
     return units.startsWith('mmol') || v < 30 ? v * 18.0182 : v;
   }
 
-  Future<List<Treatment>> treatmentsSince(DateTime since) async {
+  Future<List<Treatment>> treatmentsSince(DateTime since, {int count = 1000, DateTime? until}) async {
     final j = await _get('/api/v1/treatments.json', {
       'find[created_at][\$gte]': since.toUtc().toIso8601String(),
-      'count': '1000',
+      if (until != null) 'find[created_at][\$lt]': until.toUtc().toIso8601String(),
+      'count': '$count',
     });
     final out = <Treatment>[];
     if (j is List) {
@@ -234,6 +240,26 @@ class NightscoutClient {
     }
     out.sort((a, b) => a.t.compareTo(b.t));
     return out;
+  }
+
+  /// Treatments over a long period, a few days at a time (Loop logs a temp
+  /// basal every 5 minutes, so one request could be cut short).
+  Future<List<Treatment>> treatmentsBetween(DateTime from, DateTime to) async {
+    final out = <Treatment>[];
+    var a = from;
+    while (a.isBefore(to)) {
+      final b = a.add(const Duration(days: 3)).isAfter(to) ? to : a.add(const Duration(days: 3));
+      out.addAll(await treatmentsSince(a, until: b, count: 5000));
+      a = b;
+    }
+    out.sort((x, y) => x.t.compareTo(y.t));
+    return out;
+  }
+
+  /// Therapy profiles (basal, carb ratio, ISF), newest first.
+  Future<List<ProfileDoc>> profiles() async {
+    final j = await _get('/api/v1/profile.json', {'count': '200'});
+    return parseProfiles(j);
   }
 
   /// Time of the latest treatment of one of [types] (for sensor / site age).
