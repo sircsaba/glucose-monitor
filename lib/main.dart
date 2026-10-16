@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show ApplicationSwitcherDescription, SystemChrome;
 
 import 'logic/glucose.dart';
 import 'state/app_state.dart';
@@ -12,7 +13,27 @@ final GlobalKey<NavigatorState> navKey = GlobalKey<NavigatorState>();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await app.init(navKey);
+  // Browser tab (and the phone's app switcher): the latest glucose, e.g.
+  // "7.4 ↗ +0.1". Set straight away on each update, not when the screen is
+  // redrawn: a browser does not redraw a tab you are not looking at.
+  app.addListener(_updateTitle);
+  _updateTitle();
   runApp(const GlucoseApp());
+}
+
+String _lastTitle = '';
+
+void _updateTitle() {
+  final l = app.latest;
+  final t = l == null
+      ? 'Glucose Monitor'
+      : '${app.isStale ? '⚠ ' : ''}${fmtBg(l.mg, app.mmol)} ${arrowText(l.direction)}'
+          '${app.delta5 == null ? '' : ' ${fmtDelta(app.delta5!, app.mmol)}'}'
+          '${app.isStale && app.age != null ? ' (${fmtAge(app.age!)})' : ''}';
+  if (t == _lastTitle) return;
+  _lastTitle = t;
+  SystemChrome.setApplicationSwitcherDescription(
+      ApplicationSwitcherDescription(label: t, primaryColor: 0xFF0D1117));
 }
 
 /// How much bigger to draw everything. Auto: phones 100%, tablets larger.
@@ -34,6 +55,7 @@ class GlucoseApp extends StatelessWidget {
     return MaterialApp(
       navigatorKey: navKey,
       title: 'Glucose Monitor',
+      onGenerateTitle: (_) => _lastTitle,
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
       // Scales the whole app (text, buttons, graph, night view) on tablets,
@@ -62,15 +84,6 @@ class GlucoseApp extends StatelessWidget {
               ),
             ),
           );
-          // Browser tab (and the phone's app switcher): the latest glucose,
-          // e.g. "7.4 ↗ +0.1".
-          final l = app.latest;
-          final tabTitle = l == null
-              ? 'Glucose Monitor'
-              : '${app.isStale ? '⚠ ' : ''}${fmtBg(l.mg, app.mmol)} ${arrowText(l.direction)}'
-                  '${app.delta5 == null ? '' : ' ${fmtDelta(app.delta5!, app.mmol)}'}'
-                  '${app.isStale && app.age != null ? ' (${fmtAge(app.age!)})' : ''}';
-          scaled = Title(title: tabTitle, color: const Color(0xFF0D1117), child: scaled);
           if (!kIsWeb) return scaled;
           // In a browser, the first click or tap allows alarm sounds.
           return Listener(onPointerDown: (_) => app.player.unlock(), child: scaled);
