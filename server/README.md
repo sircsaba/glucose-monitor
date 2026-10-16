@@ -103,6 +103,20 @@ status from Loop, but no glucose. `lib/copy.php` fetches the readings from Night
 To test the command once by hand: cPanel › *Terminal* (if your plan has it) and run the same
 command without `>/dev/null 2>&1`: it prints `Copied N new reading(s) from Nightscout`.
 
+## Importing the history from a Nightscout (one time)
+
+`lib/import.php` copies everything from a Nightscout site: all glucose
+readings, all treatments, the profiles, and the loop status of the last 30 days
+(loop status is big; change `import_devicestatus_days`). Records already here
+are skipped, so it never makes duplicates.
+
+1. In `config.php` add `'import_url' => 'https://your-nightscout'` and
+   `'import_secret' => 'its API secret'`.
+2. cPanel › Cron Jobs › Once Per Minute, command:
+   `/usr/local/bin/php /home/CPANELUSER/your-site/lib/import.php >> /home/CPANELUSER/import.log 2>&1`
+3. Each run imports for about 40 seconds and continues where it stopped.
+   Watch `import.log`; when it says **Import finished**, delete that cron job.
+
 ## Web app at your own address
 
 Opening your site (for example `https://bg.example.com`) in a browser shows the

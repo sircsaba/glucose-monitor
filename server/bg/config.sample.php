@@ -52,4 +52,10 @@ return [
     // The web app at this site's address (https://your-site/). '' = the
     // published Glucose Monitor app; 'none' = only the API, no web app.
     'web_app_url' => '',
+
+    // One-time import of the whole history from a Nightscout (lib/import.php,
+    // see README.md). Leave '' when not importing.
+    'import_url' => '',
+    'import_secret' => '',             // Nightscout API secret, or a read token
+    'import_devicestatus_days' => 30,  // loop status: only the last N days
 ];
