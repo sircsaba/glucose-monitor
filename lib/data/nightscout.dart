@@ -31,6 +31,7 @@ class Treatment {
   final bool isSmb; // SMB, or a bolus the loop gave by itself (Loop: automatic)
   final String notes;
   final String profile; // Profile Switch: the profile's name
+  final String enteredBy;
   // Presets: Loop "Temporary Override", Trio / AAPS "Temporary Target".
   final String reason;
   final double? targetLo; // mg/dL
@@ -47,6 +48,7 @@ class Treatment {
     this.isSmb = false,
     this.notes = '',
     this.profile = '',
+    this.enteredBy = '',
     this.reason = '',
     this.targetLo,
     this.targetHi,
@@ -55,6 +57,15 @@ class Treatment {
   });
 
   bool get isPreset => type == 'Temporary Override' || type == 'Temporary Target';
+}
+
+/// One line of your own server's event log (Settings › Logs).
+class LogEvent {
+  final int id;
+  final DateTime t;
+  final String kind; // cgm, push, loop, treatment, job
+  final String msg;
+  LogEvent(this.id, this.t, this.kind, this.msg);
 }
 
 /// Loop / pump status from the latest device status uploads.
@@ -237,6 +248,7 @@ class NightscoutClient {
       duration: _d(e['duration']),
       isSmb: e['isSMB'] == true || (e['type'] ?? '').toString() == 'SMB' || e['automatic'] == true,
       profile: (e['profile'] ?? e['profileName'] ?? '').toString(),
+      enteredBy: (e['enteredBy'] ?? '').toString(),
       notes: (e['notes'] ?? '').toString(),
       reason: (e['reason'] ?? e['notes'] ?? '').toString(),
       targetLo: _presetTarget(e, true),
@@ -400,6 +412,70 @@ class NightscoutClient {
       }
     }
     return info;
+  }
+
+  // ---------- event log (only on your own Glucose Monitor server)
+
+  /// Headers for a change that needs the API secret: the one given, or the
+  /// app's own when it is connected with the API secret.
+  Map<String, String> _adminHeaders(String? secretOverride) {
+    final h = {..._headers, 'Content-Type': 'application/json'};
+    if (secretOverride != null && secretOverride.isNotEmpty) {
+      h['api-secret'] = sha1.convert(utf8.encode(secretOverride)).toString();
+    }
+    return h;
+  }
+
+  Never _logError(http.Response r) {
+    if (r.statusCode == 404) throw NsException('This site has no event log. Only your own Glucose Monitor server keeps one.');
+    if (r.statusCode == 401 || r.statusCode == 403) throw NsException('The API secret is needed for this (wrong or missing)');
+    throw NsException('The site answered with error ${r.statusCode}');
+  }
+
+  Future<List<LogEvent>> logs({List<String> kinds = const [], int count = 500, DateTime? before}) async {
+    final r = await http
+        .get(_uri('/api/v1/logs', {
+          if (kinds.isNotEmpty) 'kind': kinds.join(','),
+          'count': '$count',
+          if (before != null) 'before': '${before.millisecondsSinceEpoch}',
+        }), headers: _headers)
+        .timeout(const Duration(seconds: 25));
+    if (r.statusCode != 200) _logError(r);
+    final j = jsonDecode(r.body);
+    final out = <LogEvent>[];
+    if (j is List) {
+      for (final e in j) {
+        if (e is! Map || e['at'] is! num) continue;
+        out.add(LogEvent((e['id'] as num?)?.toInt() ?? 0, DateTime.fromMillisecondsSinceEpoch((e['at'] as num).toInt()),
+            (e['kind'] ?? '').toString(), (e['msg'] ?? '').toString()));
+      }
+    }
+    return out;
+  }
+
+  /// {'on': bool, 'kinds': {kind: bool}, 'keep_days': int}
+  Future<Map<String, dynamic>> logSettings() async {
+    final r = await http.get(_uri('/api/v1/logs/settings', const {}), headers: _headers).timeout(const Duration(seconds: 25));
+    if (r.statusCode != 200) _logError(r);
+    return Map<String, dynamic>.from(jsonDecode(r.body) as Map);
+  }
+
+  Future<Map<String, dynamic>> saveLogSettings(Map<String, dynamic> settings, {String? secret}) async {
+    final r = await http
+        .put(_uri('/api/v1/logs/settings', const {}), headers: _adminHeaders(secret), body: jsonEncode(settings))
+        .timeout(const Duration(seconds: 25));
+    if (r.statusCode != 200) _logError(r);
+    return Map<String, dynamic>.from(jsonDecode(r.body) as Map);
+  }
+
+  /// Deletes the log lines of [kinds] (all when empty). Returns how many.
+  Future<int> clearLogs(List<String> kinds, {String? secret}) async {
+    final r = await http
+        .delete(_uri('/api/v1/logs', {if (kinds.isNotEmpty) 'kind': kinds.join(',')}), headers: _adminHeaders(secret))
+        .timeout(const Duration(seconds: 25));
+    if (r.statusCode != 200) _logError(r);
+    final j = jsonDecode(r.body);
+    return j is Map && j['n'] is num ? (j['n'] as num).toInt() : 0;
   }
 
   Future<void> postTreatment(Map<String, dynamic> t) async {

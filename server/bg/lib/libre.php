@@ -18,6 +18,8 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $cfg = require __DIR__ . '/../config.php';
+require_once __DIR__ . '/eventlog.php';
+EventLog::timezone($cfg);
 $email = trim((string)($cfg['libre_email'] ?? ''));
 $password = (string)($cfg['libre_password'] ?? '');
 if ($email === '' || $password === '') exit(0); // turned off
@@ -54,6 +56,26 @@ function saveStatus(?string $error, int $added = 0): void
         : ['ok' => false, 'at' => time(), 'error' => $error, 'fails' => (int)($old['fails'] ?? 0) + 1,
            'since' => (int)(($old['ok'] ?? true) ? time() : ($old['since'] ?? time()))];
     @file_put_contents($file, json_encode($s), LOCK_EX);
+    // In the event log: when a problem starts or changes, and when it is over.
+    $wasOk = (bool)($old['ok'] ?? true);
+    if ($error !== null && ($wasOk || ($old['error'] ?? '') !== $error)) {
+        jobLog('job', 'LibreLinkUp problem: ' . $error);
+    } elseif ($error === null && !$wasOk && $old) {
+        jobLog('job', 'LibreLinkUp working again after ' . EventLog::span(time() - (int)($old['since'] ?? time())));
+    }
+}
+
+/** Adds a line to the event log (opens the database only when logging is on). */
+function jobLog(string $kind, string $msg): void
+{
+    global $cfg;
+    if (!EventLog::enabled($kind)) return;
+    try {
+        static $db = null;
+        $db ??= new PDO($cfg['db_dsn'], $cfg['db_user'] ?? null, $cfg['db_pass'] ?? null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        EventLog::add($db, $kind, $msg);
+    } catch (Throwable $e) {
+    }
 }
 
 function llu(string $method, string $url, array $headers, ?array $body = null): array
@@ -247,8 +269,15 @@ try {
         $doc['_id'] = bin2hex(random_bytes(12));
         $insert->execute([$doc['_id'], $doc['date'], 'sgv', json_encode($doc, JSON_UNESCAPED_SLASHES)]);
         $added++;
+        if ($doc['date'] >= (time() - 900) * 1000) {
+            jobLog('cgm', 'LibreLinkUp reading ' . EventLog::bg((float)$doc['sgv'], ($cfg['units'] ?? 'mmol') === 'mmol' ? 'mmol' : 'mg/dl')
+                . ', measured ' . date('H:i:s', intdiv($doc['date'], 1000)) . ', fetched ' . EventLog::span(time() - intdiv($doc['date'], 1000)) . ' later');
+        } else {
+            $backfill = ($backfill ?? 0) + 1;
+        }
     }
     $db->commit();
+    if (!empty($backfill)) jobLog('cgm', "LibreLinkUp: filled in $backfill older reading(s)");
     saveStatus(null, $added);
     echo date('Y-m-d H:i:s ') . "LibreLinkUp: $added new reading(s)\n";
 } catch (Throwable $e) {

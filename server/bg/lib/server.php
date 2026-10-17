@@ -5,6 +5,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/eventlog.php';
+
 final class HttpError extends Exception
 {
     public int $status;
@@ -252,6 +254,9 @@ final class Server
             case 'devicestatus':
                 $this->devicestatus($method, $sub);
                 return;
+            case 'logs':
+                $this->logs($method, $sub);
+                return;
             case 'profile':
             case 'profiles':
                 $this->profile($method, $res === 'profiles' ? 'list' : $sub);
@@ -348,14 +353,27 @@ final class Server
                 $doc->date = $date;
                 if (empty($doc->dateString)) $doc->dateString = self::iso($date);
                 $id = isset($doc->_id) && is_string($doc->_id) && $doc->_id !== '' ? $doc->_id : null;
+                $isNew = true;
                 if ($id === null) {
                     // Same reading sent twice: keep one.
                     $st = $this->db->prepare('SELECT id FROM entries WHERE type = ? AND date_ms = ?');
                     $st->execute([$type, $date]);
-                    $id = $st->fetchColumn() ?: self::newId();
+                    $found = $st->fetchColumn();
+                    $isNew = !$found;
+                    $id = $found ?: self::newId();
+                } else {
+                    $st = $this->db->prepare('SELECT 1 FROM entries WHERE id = ?');
+                    $st->execute([$id]);
+                    $isNew = !$st->fetchColumn();
                 }
                 $doc->_id = $id;
                 $this->save('entries', $id, ['date_ms' => $date, 'type' => $type, 'doc' => self::enc($doc)]);
+                if ($isNew && $type === 'sgv' && isset($doc->sgv) && is_numeric($doc->sgv)) {
+                    $delay = (int)round((microtime(true) * 1000 - $date) / 1000);
+                    EventLog::add($this->db, 'cgm', 'Reading ' . EventLog::bg((float)$doc->sgv, $this->units())
+                        . ' from ' . (string)($doc->device ?? 'an uploader')
+                        . ', measured ' . date('H:i:s', intdiv($date, 1000)) . ', arrived ' . EventLog::span($delay) . ' later');
+                }
                 $saved[] = $doc;
             }
             $this->cleanup();
@@ -400,8 +418,10 @@ final class Server
                 $id = $st->fetchColumn() ?: null;
             }
         }
+        $isNew = $id === null;
         $id = $id ?? self::newId();
         $doc->_id = $id;
+        if ($isNew && $dedupe) $this->logTreatment($doc, $type, $created);
         $this->save('treatments', $id, [
             'created_ms' => $created,
             'event_type' => $type,
@@ -409,6 +429,107 @@ final class Server
             'doc' => self::enc($doc),
         ]);
         return $doc;
+    }
+
+    private function units(): string
+    {
+        return ($this->cfg['units'] ?? 'mmol') === 'mmol' ? 'mmol' : 'mg/dl';
+    }
+
+    /** One log line for a new bolus, carbs, override... (temp basals are in the loop lines). */
+    private function logTreatment(object $doc, string $type, int $created): void
+    {
+        if ($type === 'Temp Basal' || $type === '') return;
+        $parts = [];
+        $ins = isset($doc->insulin) && is_numeric($doc->insulin) ? (float)$doc->insulin : 0;
+        $carbs = isset($doc->carbs) && is_numeric($doc->carbs) ? (float)$doc->carbs : 0;
+        $auto = !empty($doc->automatic) || !empty($doc->isSMB) || (($doc->type ?? '') === 'SMB');
+        if ($ins > 0) $parts[] = 'Bolus ' . rtrim(rtrim(number_format($ins, 2), '0'), '.') . ' U' . ($auto ? ' (automatic)' : '');
+        if ($carbs > 0) $parts[] = 'Carbs ' . round($carbs) . ' g';
+        if (!$parts) {
+            $name = trim((string)($doc->reason ?? $doc->notes ?? $doc->profile ?? ''));
+            $dur = isset($doc->duration) && is_numeric($doc->duration) ? ' for ' . round((float)$doc->duration) . ' min' : '';
+            $parts[] = $type . ($name !== '' ? " \"$name\"" : '') . $dur;
+        }
+        $by = trim((string)($doc->enteredBy ?? ''));
+        EventLog::add($this->db, 'treatment', implode(' + ', $parts) . ' at ' . date('H:i', intdiv($created, 1000)) . ($by !== '' ? " (from $by)" : ''));
+    }
+
+    /** One log line for each loop run in a device status upload. */
+    private function logLoop(object $doc, int $created): void
+    {
+        $l = $doc->loop ?? null;
+        $o = $doc->openaps ?? null;
+        if (!is_object($l) && !is_object($o)) return;
+        $u = $this->units();
+        $parts = [];
+        $failed = '';
+        if (is_object($l)) {
+            $t = self::toMs($l->timestamp ?? null) ?? $created;
+            $failed = trim((string)($l->failureReason ?? ''));
+            $bg = $l->predicted->values[0] ?? null;
+            if (is_numeric($bg)) $parts[] = 'BG ' . EventLog::bg((float)$bg, $u);
+            if (isset($l->iob->iob) && is_numeric($l->iob->iob)) $parts[] = 'IOB ' . number_format((float)$l->iob->iob, 2) . ' U';
+            if (isset($l->cob->cob) && is_numeric($l->cob->cob)) $parts[] = 'COB ' . round((float)$l->cob->cob) . ' g';
+            $en = $l->enacted ?? null;
+            if (is_object($en) && isset($en->rate)) {
+                $parts[] = 'temp basal ' . number_format((float)$en->rate, 2) . ' U/h' . (isset($en->duration) ? ' for ' . round((float)$en->duration) . ' min' : '');
+            }
+            $rec = $l->automaticDoseRecommendation->bolusUnits ?? null;
+            if (is_numeric($rec) && (float)$rec > 0) $parts[] = 'auto bolus ' . number_format((float)$rec, 2) . ' U';
+        } else {
+            $sug = $o->suggested ?? null;
+            $en = $o->enacted ?? null;
+            $t = self::toMs($en->timestamp ?? null) ?? self::toMs($sug->timestamp ?? null) ?? $created;
+            if (isset($sug->bg) && is_numeric($sug->bg)) $parts[] = 'BG ' . EventLog::bg((float)$sug->bg, $u);
+            $iob = is_object($o->iob ?? null) ? ($o->iob->iob ?? null) : null;
+            if (is_numeric($iob)) $parts[] = 'IOB ' . number_format((float)$iob, 2) . ' U';
+            if (isset($sug->COB) && is_numeric($sug->COB)) $parts[] = 'COB ' . round((float)$sug->COB) . ' g';
+            if (is_object($en) && isset($en->rate)) $parts[] = 'temp basal ' . number_format((float)$en->rate, 2) . ' U/h';
+            if (is_object($en) && isset($en->smb) && is_numeric($en->smb) && (float)$en->smb > 0) $parts[] = 'SMB ' . $en->smb . ' U';
+        }
+        // Time since the previous loop run.
+        $file = __DIR__ . '/.last-loop.json';
+        $prev = is_file($file) ? (int)((json_decode((string)file_get_contents($file), true) ?: [])['at'] ?? 0) : 0;
+        if ($t <= $prev) return; // the same run uploaded again
+        @file_put_contents($file, json_encode(['at' => $t]), LOCK_EX);
+        $gap = $prev > 0 ? ' ' . EventLog::span(intdiv($t - $prev, 1000)) . ' after the last' : '';
+        $device = (string)($doc->device ?? '');
+        $head = $failed !== '' ? "Loop FAILED$gap: $failed" : "Loop ran$gap";
+        EventLog::add($this->db, 'loop', $head . ($parts ? ' · ' . implode(' · ', $parts) : '') . ($device !== '' ? " ($device)" : ''), $t);
+    }
+
+    // ------------------------------------------------------------ logs
+
+    private function logs(string $method, string $sub): void
+    {
+        if ($sub === 'settings') {
+            if ($method === 'GET') {
+                $this->need(self::READ);
+                self::out(EventLog::settings());
+                return;
+            }
+            if ($method === 'PUT' || $method === 'POST') {
+                $this->need(self::ADMIN);
+                $raw = json_decode((string)file_get_contents('php://input'), true);
+                self::out(EventLog::saveSettings(is_array($raw) ? $raw : []));
+                return;
+            }
+            throw new HttpError(405, 'Method not allowed');
+        }
+        $kinds = array_values(array_filter(explode(',', (string)($_GET['kind'] ?? ''))));
+        if ($method === 'GET') {
+            $this->need(self::READ);
+            $before = isset($_GET['before']) && is_numeric($_GET['before']) ? (int)$_GET['before'] : null;
+            self::out(EventLog::list($this->db, $kinds, $this->count(500, 5000), $before));
+            return;
+        }
+        if ($method === 'DELETE') {
+            $this->need(self::ADMIN);
+            self::out(['n' => EventLog::clear($this->db, $kinds), 'ok' => 1]);
+            return;
+        }
+        throw new HttpError(405, 'Method not allowed');
     }
 
     private function treatments(string $method, string $sub): void
@@ -499,6 +620,7 @@ final class Server
                 $id = isset($doc->_id) && is_string($doc->_id) && $doc->_id !== '' ? $doc->_id : self::newId();
                 $doc->_id = $id;
                 $this->save('devicestatus', $id, ['created_ms' => $created, 'doc' => self::enc($doc)]);
+                $this->logLoop($doc, $created);
                 $saved[] = $doc;
             }
             $this->cleanup();
@@ -642,6 +764,7 @@ final class Server
 
     public static function run(array $cfg): void
     {
+        EventLog::timezone($cfg);
         header('Access-Control-Allow-Origin: *');
         header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
         header('Access-Control-Allow-Headers: Content-Type, Accept, api-secret, Authorization');

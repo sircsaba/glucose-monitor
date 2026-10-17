@@ -58,4 +58,7 @@ return [
     'import_url' => '',
     'import_secret' => '',             // Nightscout API secret, or a read token
     'import_devicestatus_days' => 30,  // loop status: only the last N days
+
+    // Time zone for the times written in the event log (Settings › Logs).
+    'timezone' => 'America/Toronto',
 ];

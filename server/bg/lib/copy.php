@@ -16,6 +16,8 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $cfg = require __DIR__ . '/../config.php';
+require_once __DIR__ . '/eventlog.php';
+EventLog::timezone($cfg);
 
 // The last result, shown by the apps when something is wrong (see server.php).
 function saveStatus(?string $error, int $added = 0): void
@@ -27,6 +29,26 @@ function saveStatus(?string $error, int $added = 0): void
         : ['ok' => false, 'at' => time(), 'error' => $error, 'fails' => (int)($old['fails'] ?? 0) + 1,
            'since' => (int)(($old['ok'] ?? true) ? time() : ($old['since'] ?? time()))];
     @file_put_contents($file, json_encode($s), LOCK_EX);
+    // In the event log: when a problem starts or changes, and when it is over.
+    $wasOk = (bool)($old['ok'] ?? true);
+    if ($error !== null && ($wasOk || ($old['error'] ?? '') !== $error)) {
+        jobLog('job', 'Nightscout copy problem: ' . $error);
+    } elseif ($error === null && !$wasOk && $old) {
+        jobLog('job', 'Nightscout copy working again after ' . EventLog::span(time() - (int)($old['since'] ?? time())));
+    }
+}
+
+/** Adds a line to the event log (opens the database only when logging is on). */
+function jobLog(string $kind, string $msg): void
+{
+    global $cfg;
+    if (!EventLog::enabled($kind)) return;
+    try {
+        static $db = null;
+        $db ??= new PDO($cfg['db_dsn'], $cfg['db_user'] ?? null, $cfg['db_pass'] ?? null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        EventLog::add($db, $kind, $msg);
+    } catch (Throwable $e) {
+    }
 }
 $ns = rtrim(trim((string)($cfg['nightscout_url'] ?? '')), '/');
 if ($ns === '') {
@@ -106,6 +128,10 @@ foreach ($docs as $doc) {
     $doc->_id = $id;
     $insert->execute([$id, $date, $type, json_encode($doc, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION)]);
     $added++;
+    if ($type === 'sgv' && $date >= (time() - 900) * 1000) {
+        jobLog('cgm', 'Nightscout copy: reading ' . EventLog::bg((float)$doc->sgv, ($cfg['units'] ?? 'mmol') === 'mmol' ? 'mmol' : 'mg/dl')
+            . ', measured ' . date('H:i:s', intdiv($date, 1000)) . ', copied ' . EventLog::span(time() - intdiv($date, 1000)) . ' later');
+    }
 }
 $db->commit();
 saveStatus(null, $added);
