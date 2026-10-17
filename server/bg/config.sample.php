@@ -59,6 +59,11 @@ return [
     'import_secret' => '',             // Nightscout API secret, or a read token
     'import_devicestatus_days' => 30,  // loop status: only the last N days
 
+    // Your main Nightscout, checked by the apps' fault banner (is it up, does it
+    // get readings, does Loop upload to it). Leave '' if you have none.
+    'main_nightscout_url' => '',       // e.g. 'https://nsval.mooo.com'
+    'main_nightscout_token' => '',     // a read token, if that site is not public
+
     // Time zone for the times written in the event log (Settings › Logs).
     'timezone' => 'America/Toronto',
 ];

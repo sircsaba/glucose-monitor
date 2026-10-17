@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../alarm/alarm_player.dart';
 import '../data/nightscout.dart';
+import '../logic/faults.dart';
 import '../logic/profile.dart';
 import '../logic/glucose.dart';
 import '../ui/alert_screen.dart';
@@ -128,6 +129,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   List<ProfileDoc> profiles = [];
   /// From your own server: why no readings are coming in (shown in a bar).
   String? feedProblem;
+  /// Your own server's health report (null on a plain Nightscout).
+  Health? health;
+  /// Internet check, done only when the site does not answer (null = not checked).
+  bool? internetUp;
   DateTime? lastFetch;
   bool loading = false;
 
@@ -295,15 +300,37 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
           feedProblem = await c.feedProblem();
         } catch (_) {}
       }
+      health = Health.fromJson(await c.health());
       error = null;
+      internetUp = null;
       lastFetch = now;
     } catch (e) {
       error = e.toString();
+      internetUp = await NightscoutClient.internetUp();
     }
     loading = false;
     _n++;
     evaluate();
     notifyListeners();
+  }
+
+  /// The flashing message on the top line, and whether Loop uses the backup.
+  FaultStatus get faultStatus {
+    String site = 'Glucose server';
+    try {
+      final h = Uri.parse(client.base).host;
+      if (h.isNotEmpty) site = h;
+    } catch (_) {}
+    return diagnose(
+      now: DateTime.now(),
+      lateMin: settings.integer('faultMin'),
+      siteError: error != null,
+      internetUp: internetUp,
+      siteName: site,
+      lastReading: latest?.t,
+      lastLoop: device?.loopTime,
+      health: health,
+    );
   }
 
   Future<void> postTreatment(Map<String, dynamic> t) async {

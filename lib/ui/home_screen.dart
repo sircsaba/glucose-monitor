@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
+import '../logic/faults.dart';
 import '../logic/glucose.dart';
 import '../logic/insulin.dart';
 import '../logic/profile.dart';
@@ -508,7 +509,16 @@ class _DayViewState extends State<DayView> {
         }
       }
       final children = <Widget>[];
+      // Top line: a fault ("No Internet", "Libre connection down"...) flashes in
+      // the middle, between the reading age and the loop, 150 % of their size.
+      final fs = first && !widget.preview ? app.faultStatus : null;
+      final bannerAt = fs == null || fs.isEmpty ? -1 : (spots.length >= 2 ? (spots.length + 1) ~/ 2 : spots.length);
+      final baseSize = g.map((c) => c.size).fold<double>(0, (a, b) => b > a ? b : a);
       for (var i = 0; i < spots.length; i++) {
+        if (i == bannerAt) {
+          children.add(SizedBox(width: wide ? 10 : 6));
+          children.add(Expanded(flex: 3, child: FaultBanner(status: fs!, size: (baseSize <= 0 ? 16 : baseSize) * 1.5)));
+        }
         if (i > 0) children.add(SizedBox(width: wide ? 10 : 6));
         final sp = spots[i];
         children.add(Expanded(
@@ -520,6 +530,10 @@ class _DayViewState extends State<DayView> {
                     Padding(padding: EdgeInsets.only(top: k == 0 ? 0 : sp[k].space), child: cell(sp[k])),
                 ]),
         ));
+      }
+      if (bannerAt == spots.length) {
+        children.add(SizedBox(width: wide ? 10 : 6));
+        children.add(Expanded(flex: 3, child: FaultBanner(status: fs!, size: (baseSize <= 0 ? 16 : baseSize) * 1.5)));
       }
       if (first) children.add(icons);
       return Padding(
@@ -599,6 +613,102 @@ class _RangeButton extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// The fault message in the middle of the top line. A fault flashes in bright
+/// red-amber; "Backup CGM" alone (Loop reads from your own server) stays steady.
+class FaultBanner extends StatefulWidget {
+  final FaultStatus status;
+  final double size;
+  const FaultBanner({super.key, required this.status, required this.size});
+  @override
+  State<FaultBanner> createState() => _FaultBannerState();
+}
+
+class _FaultBannerState extends State<FaultBanner> with SingleTickerProviderStateMixin {
+  late final AnimationController _blink = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+
+  @override
+  void initState() {
+    super.initState();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(covariant FaultBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _sync();
+  }
+
+  void _sync() {
+    final flash = widget.status.fault != null;
+    if (flash && !_blink.isAnimating) _blink.repeat(reverse: true);
+    if (!flash) {
+      _blink.stop();
+      _blink.value = 1;
+    }
+  }
+
+  @override
+  void dispose() {
+    _blink.dispose();
+    super.dispose();
+  }
+
+  /// The largest font size up to [max] at which [text] fits [width] in 2 lines.
+  static double _fit(String text, double max, double width, FontWeight w) {
+    var size = max;
+    while (size > 10) {
+      final tp = TextPainter(
+        text: TextSpan(text: text, style: TextStyle(fontSize: size, fontWeight: w)),
+        maxLines: 2,
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+      )..layout(maxWidth: width);
+      if (!tp.didExceedMaxLines && tp.width <= width) break;
+      size -= 1;
+    }
+    return size;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const faultColor = Color(0xFFFF5A3C);
+    final st = widget.status;
+    return LayoutBuilder(builder: (context, box) {
+      final width = box.maxWidth.isFinite ? box.maxWidth : 300.0;
+      final backupSize = _fit('BACKUP CGM', st.fault == null ? widget.size : widget.size * 0.55, width, FontWeight.w700);
+      final backup = Text(
+        'BACKUP CGM',
+        maxLines: 1,
+        textAlign: TextAlign.center,
+        style: TextStyle(color: kAccent, fontSize: backupSize, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+      );
+      Widget body;
+      if (st.fault == null) {
+        body = backup;
+      } else {
+        final size = _fit(st.fault!, widget.size, width, FontWeight.w800);
+        body = Column(mainAxisSize: MainAxisSize.min, children: [
+          FadeTransition(
+            opacity: Tween<double>(begin: 0.2, end: 1.0).animate(_blink),
+            child: Text(
+              st.fault!,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: faultColor, fontSize: size, fontWeight: FontWeight.w800, height: 1.05),
+            ),
+          ),
+          if (st.onBackup) backup,
+        ]);
+      }
+      return Semantics(
+        liveRegion: true,
+        label: [if (st.fault != null) st.fault!, if (st.onBackup) 'Loop is using the backup CGM'].join('. '),
+        child: ExcludeSemantics(child: Center(child: body)),
+      );
+    });
   }
 }
 
