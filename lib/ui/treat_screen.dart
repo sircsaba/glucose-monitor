@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../logic/glucose.dart';
+import '../plus.dart';
 import '../state/app_state.dart';
 import '../state/settings.dart';
 import 'common.dart';
+import 'remote_screen.dart';
 
 class _EventType {
   final String label;
@@ -103,6 +105,15 @@ class _TreatScreenState extends State<TreatScreen> {
                 Text('${fmtBg(l.mg, mmol)} ${arrowText(l.direction)}', style: kMono.copyWith(color: app.colorFor(l.mg), fontSize: 16)),
             ]),
             const SizedBox(height: 14),
+            if (kPlus)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: FilledButton.icon(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RemoteScreen())),
+                  icon: const Icon(Icons.settings_remote_outlined),
+                  label: const Text('Loop remote control: override, carbs, bolus'),
+                ),
+              ),
             if (!allowed)
               const Padding(
                 padding: EdgeInsets.only(bottom: 12),

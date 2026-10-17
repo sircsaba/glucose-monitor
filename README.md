@@ -114,6 +114,43 @@ Run the workflow again whenever you change the code; each run gets a higher buil
 - English only for now.
 - For information only. Always check with a meter before treating.
 
+## Glucose Monitor Plus (Loop remote control, build it yourself)
+
+Glucose Monitor Plus is the same app with **Loop remote commands**: start or
+cancel an override, send carbs, send a bolus. It is not in the stores: you
+build it on GitHub with your own accounts, and it installs next to the regular
+app (its own name and app ID, `<your bundle ID>.plus`).
+
+**No Apple keys in the app.** Commands go through the site the app shows:
+
+- **Nightscout** uses its own `LOOP_APNS_KEY`, `LOOP_APNS_KEY_ID` and
+  `LOOP_DEVELOPER_TEAM_ID` settings (the same as for Loop Caregiver / Careportal).
+- **Your own Glucose Monitor server (WHC)** uses `loop_apns_key_file`,
+  `loop_apns_key_id`, `loop_team_id` in `config.php`, or finds the key of the
+  Loop heartbeat installed next to it.
+
+Loop's device token and bundle ID come from the profile Loop uploads, its
+override presets too. Carbs and boluses need Loop's one-time password: in the
+Plus app, Treat › Loop remote control › One-time password › take a photo (or a
+screenshot) of the QR code in Loop › Settings › Services › Nightscout ›
+One-Time Password. It is kept in the phone's secure storage. Sending needs the
+site's API secret (asked once, can be remembered on the phone).
+
+**Build it:**
+
+- Android: Actions › **Build Glucose Monitor Plus (Android)** › Run workflow,
+  then install the APK from the run's Artifacts.
+- iPhone: first create the app record once: App Store Connect › Apps › + ›
+  New App, name e.g. "Glucose Monitor Plus <your name>", Bundle ID
+  `<your bundle ID>.plus` (the first Plus build creates this ID; run it once,
+  let it fail at the upload, then create the app record and run it again).
+  Then Actions › **Build Glucose Monitor Plus (iPhone, TestFlight)** › Run
+  workflow. Same secrets as the regular iPhone build.
+- Optional repository variables: `PLUS_APP_NAME`, `PLUS_BUNDLE_ID`.
+
+In Loop, remote commands must be on: Settings › Services › Nightscout ›
+Remote Commands. Loop checks every command against its own limits.
+
 ## Publishing on the stores later
 
 - **App Store:** in App Store Connect add screenshots, a description, a privacy-policy web page (it can live on inforap.com), category Medical, and submit a TestFlight build for review.

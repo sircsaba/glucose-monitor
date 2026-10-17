@@ -6,13 +6,41 @@ class TimedValue {
   const TimedValue(this.sec, this.v);
 }
 
+/// One of Loop's override presets (Settings › Overrides), from the profile.
+class OverridePreset {
+  final String name;
+  final String symbol;
+  final int? durationMin; // null = until cancelled
+  final double? scale; // insulin needs, 1 = 100 %
+  final double? targetLo, targetHi; // mg/dL
+  const OverridePreset(this.name, this.symbol, this.durationMin, this.scale, this.targetLo, this.targetHi);
+  String get label => symbol.isEmpty ? name : '$symbol $name';
+}
+
 class ProfileDoc {
   final String name;
   final DateTime start;
   final List<TimedValue> basal; // U/h
   final List<TimedValue> carbRatio; // g/U
   final List<TimedValue> sens; // mg/dL per U
-  ProfileDoc({required this.name, required this.start, required this.basal, required this.carbRatio, required this.sens});
+  /// Loop only: what remote commands need.
+  final bool isLoop;
+  final List<OverridePreset> presets;
+  final String? deviceToken;
+  final String? bundleId;
+  final double? maxBolus;
+  ProfileDoc({
+    required this.name,
+    required this.start,
+    required this.basal,
+    required this.carbRatio,
+    required this.sens,
+    this.isLoop = false,
+    this.presets = const [],
+    this.deviceToken,
+    this.bundleId,
+    this.maxBolus,
+  });
 
   static double? _at(List<TimedValue> list, DateTime t) {
     if (list.isEmpty) return null;
@@ -84,12 +112,34 @@ List<ProfileDoc> parseProfiles(dynamic j) {
     final mmol = units.startsWith('mmol') || (sensList.isNotEmpty && sensList.every((x) => x.v < 20));
     final start = _date(d['startDate']) ?? _date(d['created_at']) ?? _date(d['mills']);
     if (start == null) continue;
+    final ls = d['loopSettings'];
+    final presets = <OverridePreset>[];
+    if (ls is Map && ls['overridePresets'] is List) {
+      for (final o in ls['overridePresets'] as List) {
+        if (o is! Map || o['name'] == null) continue;
+        final dur = _num(o['duration']);
+        final tr = o['targetRange'];
+        presets.add(OverridePreset(
+          o['name'].toString(),
+          (o['symbol'] ?? '').toString(),
+          dur == null || dur <= 0 ? null : (dur / 60).round(),
+          _num(o['insulinNeedsScaleFactor']),
+          tr is List && tr.length == 2 ? _num(tr[0]) : null,
+          tr is List && tr.length == 2 ? _num(tr[1]) : null,
+        ));
+      }
+    }
     out.add(ProfileDoc(
       name: name,
       start: start,
       basal: _list(p['basal']),
       carbRatio: _list(p['carbratio']),
       sens: mmol ? _list(p['sens'], factor: 18.0182) : sensList,
+      isLoop: ls is Map,
+      presets: presets,
+      deviceToken: ls is Map ? ls['deviceToken']?.toString() : null,
+      bundleId: ls is Map ? ls['bundleIdentifier']?.toString() : null,
+      maxBolus: ls is Map ? _num(ls['maximumBolus']) : null,
     ));
   }
   out.sort((a, b) => b.start.compareTo(a.start));

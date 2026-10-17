@@ -18,6 +18,10 @@ dependencies:
   pdf: ^3.11.1
   printing: ^5.13.4
   share_plus: ^10.1.4
+  flutter_secure_storage: ^9.2.4
+  image_picker: ^1.1.2
+  image: ^4.2.0
+  zxing2: ^0.2.3
 
 dev_dependencies:
   flutter_test:

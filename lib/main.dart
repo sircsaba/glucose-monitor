@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show ApplicationSwitcherDescription, SystemChrome;
 
 import 'logic/glucose.dart';
+import 'plus.dart';
 import 'state/app_state.dart';
 import 'ui/common.dart';
 import 'ui/connect_screen.dart';
@@ -26,7 +27,7 @@ String _lastTitle = '';
 void _updateTitle() {
   final l = app.latest;
   final t = l == null
-      ? 'Glucose Monitor'
+      ? kAppName
       : '${app.isStale ? '⚠ ' : ''}${fmtBg(l.mg, app.mmol)} ${arrowText(l.direction)}'
           '${app.delta5 == null ? '' : ' ${fmtDelta(app.delta5!, app.mmol)}'}'
           '${app.isStale && app.age != null ? ' (${fmtAge(app.age!)})' : ''}';
@@ -54,7 +55,7 @@ class GlucoseApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navKey,
-      title: 'Glucose Monitor',
+      title: kAppName,
       onGenerateTitle: (_) => _lastTitle,
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),

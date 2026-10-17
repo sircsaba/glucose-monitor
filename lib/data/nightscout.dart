@@ -504,6 +504,26 @@ class NightscoutClient {
     return j is Map && j['n'] is num ? (j['n'] as num).toInt() : 0;
   }
 
+  /// Sends a Loop remote command (override, cancel, carbs, bolus) through the
+  /// site, which pushes it to the Loop phone with Apple's push service:
+  /// Nightscout with its LOOP_APNS_* settings, or your own Glucose Monitor
+  /// server with the heartbeat's key. Needs the API secret.
+  Future<void> sendLoopCommand(Map<String, dynamic> body, {String? secret}) async {
+    final http.Response r;
+    try {
+      r = await http
+          .post(_uri('/api/v2/notifications/loop', const {}), headers: _adminHeaders(secret), body: jsonEncode(body))
+          .timeout(const Duration(seconds: 30));
+    } catch (e) {
+      throw NsException('Cannot reach the site: $e');
+    }
+    if (r.statusCode == 200) return;
+    if (r.statusCode == 401 || r.statusCode == 403) throw NsException('The API secret is needed to send commands (wrong or missing)');
+    if (r.statusCode == 404) throw NsException('This site cannot send Loop commands (no remote command support)');
+    final text = r.body.trim();
+    throw NsException(text.isEmpty ? 'The site answered with error ${r.statusCode}' : text);
+  }
+
   Future<void> postTreatment(Map<String, dynamic> t) async {
     final http.Response r;
     try {
