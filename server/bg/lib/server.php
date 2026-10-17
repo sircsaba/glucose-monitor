@@ -6,6 +6,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/eventlog.php';
+require_once __DIR__ . '/loopremote.php';
 
 final class HttpError extends Exception
 {
@@ -217,6 +218,32 @@ final class Server
             echo '<!doctype html><meta charset="utf-8"><title>' . htmlspecialchars((string)$this->cfg['site_name']) .
                 '</title><body style="font-family:system-ui;background:#0D1117;color:#E6EDF3;padding:40px">' .
                 '<h1>' . htmlspecialchars((string)$this->cfg['site_name']) . '</h1><p>The glucose server is running.</p>';
+            return;
+        }
+        // Loop remote commands, the same way as Nightscout (needs the API secret).
+        if ($path === '/api/v2/notifications/loop') {
+            if ($method !== 'POST') throw new HttpError(405, 'Method not allowed');
+            $this->need(self::ADMIN);
+            $raw = (string)file_get_contents('php://input');
+            $data = json_decode($raw, true);
+            if (!is_array($data)) parse_str($raw, $data);
+            if (!is_array($data) || !$data) throw new HttpError(400, 'Send the command as JSON or a form');
+            $error = LoopRemote::send($this->db, $this->cfg, $data, (string)($_SERVER['REMOTE_ADDR'] ?? ''));
+            $desc = (string)($data['eventType'] ?? '?')
+                . (isset($data['reason']) && $data['reason'] !== '' ? ' "' . $data['reason'] . '"' : '')
+                . (isset($data['duration']) && (int)$data['duration'] > 0 ? ' ' . (int)$data['duration'] . ' min' : '')
+                . (isset($data['remoteCarbs']) ? ' ' . $data['remoteCarbs'] . ' g' : '')
+                . (isset($data['remoteBolus']) ? ' ' . $data['remoteBolus'] . ' U' : '')
+                . (!empty($data['enteredBy']) ? ' (from ' . $data['enteredBy'] . ')' : '');
+            EventLog::add($this->db, 'remote', $error === null ? "Sent to Loop: $desc" : "NOT sent: $desc · $error");
+            if ($error !== null) {
+                http_response_code(500);
+                header('Content-Type: text/plain; charset=utf-8');
+                echo $error;
+                return;
+            }
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'OK';
             return;
         }
         if (($parts[0] ?? '') !== 'api' || ($parts[1] ?? '') !== 'v1') {
