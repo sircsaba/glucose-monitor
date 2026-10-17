@@ -210,7 +210,7 @@ const Map<String, String> kDayNames = {
   'sensor': 'Sensor age',
   'cannula': 'Cannula age',
   'phone': 'Looping phone battery',
-  'ttir': 'Time in range, 24 h (TIR / TTIR)',
+  'ttir': 'Time in range today (TIR / TTIR)',
   'today': 'Today so far (carbs, insulin, ICR, ISF)',
   'profile': 'Profile in use',
 };
@@ -257,6 +257,7 @@ class Settings {
     'graphButtons': [1, 2, 3, 6, 12], // the 5 buttons above the graph, in hours
     'graphTop': 0, // 0 = auto, else the top of the graph in mg/dL
     'dotSize': 0, // 0 small, 1 medium, 2 large
+    'tirPeriod': 0, // main-screen TIR card: 0 today since midnight, 1 last 24 h
     'screenMode': 0, // 0 auto, 1 computer layout, 2 phone layout
     'dotBright': 100, // % brightness of the glucose dots
     // Time in tight range (TTIR): 70–140 mg/dL (3.9–7.8 mmol/L). The part of the

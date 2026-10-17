@@ -401,15 +401,18 @@ class _DayViewState extends State<DayView> {
           if (c.box) return pair('Phone', pct);
           return pair(c.stack ? 'Looping phone' : 'Looping phone battery', pct);
         case 'ttir':
-          // Time in range over the last 24 h, and in tight range when TTIR is on.
-          final since = now.subtract(const Duration(hours: 24));
-          final day = app.entries.where((e) => e.t.isAfter(since)).map((e) => e.mg).toList();
-          if (day.isEmpty) return pair('TIR 24 h', '–');
+          // Time in range today since midnight (local time), or over the last
+          // 24 h, as set; and in tight range when TTIR is on.
+          final last24 = s.integer('tirPeriod') == 1;
+          final since = last24 ? now.subtract(const Duration(hours: 24)) : DateTime(now.year, now.month, now.day);
+          final when = last24 ? '24 h' : 'today';
+          final day = app.entries.where((e) => !e.t.isBefore(since)).map((e) => e.mg).toList();
+          if (day.isEmpty) return pair('TIR $when', '–');
           final lo = s.number('tirLo'), hi = s.number('tirHi'), th = s.number('ttirHi');
           final tir = (day.where((v) => v >= lo && v <= hi).length * 100 / day.length).round();
-          if (!s.flag('ttirOn')) return pair('TIR 24 h', '$tir%');
+          if (!s.flag('ttirOn')) return pair('TIR $when', '$tir%');
           final ttir = (day.where((v) => v >= lo && v <= th).length * 100 / day.length).round();
-          return pair(c.stack ? 'TIR · TTIR 24 h' : 'TIR / TTIR', '$tir% · $ttir%');
+          return pair('TIR · TTIR $when', '$tir% · $ttir%');
         case 'profile':
           final name = profileNameAt(app.treatments, app.profiles, now);
           return pair('Profile', name.isEmpty ? '–' : name);

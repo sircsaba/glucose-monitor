@@ -28,10 +28,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
   int _tab = 0;
   Future<ReportData>? _future;
   int _loadedDays = 0;
+  DateTime _loadedAt = DateTime(2000);
   bool _printing = false;
 
   void _load() {
     _loadedDays = _days;
+    _loadedAt = DateTime.now();
     _future = loadReport(_days);
   }
 
@@ -47,13 +49,21 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_future == null || _loadedDays != _days) _load();
+    // Reload when the period changed, the date changed since the last load
+    // (Today must start at this midnight), or the data is over 10 minutes old.
+    final now = DateTime.now();
+    final stale = now.day != _loadedAt.day || now.difference(_loadedAt) > const Duration(minutes: 10);
+    // TickerMode is off while another tab is shown, and changes (rebuilding this
+    // screen) when the Reports tab comes back into view.
+    final visible = TickerMode.of(context);
+    if (_future == null || _loadedDays != _days || (stale && visible)) _load();
     return FutureBuilder<ReportData>(
       future: _future,
       builder: (context, snap) {
         final data = snap.connectionState == ConnectionState.done && !snap.hasError ? snap.data : null;
         final head = Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 6, runSpacing: 6, children: [
           const Text('Reports', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
+          Text('updated ${two(_loadedAt.hour)}:${two(_loadedAt.minute)}', style: const TextStyle(color: kMuted, fontSize: 11)),
           const SizedBox(width: 8),
           for (final d in _periods)
             ChoiceChip(label: Text(d == 1 ? 'Today' : '${d}d'), selected: _days == d, onSelected: (_) => setState(() => _days = d)),
