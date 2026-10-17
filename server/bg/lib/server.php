@@ -230,6 +230,10 @@ final class Server
                 $this->need(self::READ);
                 self::out($this->status());
                 return;
+            case 'health':
+                $this->need(self::READ);
+                self::out($this->health());
+                return;
             case 'verifyauth':
                 self::out(['message' => [
                     'canRead' => $this->level >= self::READ,
@@ -292,6 +296,95 @@ final class Server
         return null;
     }
 
+    // ------------------------------------------------------------ health
+
+    private function noteLoopCgmFetch(): void
+    {
+        $file = __DIR__ . '/.loop-cgm.json';
+        $last = is_file($file) ? (int)(json_decode((string)file_get_contents($file), true)['at'] ?? 0) : 0;
+        if (time() - $last < 30) return;
+        @file_put_contents($file, json_encode(['at' => time()]), LOCK_EX);
+        if (time() - $last > 900) {
+            EventLog::add($this->db, 'job', 'Loop is reading its glucose from this server (backup CGM source)');
+        }
+    }
+
+    /** GET a small JSON from the main Nightscout; null when it does not answer. */
+    private static function mainGet(string $base, string $token, string $path): array
+    {
+        $url = rtrim($base, '/') . $path . ($token !== '' ? (strpos($path, '?') === false ? '?' : '&') . 'token=' . rawurlencode($token) : '');
+        if (!function_exists('curl_init')) return [null, 'PHP curl is missing'];
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 6,
+            CURLOPT_CONNECTTIMEOUT => 4,
+            CURLOPT_HTTPHEADER => ['Accept: application/json'],
+        ]);
+        $body = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+        if ($body === false || $code === 0) return [null, $err !== '' ? $err : 'no answer'];
+        if ($code !== 200) return [null, "error $code"];
+        $j = json_decode((string)$body, true);
+        return [is_array($j) ? $j : null, is_array($j) ? null : 'not JSON'];
+    }
+
+    /** The main Nightscout seen from here (checked at most once a minute). */
+    private function mainStatus(): ?array
+    {
+        $base = trim((string)($this->cfg['main_nightscout_url'] ?? ''));
+        if ($base === '') return null;
+        if (!preg_match('#^https?://#i', $base)) $base = 'https://' . $base;
+        $file = __DIR__ . '/.main-status.json';
+        $old = is_file($file) ? (json_decode((string)file_get_contents($file), true) ?: []) : [];
+        if (time() - (int)($old['checked'] ?? 0) < 60) return $old;
+        $token = trim((string)($this->cfg['main_nightscout_token'] ?? ''));
+        [$e, $err] = self::mainGet($base, $token, '/api/v1/entries/sgv.json?count=1');
+        $s = ['checked' => time(), 'host' => (string)parse_url($base, PHP_URL_HOST), 'reachable' => $e !== null,
+              'error' => $err, 'cgmLast' => null, 'loopLast' => null];
+        if ($e !== null) {
+            $s['cgmLast'] = isset($e[0]['date']) && is_numeric($e[0]['date']) ? (int)$e[0]['date'] : null;
+            [$d] = self::mainGet($base, $token, '/api/v1/devicestatus.json?count=1');
+            $t = $d[0]['loop']['timestamp'] ?? $d[0]['created_at'] ?? null;
+            $s['loopLast'] = self::toMs($t);
+        }
+        @file_put_contents($file, json_encode($s), LOCK_EX);
+        return $s;
+    }
+
+    /**
+     * What the apps need to say WHY readings or loops are late: the LibreLinkUp
+     * job here, the newest reading and loop here, the main Nightscout, and
+     * whether Loop is reading its glucose from this server (backup).
+     */
+    private function health(): array
+    {
+        $libre = null;
+        if (trim((string)($this->cfg['libre_email'] ?? '')) !== '') {
+            $f = __DIR__ . '/.libre-status.json';
+            $st = is_file($f) ? (json_decode((string)file_get_contents($f), true) ?: []) : [];
+            $libre = ['lastRun' => isset($st['at']) ? (int)$st['at'] : null, 'ok' => !empty($st['ok']),
+                      'fails' => (int)($st['fails'] ?? 0), 'error' => $st['error'] ?? null];
+        }
+        $cgm = $this->db->query("SELECT MAX(date_ms) FROM entries WHERE type = 'sgv'")->fetchColumn();
+        $loop = $this->db->query('SELECT MAX(created_ms) FROM devicestatus')->fetchColumn();
+        $lf = __DIR__ . '/.loop-cgm.json';
+        $fetch = is_file($lf) ? (int)(json_decode((string)file_get_contents($lf), true)['at'] ?? 0) : 0;
+        return [
+            'serverTime' => (int)round(microtime(true) * 1000),
+            'feedProblem' => $this->feedProblem(),
+            'libre' => $libre,
+            'cgmLast' => $cgm !== false && $cgm !== null ? (int)$cgm : null,
+            'loopLast' => $loop !== false && $loop !== null ? (int)$loop : null,
+            // Loop asked this server for glucose in the last 10 minutes.
+            'loopCgmFromHere' => $fetch > 0 && time() - $fetch < 600,
+            'loopCgmFetch' => $fetch > 0 ? $fetch * 1000 : null,
+            'main' => $this->mainStatus(),
+        ];
+    }
+
     private function status(): array
     {
         $units = ($this->cfg['units'] ?? 'mmol') === 'mmol' ? 'mmol' : 'mg/dl';
@@ -329,6 +422,13 @@ final class Server
                 $count = 1;
             }
             $find = $_GET['find'] ?? [];
+            if ($sub === '' && $this->level >= self::ADMIN && is_array($find)
+                && is_array($find['dateString'] ?? null)
+                && isset($find['dateString']['$gte'], $find['dateString']['$lte'])) {
+                // The exact request Loop's "Nightscout Remote CGM" makes: Loop is
+                // reading its glucose from this server (the backup source).
+                $this->noteLoopCgmFetch();
+            }
             if (is_array($find)) {
                 if (isset($find['date'])) $this->rangeFilter($where, $args, 'date_ms', $find['date']);
                 if (isset($find['dateString'])) $this->rangeFilter($where, $args, 'date_ms', $find['dateString']);

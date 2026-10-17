@@ -173,6 +173,32 @@ class NightscoutClient {
     return null;
   }
 
+  /// Your own server's health report (LibreLinkUp job, main Nightscout, backup
+  /// use); null when the site has none (a plain Nightscout answers 404).
+  Future<dynamic> health() async {
+    try {
+      final r = await http.get(_uri('/api/v1/health.json', const {}), headers: _headers).timeout(const Duration(seconds: 15));
+      if (r.statusCode != 200) return null;
+      return jsonDecode(r.body);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// True when the internet answers (two well-known sites that allow web apps
+  /// to ask), false when neither does. Used only after the site failed, to tell
+  /// "No Internet" from "the site is down".
+  static Future<bool> internetUp() async {
+    const probes = ['https://dns.google/resolve?name=apple.com&type=A', 'https://api.github.com/zen'];
+    for (final p in probes) {
+      try {
+        await http.get(Uri.parse(p)).timeout(const Duration(seconds: 6));
+        return true;
+      } catch (_) {}
+    }
+    return false;
+  }
+
   /// Checks the address and token. Returns the site name.
   Future<String> test() async {
     final s = await _get('/api/v1/status.json');

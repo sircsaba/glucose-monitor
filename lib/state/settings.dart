@@ -304,6 +304,8 @@ class Settings {
     'predLowMin': 20,
     'loopOn': true,
     'loopMin': 30,
+    // Flashing fault message on the top line when readings or loops are this late
+    'faultMin': 7,
     'reservoirOn': true,
     'reservoirU': 20,
     'pumpBatOn': true,
