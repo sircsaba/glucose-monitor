@@ -3,7 +3,8 @@
 // works (a reading arrives, the heartbeat push goes out, Loop runs).
 //
 // Kinds:  cgm (new reading)  push (heartbeat sent to Loop)  loop (Loop ran)
-//         treatment (bolus, carbs, override)  job (LibreLinkUp / Nightscout copy problems)
+//         treatment (bolus, carbs, override)  remote (remote command sent to Loop)
+//         job (LibreLinkUp / Nightscout copy problems)
 //
 // Used by server.php, libre.php, copy.php and loop-heartbeat.php. The settings
 // (logging on/off, which kinds, how many days to keep) are in lib/.eventlog.json
@@ -12,7 +13,7 @@ declare(strict_types=1);
 
 final class EventLog
 {
-    public const KINDS = ['cgm', 'push', 'loop', 'treatment', 'job'];
+    public const KINDS = ['cgm', 'push', 'loop', 'treatment', 'remote', 'job'];
     private static bool $ready = false;
     private static ?array $settings = null;
 
