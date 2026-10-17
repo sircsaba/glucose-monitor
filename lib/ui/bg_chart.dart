@@ -693,6 +693,7 @@ List<Widget> ttirSettings() => [
       setInt('Dot brightness', 'dotBright', step: 10, min: 50, max: 200, unit: '%', hint: 'Above 100 % makes the glucose dots brighter and more vivid'),
       setSwitch('Time in tight range (TTIR)', 'ttirOn',
           hint: 'Tints the part of your range above the tight range on graphs, and shows TTIR on reports and the main screen'),
+      setChoice('Time in range card on the main screen', 'tirPeriod', const ['Today, since midnight', 'Last 24 hours']),
       setMg('Tight range up to', 'ttirHi', min: 100, max: 180, hint: 'Usual: 7.8 mmol/L (140 mg/dL). It starts at the low end of your range'),
       _colorRow('Colour above the tight range', 'ttirColor'),
       setSwitch('Profile on the graph', 'profileShow', hint: 'Name of the profile in use, and a line where it changed'),
