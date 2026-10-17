@@ -1,0 +1,65 @@
+name: Build Glucose Monitor Plus (iPhone, TestFlight)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    env:
+      # Glucose Monitor Plus: Loop remote commands. Its own name and app ID.
+      APP_NAME: ${{ vars.PLUS_APP_NAME || 'Glucose Monitor Plus' }}
+      BUNDLE_ID: ${{ vars.PLUS_BUNDLE_ID || 'com.monitorglucoseplus.app' }}
+      TEAMID: ${{ secrets.TEAMID }}
+      FASTLANE_KEY_ID: ${{ secrets.FASTLANE_KEY_ID }}
+      FASTLANE_ISSUER_ID: ${{ secrets.FASTLANE_ISSUER_ID }}
+      FASTLANE_KEY: ${{ secrets.FASTLANE_KEY }}
+      GH_PAT: ${{ secrets.GH_PAT }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+      BUILD_NUMBER: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check secrets are set
+        run: |
+          for s in TEAMID FASTLANE_KEY_ID FASTLANE_ISSUER_ID FASTLANE_KEY GH_PAT MATCH_PASSWORD; do
+            if [ -z "${!s}" ]; then echo "::error::Secret $s is missing. See README, step 3."; exit 1; fi
+          done
+          chmod +x scripts/step.sh
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create the Android and iOS project files
+        run: scripts/step.sh "flutter create" flutter create --org com.monitorglucose --project-name glucose_monitor --platforms android,ios .
+
+      - name: Set app name, ID and settings
+        run: scripts/step.sh "Patch iOS project" python3 scripts/patch_platforms.py ios
+
+      - name: Get packages
+        run: scripts/step.sh "flutter pub get" flutter pub get
+
+      - name: App icon
+        run: dart run flutter_launcher_icons
+        continue-on-error: true
+
+      - name: Prepare the Xcode project
+        run: |
+          scripts/step.sh "Prepare Xcode project" flutter build ios --release --config-only --no-codesign --build-number=$BUILD_NUMBER --dart-define=PLUS=true
+          if [ -f ios/Podfile ]; then
+            cd ios && ../scripts/step.sh "pod install" pod install
+          fi
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Add the home-screen widget
+        run: scripts/step.sh "Add widget" bundle exec ruby native/ios/add_widget.rb
+
+      - name: Sign, build and upload to TestFlight
+        run: scripts/step.sh "fastlane (sign, build, upload)" bundle exec fastlane ios build_upload

@@ -257,6 +257,10 @@ class Settings {
     'graphButtons': [1, 2, 3, 6, 12], // the 5 buttons above the graph, in hours
     'graphTop': 0, // 0 = auto, else the top of the graph in mg/dL
     'dotSize': 0, // 0 small, 1 medium, 2 large
+    // Glucose Monitor Plus: Loop remote control limits and name.
+    'remoteMaxBolus': 2.0,
+    'remoteMaxCarbs': 50.0,
+    'remoteName': '',
     'tirPeriod': 0, // main-screen TIR card: 0 today since midnight, 1 last 24 h
     'screenMode': 0, // 0 auto, 1 computer layout, 2 phone layout
     'dotBright': 100, // % brightness of the glucose dots

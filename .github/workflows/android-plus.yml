@@ -1,0 +1,53 @@
+name: Build Glucose Monitor Plus (Android)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    env:
+      # Glucose Monitor Plus: Loop remote commands. Its own name and app ID, so it
+      # installs next to the regular app.
+      APP_NAME: ${{ vars.PLUS_APP_NAME || 'Glucose Monitor Plus' }}
+      BUNDLE_ID: ${{ vars.PLUS_BUNDLE_ID || 'com.monitorglucoseplus.app' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create the Android and iOS project files
+        run: flutter create --org com.monitorglucose --project-name glucose_monitor --platforms android,ios .
+
+      - name: Set app name, ID and permissions
+        run: python3 scripts/patch_platforms.py android
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: App icon
+        run: dart run flutter_launcher_icons
+        continue-on-error: true
+
+      - name: Check the code
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build APK
+        run: flutter build apk --release --build-number=${{ github.run_number }} --dart-define=PLUS=true
+
+      - name: Save the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: glucose-monitor-plus-android
+          path: build/app/outputs/flutter-apk/app-release.apk

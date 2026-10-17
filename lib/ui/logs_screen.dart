@@ -20,6 +20,7 @@ const _kinds = {
   'push': ('Push', Color(0xFFB39DFF)),
   'loop': ('Loop', Color(0xFF5BC0EB)),
   'treatment': ('Treatment', Color(0xFFFF9F43)),
+  'remote': ('Remote', Color(0xFFF08BD0)),
   'job': ('Job', Color(0xFFFF4D5A)),
 };
 
@@ -174,6 +175,7 @@ class _LogsScreenState extends State<LogsScreen> {
         'push' => 'Each heartbeat push sent to Loop',
         'loop' => 'Each loop run uploaded by Loop, with the time since the last',
         'treatment' => 'Boluses, carbs, overrides (not temp basals)',
+        'remote' => 'Remote commands sent to Loop (Glucose Monitor Plus, Loop Caregiver)',
         _ => 'LibreLinkUp / Nightscout copy problems and recoveries',
       };
 
