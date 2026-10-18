@@ -48,6 +48,15 @@ class RemoteSecrets {
 /// Apple keys here: the site has them. Loop's device token comes from the
 /// profile; carbs and boluses need Loop's one-time password (its QR code,
 /// read once).
+const Color _kOn = Color(0xFF2E9E4F); // an override is running
+
+String _presetLabel(ProfileDoc? loop, String name) {
+  for (final p in loop?.presets ?? const <OverridePreset>[]) {
+    if (p.name == name) return p.label;
+  }
+  return name;
+}
+
 class RemoteScreen extends StatefulWidget {
   const RemoteScreen({super.key});
   @override
@@ -435,8 +444,13 @@ class _RemoteScreenState extends State<RemoteScreen> {
     return parts.join(' · ');
   }
 
-  /// The override running now, from the treatments (Loop uploads them).
-  Treatment? get _activeOverride {
+  /// The override running now: from Loop's latest status upload (every 5
+  /// minutes), or else from the override treatments.
+  ({String name, DateTime? end})? get _activeOverride {
+    final d = app.device;
+    if (d != null && d.overrideSeen) {
+      return d.overrideActive ? (name: d.overrideName, end: d.overrideEnd) : null;
+    }
     Treatment? last;
     final list = app.treatments.where((t) => t.type == 'Temporary Override').toList()..sort((a, b) => a.t.compareTo(b.t));
     for (final t in list) {
@@ -446,7 +460,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
     if ((last.duration ?? 0) <= 0 && !last.indefinite) return null;
     final end = last.indefinite ? null : last.t.add(Duration(seconds: ((last.duration ?? 0) * 60).round()));
     if (end != null && end.isBefore(DateTime.now())) return null;
-    return last;
+    return (name: last.reason, end: end);
   }
 
   Widget _card(String title, List<Widget> children) => Container(
@@ -501,15 +515,26 @@ class _RemoteScreenState extends State<RemoteScreen> {
               _card('Override', [
                 if (active != null)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text('Running: ${active.reason.isEmpty ? 'override' : active.reason}${active.indefinite ? ' (until cancelled)' : ''}',
-                        style: const TextStyle(color: kAccent, fontSize: 13)),
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Text(
+                        'Running: ${active.name.isEmpty ? 'override' : _presetLabel(loop, active.name)}'
+                        '${active.end == null ? ' (until cancelled)' : ' until ${fmtClock(active.end!, s.flag('time24'))}'}',
+                        style: const TextStyle(color: _kOn, fontSize: 16, fontWeight: FontWeight.w700)),
                   ),
                 if (loop == null || loop.presets.isEmpty)
                   const Text('No override presets in Loop\'s profile yet.', style: TextStyle(color: kMuted, fontSize: 13))
                 else
                   Wrap(spacing: 8, runSpacing: 8, children: [
-                    for (final p in loop.presets) ActionChip(label: Text(p.label), onPressed: () => _override(p)),
+                    for (final p in loop.presets)
+                      ActionChip(
+                        label: Text(p.label,
+                            style: active != null && active.name == p.name
+                                ? const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)
+                                : null),
+                        backgroundColor: active != null && active.name == p.name ? _kOn : null,
+                        side: active != null && active.name == p.name ? const BorderSide(color: _kOn) : null,
+                        onPressed: () => _override(p),
+                      ),
                   ]),
                 const SizedBox(height: 8),
                 if (active != null)
