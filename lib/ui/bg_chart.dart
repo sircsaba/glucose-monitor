@@ -184,7 +184,7 @@ class _BgChartState extends State<BgChart> {
       );
     });
     final h24 = s.flag('time24');
-    String when(DateTime t) => '${const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][t.weekday - 1]} ${fmtClock(t, h24)}';
+    String dayTime(DateTime t) => '${const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][t.weekday - 1]} ${fmtClock(t, h24)}';
     final step = Duration(minutes: math.max(15, widget.hours * 30)); // half a screen
     return Stack(children: [
       chart,
@@ -194,7 +194,7 @@ class _BgChartState extends State<BgChart> {
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           if (_loadingOld) const Padding(padding: EdgeInsets.all(6), child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))),
           if (!live)
-            Text('${when(viewNow.subtract(Duration(hours: widget.hours)))} – ${when(viewNow)}', style: const TextStyle(color: kMuted, fontSize: 11)),
+            Text('${dayTime(viewNow.subtract(Duration(hours: widget.hours)))} – ${dayTime(viewNow)}', style: const TextStyle(color: kMuted, fontSize: 11)),
           _arrow(Icons.chevron_left, 'Earlier', () => _shift(step)),
           if (!live) _arrow(Icons.chevron_right, 'Later', () => _shift(-step)),
           if (!live)
@@ -218,7 +218,6 @@ class _BgChartState extends State<BgChart> {
         onPressed: onTap,
         icon: Icon(icon),
       );
-  }
 }
 
 /// Something under the mouse: a treatment marker.
