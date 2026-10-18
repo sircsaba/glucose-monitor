@@ -141,7 +141,7 @@ class _BgChartState extends State<BgChart> {
           h24: s.flag('time24'),
           now: viewNow,
           topMg: s.number('graphTop'),
-          dotScale: const [1.0, 1.4, 1.9][s.integer('dotSize').clamp(0, 2)],
+          dotScale: const [1.0, 1.4, 1.9, 2.5][s.integer('dotSize').clamp(0, 3)],
           treatScale: (s.integer('treatSize') / 100.0).clamp(0.5, 3.0),
           treatOnLine: s.integer('treatPlace') == 1,
           grid: s.flag('gridLines'),
@@ -792,8 +792,11 @@ List<Widget> graphGridSettings() {
 Color brighten(Color c, double f) {
   if ((f - 1).abs() < 0.01) return c;
   final h = HSLColor.fromColor(c);
-  final sat = (h.saturation * (f > 1 ? 1 + (f - 1) * 0.6 : f)).clamp(0.0, 1.0);
-  final light = f > 1 ? (h.lightness + (1 - h.lightness) * (f - 1) * 0.35).clamp(0.0, 0.92) : (h.lightness * f).clamp(0.05, 1.0);
+  // Brighter = richer: full saturation and the colour's strongest lightness
+  // (0.5), not whiter (which looks paler on a dark screen).
+  final k = (f - 1).clamp(0.0, 1.0);
+  final sat = f > 1 ? (h.saturation + (1 - h.saturation) * k).clamp(0.0, 1.0) : (h.saturation * f).clamp(0.0, 1.0);
+  final light = f > 1 ? (h.lightness + (0.5 - h.lightness) * k).clamp(0.0, 1.0) : (h.lightness * f).clamp(0.05, 1.0);
   return h.withSaturation(sat).withLightness(light).toColor();
 }
 
