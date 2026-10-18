@@ -1,4 +1,4 @@
-name: Build iPhone app (TestFlight)
+name: Build Glucose Monitor (iPhone, TestFlight)
 
 on:
   workflow_dispatch:
