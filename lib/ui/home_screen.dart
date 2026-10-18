@@ -494,6 +494,12 @@ class _DayViewState extends State<DayView> {
     for (final g in groups) {
       g.removeWhere((c) => !c.show);
     }
+    // Patient name: only when one is entered.
+    if (s.str('patientName').trim().isEmpty) {
+      for (final g in groups) {
+        g.removeWhere((c) => c.id == 'name');
+      }
+    }
     groups.removeWhere((g) => g.isEmpty);
     if (widget.part == 1) groups.removeWhere((g) => g.first.id == 'graph');
     if (widget.part == 2) groups.removeWhere((g) => g.first.id != 'graph');
@@ -573,6 +579,10 @@ class _DayViewState extends State<DayView> {
 
     final rows = <Widget>[];
     var filled = false;
+    // The top line (reading age, fault, loop, buttons): the first line that is
+    // not just the patient name.
+    var topIdx = groups.indexWhere((g) => !(g.length == 1 && g.first.id == 'name'));
+    if (topIdx < 0) topIdx = 0;
     for (var gi = 0; gi < groups.length; gi++) {
       final g = groups[gi];
       if (widget.fill && !filled && g.first.id == 'graph') {
@@ -586,8 +596,8 @@ class _DayViewState extends State<DayView> {
         ));
         continue;
       }
-      rows.add(line(g, first: gi == 0 && widget.part != 2));
-      if (gi == 0 && errorBox != null && widget.part != 2) rows.add(errorBox);
+      rows.add(line(g, first: gi == topIdx && widget.part != 2));
+      if (gi == topIdx && errorBox != null && widget.part != 2) rows.add(errorBox);
     }
     if (groups.isEmpty && widget.part != 2) rows.add(Align(alignment: Alignment.centerRight, child: icons));
     return Column(
