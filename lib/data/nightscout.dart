@@ -84,6 +84,13 @@ class DeviceInfo {
   int? phoneBattery;
   DateTime? pumpTime;
 
+  /// Loop's override as of its last upload (devicestatus "override").
+  bool overrideSeen = false;
+  bool overrideActive = false;
+  String overrideName = '';
+  DateTime? overrideEnd; // null: until cancelled
+  double? overrideMultiplier;
+
   /// The prediction line drawn on the graph.
   List<double> get mainPrediction => predLines.isEmpty ? const [] : predLines.first;
 }
@@ -406,6 +413,19 @@ class NightscoutClient {
           info.basalMinLeft = _d(en['duration']);
         }
         info.loopTime = _time(l['timestamp']) ?? _time(ds['created_at']);
+      }
+      final ov = ds['override'];
+      if (ov is Map && !info.overrideSeen) {
+        info.overrideSeen = true;
+        info.overrideActive = ov['active'] == true;
+        info.overrideName = (ov['name'] ?? '').toString();
+        info.overrideMultiplier = _d(ov['multiplier']);
+        final start = _time(ov['timestamp']);
+        final secs = _d(ov['duration']);
+        if (start != null && secs != null && secs > 0 && secs < 7 * 24 * 3600) {
+          info.overrideEnd = start.add(Duration(seconds: secs.round()));
+          if (info.overrideEnd!.isBefore(DateTime.now())) info.overrideActive = false;
+        }
       }
       final p = ds['pump'];
       if (p is Map) {
