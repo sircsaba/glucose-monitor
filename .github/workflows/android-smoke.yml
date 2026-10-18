@@ -1,4 +1,4 @@
-name: Test Android app start (emulator)
+name: Test Glucose Monitor (Android start, emulator)
 
 on:
   workflow_dispatch:

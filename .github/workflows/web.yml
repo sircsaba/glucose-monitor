@@ -1,4 +1,4 @@
-name: Build web app
+name: Build Glucose Monitor (Web)
 
 # Builds the browser version of the app and publishes it on GitHub Pages.
 # Every glucose server (cloudflare/) shows it at its own address.

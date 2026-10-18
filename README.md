@@ -10,8 +10,8 @@ You do not need a Mac. GitHub builds both apps in the cloud, the same way as an 
 
 | Workflow | What it makes | Where it goes |
 |---|---|---|
-| **Build Android app** | `app-release.apk` | Download from the GitHub run, install on the phone |
-| **Build iPhone app (TestFlight)** | signed iPhone app | Uploaded to App Store Connect › TestFlight |
+| **Build Glucose Monitor (Android)** | `app-release.apk` | Download from the GitHub run, install on the phone |
+| **Build Glucose Monitor (iPhone, TestFlight)** | signed iPhone app | Uploaded to App Store Connect › TestFlight |
 
 ---
 
@@ -54,7 +54,7 @@ Uploading to `main` starts the Android build by itself.
 
 ## Step 2 — Get the Android app
 
-1. Repository › **Actions** › **Build Android app** › the latest run (green tick, about 8–10 minutes).
+1. Repository › **Actions** › **Build Glucose Monitor (Android)** › the latest run (green tick, about 8–10 minutes).
 2. Under **Artifacts**, download `glucose-monitor-android` (a zip), unzip it: `app-release.apk`.
 3. Copy the APK to the phone and open it. Allow "install unknown apps" for your file manager when Android asks.
 
@@ -88,7 +88,7 @@ Optional, same page, **Variables** tab: `APP_NAME` (name under the icon, default
 
 ## Step 4 — Build the iPhone app
 
-1. Repository › **Actions** › **Build iPhone app (TestFlight)** › **Run workflow** › Run. About 20–30 minutes.
+1. Repository › **Actions** › **Build Glucose Monitor (iPhone, TestFlight)** › **Run workflow** › Run. About 20–30 minutes.
    The first run creates your distribution certificate and stores it in `Match-Secrets`.
 2. App Store Connect › your app › **TestFlight**. The build appears after Apple processes it (10–30 minutes). Answer the export-compliance question if asked (the app uses no special encryption).
 3. TestFlight › *Internal Testing* › **+** › add yourself (and your wife) as testers.
