@@ -438,8 +438,9 @@ class _RemoteScreenState extends State<RemoteScreen> {
   /// The override running now, from the treatments (Loop uploads them).
   Treatment? get _activeOverride {
     Treatment? last;
-    for (final t in app.treatments) {
-      if (t.type == 'Temporary Override') last = t;
+    final list = app.treatments.where((t) => t.type == 'Temporary Override').toList()..sort((a, b) => a.t.compareTo(b.t));
+    for (final t in list) {
+      last = t;
     }
     if (last == null) return null;
     if ((last.duration ?? 0) <= 0 && !last.indefinite) return null;
@@ -511,7 +512,10 @@ class _RemoteScreenState extends State<RemoteScreen> {
                     for (final p in loop.presets) ActionChip(label: Text(p.label), onPressed: () => _override(p)),
                   ]),
                 const SizedBox(height: 8),
-                OutlinedButton.icon(onPressed: _cancelOverride, icon: const Icon(Icons.stop_circle_outlined), label: const Text('Cancel override')),
+                if (active != null)
+                  OutlinedButton.icon(onPressed: _cancelOverride, icon: const Icon(Icons.stop_circle_outlined), label: const Text('Cancel override'))
+                else
+                  const Text('No override running', style: TextStyle(color: kMuted, fontSize: 13)),
               ]),
               _card('Carbs', [
                 StepRow(

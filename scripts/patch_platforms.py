@@ -71,6 +71,7 @@ def patch_android():
 -keep class net.nfet.flutter.printing.** { *; }
 -keep class kotlin.coroutines.** { *; }
 -keep class kotlinx.coroutines.** { *; }
+-keep class kotlin.** { *; }
 -dontwarn kotlinx.coroutines.**
 ''')
 
@@ -80,10 +81,11 @@ def patch_android():
         with open(gradle) as f:
             g = f.read()
         g = re.sub(r'applicationId\s*=\s*"[^"]*"', f'applicationId = "{BUNDLE_ID}"', g)
-        if gradle.endswith('.kts') and 'proguard-rules.pro' not in g:
-            g = re.sub(r'(buildTypes\s*\{\s*release\s*\{)', r'\1\n            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")', g, 1)
-        elif not gradle.endswith('.kts') and 'proguard-rules.pro' not in g:
-            g = re.sub(r'(buildTypes\s*\{\s*release\s*\{)', r"\1\n            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'", g, 1)
+        # No shrinking at all: R8 kept removing Kotlin classes the plugins need.
+        if gradle.endswith('.kts') and 'isMinifyEnabled' not in g:
+            g = re.sub(r'(buildTypes\s*\{\s*release\s*\{)', r'\1\n            isMinifyEnabled = false\n            isShrinkResources = false', g, count=1)
+        elif not gradle.endswith('.kts') and 'minifyEnabled' not in g:
+            g = re.sub(r'(buildTypes\s*\{\s*release\s*\{)', r'\1\n            minifyEnabled false\n            shrinkResources false', g, count=1)
         g = re.sub(r'applicationId\s+"[^"]*"', f'applicationId "{BUNDLE_ID}"', g)
         with open(gradle, 'w') as f:
             f.write(g)
