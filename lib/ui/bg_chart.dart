@@ -798,7 +798,35 @@ Color brighten(Color c, double f) {
 }
 
 /// Settings rows for TTIR and the dots (used in two screens).
+const kSoftColors = [0xFFFF4D5A, 0xFFF2C94C, 0xFF3DBE7A]; // red, yellow, green
+const kBrightColors = [0xFFFF2020, 0xFFFFFF00, 0xFF4CFF00]; // like Nightscout
+
+/// Soft or bright glucose colours, for every range (dots, value, graph).
+Widget colourStyleRow() {
+  final r = app.settings.ranges;
+  bool all(List<int> c) => r.every((z) => z.cRed == c[0] && z.cYel == c[1] && z.cGreen == c[2]);
+  final idx = all(kSoftColors) ? 0 : (all(kBrightColors) ? 1 : 2);
+  return ChoiceRow(
+    label: 'Glucose colours',
+    hint: 'Bright: the strong red, yellow and green Nightscout uses',
+    options: [ 'Soft', 'Bright', if (idx == 2) 'Your own'],
+    index: idx,
+    onChanged: (i) {
+      if (i > 1) return;
+      final c = i == 0 ? kSoftColors : kBrightColors;
+      app.change((x) {
+        for (final z in x.ranges) {
+          z.cRed = c[0];
+          z.cYel = c[1];
+          z.cGreen = c[2];
+        }
+      });
+    },
+  );
+}
+
 List<Widget> ttirSettings() => [
+      colourStyleRow(),
       setInt('Dot brightness', 'dotBright', step: 10, min: 50, max: 200, unit: '%', hint: 'Above 100 % makes the glucose dots brighter and more vivid'),
       setSwitch('Time in tight range (TTIR)', 'ttirOn',
           hint: 'Tints the part of your range above the tight range on graphs, and shows TTIR on reports and the main screen'),
