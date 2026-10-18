@@ -380,9 +380,20 @@ class _DayViewState extends State<DayView> {
         case 'cob':
           return pair('COB', d?.cob == null ? '–' : '${d!.cob!.round()}g');
         case 'basal':
-          final temp = (d?.basalMinLeft ?? 0) > 0;
-          final rate = d?.basal == null ? '–' : '${d!.basal!.toStringAsFixed(2)}U/h';
-          if (c.stack) return pair('Basal', rate, sub: temp ? 'Temp · ${d!.basalMinLeft!.round()} min' : null);
+          var temp = (d?.basalMinLeft ?? 0) > 0;
+          double? now = d?.basal;
+          if (now == null || !temp) {
+            // Loop's last status had no new temp basal: what is running now, from
+            // the temp basals and the profile (like Nightscout).
+            final t = DateTime.now();
+            final segs = basalSegments(app.treatments, app.profiles, t.subtract(const Duration(hours: 6)), t);
+            if (segs.isNotEmpty) {
+              now = segs.last.rate;
+              temp = segs.last.temp;
+            }
+          }
+          final rate = now == null ? '–' : '${now.toStringAsFixed(2)}U/h';
+          if (c.stack) return pair('Basal', rate, sub: temp && (d?.basalMinLeft ?? 0) > 0 ? 'Temp · ${d!.basalMinLeft!.round()} min' : (temp ? 'Temp' : null));
           return pair(temp ? 'Temp' : 'Basal', rate, labelColor: temp ? kAmber : null);
         case 'reservoir':
           return pair(c.stack ? 'Reservoir' : 'Res', reservoir());
