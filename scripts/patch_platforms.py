@@ -59,12 +59,31 @@ def patch_android():
             for n in os.listdir(f'native/android/res/{sub}'):
                 shutil.copy(f'native/android/res/{sub}/{n}', dst)
 
+    # Release builds are shrunk by R8, which removed methods the plugins call
+    # (shared_preferences: settings could not be read, the app stayed on the
+    # start screen). Keep the plugin classes and Kotlin coroutines.
+    with open('android/app/proguard-rules.pro', 'a') as f:
+        f.write('''
+-keep class io.flutter.plugins.** { *; }
+-keep class io.flutter.plugin.** { *; }
+-keep class dev.fluttercommunity.** { *; }
+-keep class com.it_nomads.fluttersecurestorage.** { *; }
+-keep class net.nfet.flutter.printing.** { *; }
+-keep class kotlin.coroutines.** { *; }
+-keep class kotlinx.coroutines.** { *; }
+-dontwarn kotlinx.coroutines.**
+''')
+
     for gradle in ['android/app/build.gradle.kts', 'android/app/build.gradle']:
         if not os.path.exists(gradle):
             continue
         with open(gradle) as f:
             g = f.read()
         g = re.sub(r'applicationId\s*=\s*"[^"]*"', f'applicationId = "{BUNDLE_ID}"', g)
+        if gradle.endswith('.kts') and 'proguard-rules.pro' not in g:
+            g = re.sub(r'(buildTypes\s*\{\s*release\s*\{)', r'\1\n            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")', g, 1)
+        elif not gradle.endswith('.kts') and 'proguard-rules.pro' not in g:
+            g = re.sub(r'(buildTypes\s*\{\s*release\s*\{)', r"\1\n            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'", g, 1)
         g = re.sub(r'applicationId\s+"[^"]*"', f'applicationId "{BUNDLE_ID}"', g)
         with open(gradle, 'w') as f:
             f.write(g)
