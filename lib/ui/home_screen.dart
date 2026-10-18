@@ -537,7 +537,7 @@ class _DayViewState extends State<DayView> {
       // Top line: a fault ("No Internet", "Libre connection down"...) flashes in
       // the middle, between the reading age and the loop, 150 % of their size.
       final fs = first && !widget.preview ? app.faultStatus : null;
-      final hasBanner = fs != null && fs.isNotEmpty;
+      final hasBanner = fs != null && !fs.isEmpty;
       final mid = spots.length >= 2 ? (spots.length + 1) ~/ 2 : spots.length;
       final bannerAt = hasBanner ? mid : -1;
       final nameAt = first && nameCfg != null ? mid : -1;
