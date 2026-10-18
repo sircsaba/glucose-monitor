@@ -13,12 +13,18 @@ final GlobalKey<NavigatorState> navKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await app.init(navKey);
+  try {
+    await app.init(navKey);
+  } catch (e) {
+    debugPrint('init: $e');
+  }
   // Browser tab (and the phone's app switcher): the latest glucose, e.g.
   // "7.4 ↗ +0.1". Set straight away on each update, not when the screen is
   // redrawn: a browser does not redraw a tab you are not looking at.
   app.addListener(_updateTitle);
-  _updateTitle();
+  try {
+    _updateTitle();
+  } catch (_) {}
   runApp(const GlucoseApp());
 }
 

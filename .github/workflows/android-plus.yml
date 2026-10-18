@@ -34,7 +34,9 @@ jobs:
         run: flutter pub get
 
       - name: App icon
-        run: dart run flutter_launcher_icons
+        run: |
+          cp assets/icon/plus/icon.png assets/icon/plus/icon_fg.png assets/icon/
+          dart run flutter_launcher_icons
         continue-on-error: true
 
       - name: Check the code

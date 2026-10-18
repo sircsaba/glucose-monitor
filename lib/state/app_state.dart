@@ -155,7 +155,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     navKey = key;
     _prefs = await SharedPreferences.getInstance();
     settings = Settings.decode(_prefs!.getString('settings'));
-    await player.init();
+    // Never stay on the start screen because the sound player is slow to start.
+    try {
+      await player.init().timeout(const Duration(seconds: 5));
+    } catch (_) {}
     player.onPreviewEnd = notifyListeners;
     WidgetsBinding.instance.addObserver(this);
     restartTimers();
