@@ -87,8 +87,14 @@ void main() {
     expect(run(loop: 12, health: h(mainCgm: 15, mainLoop: 15)).fault, 'nsval.mooo.com: no readings (VPS)');
   });
 
-  test('late loop here but Nightscout shows Loop fine: upload to here', () {
-    expect(run(loop: 12, health: h(mainLoop: 2)).fault, 'Loop not uploading here');
+  test('this server a few minutes behind Nightscout: no alarm', () {
+    // WHC can get Loop's upload 1-2 minutes after Nightscout.
+    expect(run(loop: 8, health: h(mainLoop: 1)).fault, isNull);
+    expect(run(loop: 12, health: h(mainLoop: 2)).fault, isNull);
+  });
+
+  test('nothing reached this server for twice the limit, Nightscout fine: upload to here', () {
+    expect(run(loop: 14, health: h(mainLoop: 2)).fault, 'Loop not uploading here');
   });
 
   test('late loop, everything else fine: Loop not looping', () {

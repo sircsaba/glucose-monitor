@@ -94,12 +94,20 @@ FaultStatus diagnose({
     return FaultStatus('$siteName down', onBackup);
   }
 
-  final cgmLate = late(lastReading);
-  // No loop data at all (no loop on this site): nothing to check.
-  final loopLate = lastLoop != null && late(lastLoop);
-  if (!cgmLate && !loopLate) return FaultStatus(null, onBackup);
-
   final h = health;
+  final cgmLate = late(lastReading);
+  // Loop uploads to both servers, and one can be a minute or two behind the
+  // other: Loop is late only when NEITHER has a recent loop.
+  final mainLoop = h != null && h.mainConfigured ? h.mainLoopLast : null;
+  final newestLoop = [lastLoop, mainLoop].whereType<DateTime>().fold<DateTime?>(null, (a, b) => a == null || b.isAfter(a) ? b : a);
+  // No loop data at all (no loop on this site): nothing to check.
+  final loopLate = newestLoop != null && late(newestLoop);
+  // Loop fine on the main Nightscout, but nothing reached this server for a
+  // long time (twice the limit): its upload here has stopped.
+  final uploadStopped = !loopLate && mainLoop != null && lastLoop != null &&
+      now.difference(lastLoop).inSeconds >= 2 * lateMin * 60;
+  if (!cgmLate && !loopLate && !uploadStopped) return FaultStatus(null, onBackup);
+
   String? fault;
 
   if (cgmLate) {
@@ -131,11 +139,9 @@ FaultStatus diagnose({
         fault = '$main: no readings (VPS)';
       }
     }
-    if (fault == null && h != null && h.mainConfigured && fresh(h.mainLoopLast)) {
-      fault = 'Loop not uploading here';
-    }
     fault ??= 'Loop not looping';
   }
+  if (fault == null && uploadStopped) fault = 'Loop not uploading here';
 
   return FaultStatus(fault, onBackup);
 }
