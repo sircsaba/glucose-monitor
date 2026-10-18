@@ -101,7 +101,7 @@ class DisplaySettingsScreen extends StatelessWidget {
               hint: 'Fit: the graph uses the room left, so the whole page shows without scrolling'),
           ChoiceRow(
             label: 'Dot size',
-            options: const ['Small', 'Medium', 'Large'],
+            options: const ['Small', 'Medium', 'Large', 'Extra large'],
             index: s.integer('dotSize'),
             onChanged: (i) => app.change((x) => x.set('dotSize', i)),
           ),
