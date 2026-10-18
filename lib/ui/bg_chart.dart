@@ -186,7 +186,8 @@ class _BgChartState extends State<BgChart> {
     final h24 = s.flag('time24');
     String dayTime(DateTime t) => '${const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][t.weekday - 1]} ${fmtClock(t, h24)}';
     final step = Duration(minutes: math.max(15, widget.hours * 30)); // half a screen
-    return Stack(children: [
+    // Fill the space given (graph that fits the screen) or keep its height.
+    return Stack(fit: widget.height == null ? StackFit.expand : StackFit.loose, children: [
       chart,
       Positioned(
         right: 4,
