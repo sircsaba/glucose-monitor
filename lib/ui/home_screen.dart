@@ -329,6 +329,10 @@ class _DayViewState extends State<DayView> {
         case 'loop':
           if (loopAge == null) return const SizedBox.shrink();
           return Align(alignment: align, child: LoopBadge(age: loopAge, late: loopAge.inMinutes >= s.integer('loopMin'), size: size));
+        case 'name':
+          final name = s.str('patientName').trim();
+          if (name.isEmpty) return const SizedBox.shrink();
+          return text(name);
         case 'clock':
           return text(fmtClock(now, s.flag('time24')));
         case 'bg':

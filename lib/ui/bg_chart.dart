@@ -196,8 +196,10 @@ class _BgChartState extends State<BgChart> {
           if (_loadingOld) const Padding(padding: EdgeInsets.all(6), child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))),
           if (!live)
             Text('${dayTime(viewNow.subtract(Duration(hours: widget.hours)))} – ${dayTime(viewNow)}', style: const TextStyle(color: kMuted, fontSize: 11)),
+          _arrow(Icons.keyboard_double_arrow_left, '24 hours earlier', () => _shift(const Duration(hours: 24))),
           _arrow(Icons.chevron_left, 'Earlier', () => _shift(step)),
           if (!live) _arrow(Icons.chevron_right, 'Later', () => _shift(-step)),
+          if (!live) _arrow(Icons.keyboard_double_arrow_right, '24 hours later', () => _shift(const Duration(hours: -24))),
           if (!live)
             TextButton(
               style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8), minimumSize: const Size(0, 28), tapTargetSize: MaterialTapTargetSize.shrinkWrap),
