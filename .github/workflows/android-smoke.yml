@@ -26,6 +26,19 @@ jobs:
           channel: stable
           cache: true
       - run: flutter create --org com.inforap --project-name glucose_monitor --platforms android,ios .
+      - name: Signing key
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PW: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KS" ] && [ -n "$KS_PW" ]; then
+            echo "$KS" | base64 -d > "$RUNNER_TEMP/upload.jks"
+            echo "GM_KEYSTORE=$RUNNER_TEMP/upload.jks" >> $GITHUB_ENV
+            echo "GM_KEYSTORE_PASSWORD=$KS_PW" >> $GITHUB_ENV
+          else
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD secrets: this APK will not install over an older one."
+          fi
+
       - run: python3 scripts/patch_platforms.py android
       - run: flutter pub get
       - run: flutter build apk --release --target-platform android-x64 --dart-define=PLUS=${{ inputs.plus }}

@@ -81,6 +81,27 @@ def patch_android():
         with open(gradle) as f:
             g = f.read()
         g = re.sub(r'applicationId\s*=\s*"[^"]*"', f'applicationId = "{BUNDLE_ID}"', g)
+        # A permanent signing key (GitHub secrets ANDROID_KEYSTORE_BASE64 and
+        # ANDROID_KEYSTORE_PASSWORD), so a new APK installs over the old one.
+        # Without it the APK is signed with a throw-away key: uninstall first.
+        ks = os.environ.get('GM_KEYSTORE', '')
+        pw = os.environ.get('GM_KEYSTORE_PASSWORD', '')
+        if ks and pw and os.path.exists(ks) and 'create("upload")' not in g:
+            if gradle.endswith('.kts'):
+                block = ('    signingConfigs {\n        create("upload") {\n'
+                         f'            storeFile = file("{ks}")\n            storePassword = "{pw}"\n'
+                         f'            keyAlias = "glucosemonitor"\n            keyPassword = "{pw}"\n        }}\n    }}\n')
+                g = re.sub(r'(\n\s*buildTypes\s*\{)', '\n' + block.replace('\\', '\\\\') + r'\1', g, count=1)
+                g = g.replace('signingConfigs.getByName("debug")', 'signingConfigs.getByName("upload")')
+            else:
+                block = ('    signingConfigs {\n        upload {\n'
+                         f"            storeFile file('{ks}')\n            storePassword '{pw}'\n"
+                         f"            keyAlias 'glucosemonitor'\n            keyPassword '{pw}'\n        }}\n    }}\n")
+                g = re.sub(r'(\n\s*buildTypes\s*\{)', '\n' + block + r'\1', g, count=1)
+                g = g.replace('signingConfigs.debug', 'signingConfigs.upload')
+            print('Android: signed with your permanent key')
+        elif not ks:
+            print('Android: no ANDROID_KEYSTORE_BASE64 secret, signed with a throw-away key')
         # No shrinking at all: R8 kept removing Kotlin classes the plugins need.
         if gradle.endswith('.kts') and 'isMinifyEnabled' not in g:
             g = re.sub(r'(buildTypes\s*\{\s*release\s*\{)', r'\1\n            isMinifyEnabled = false\n            isShrinkResources = false', g, count=1)
