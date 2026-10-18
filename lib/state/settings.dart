@@ -194,6 +194,7 @@ const Map<String, String> kLineNames = {
 
 /// Names shown for each day-view element.
 const Map<String, String> kDayNames = {
+  'name': 'Patient name',
   'ago': 'Minutes since reading',
   'loop': 'Loop status',
   'clock': 'Clock',
@@ -261,6 +262,7 @@ class Settings {
     'remoteMaxBolus': 2.0,
     'remoteMaxCarbs': 50.0,
     'remoteName': '',
+    'patientName': '',
     'tirPeriod': 0, // main-screen TIR card: 0 today since midnight, 1 last 24 h
     'screenMode': 0, // 0 auto, 1 computer layout, 2 phone layout
     'dotBright': 100, // % brightness of the glucose dots
@@ -423,6 +425,7 @@ class Settings {
     const blue = 0xFF5BC0EB;
     if (!compact) {
       return [
+        LineCfg(id: 'name', size: 16, zoneColor: false, color: white, align: 'center', space: 0, bold: true),
         LineCfg(id: 'ago', size: 13, zoneColor: false, color: grey, align: 'left', space: 0),
         LineCfg(id: 'loop', size: 13, zoneColor: false, color: grey, align: 'right', space: 0, join: true),
         LineCfg(id: 'clock', size: 20, zoneColor: false, color: blue, align: 'left', space: 8, flex: 2, show: false),
@@ -447,6 +450,7 @@ class Settings {
     if (big) {
       // Computer screen: the sizes of the earlier wide layout, in one column.
       return [
+        LineCfg(id: 'name', size: 22, zoneColor: false, color: white, align: 'center', space: 0, bold: true),
         LineCfg(id: 'ago', size: 18, zoneColor: false, color: grey, align: 'left', space: 0),
         LineCfg(id: 'loop', size: 18, zoneColor: false, color: grey, align: 'right', space: 0, join: true),
         LineCfg(id: 'clock', size: 44, zoneColor: false, color: blue, align: 'left', space: 0, flex: 3),
@@ -471,6 +475,7 @@ class Settings {
     const k = 1.0;
     double z(double v) => (v * k).roundToDouble();
     return [
+      LineCfg(id: 'name', size: z(16), zoneColor: false, color: white, align: 'center', space: 0, bold: true),
       LineCfg(id: 'ago', size: z(13), zoneColor: false, color: grey, align: 'left', space: 0),
       LineCfg(id: 'loop', size: z(13), zoneColor: false, color: grey, align: 'right', space: 0, join: true),
       LineCfg(id: 'clock', size: z(26), zoneColor: false, color: blue, align: 'left', space: z(4), flex: 2),
@@ -529,7 +534,13 @@ class Settings {
       final dayList = (day == null || day.isEmpty) ? init.day : day;
       for (final d in init.day) {
         // New elements appear hidden in a layout you made, except time in range.
-        if (!dayList.any((l) => l.id == d.id)) dayList.add(d..show = const ['ttir', 'today', 'profile'].contains(d.id));
+        if (dayList.any((l) => l.id == d.id)) continue;
+        if (d.id == 'name') {
+          // Patient name: on top (it only shows once a name is entered).
+          dayList.insert(0, d..show = true);
+          continue;
+        }
+        dayList.add(d..show = const ['ttir', 'today', 'profile'].contains(d.id));
       }
       final presets = (j['snoozePresets'] as List?)?.map((e) => (e as num).toInt()).toList();
       // Add any night-view line that is missing (for older saved settings).

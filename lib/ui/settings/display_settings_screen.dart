@@ -49,6 +49,16 @@ class DisplaySettingsScreen extends StatelessWidget {
       final scaleIndex = scales.indexOf(s.integer('uiScale')).clamp(0, scales.length - 1);
 
       return [
+        Section(title: 'Patient', children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: TextFormField(
+              initialValue: s.str('patientName'),
+              decoration: const InputDecoration(labelText: 'Name shown above the glucose (empty: none)'),
+              onChanged: (v) => app.change((x) => x.set('patientName', v)),
+            ),
+          ),
+        ]),
         Section(title: 'Units', children: [
           ChoiceRow(
             label: 'Glucose units',
