@@ -97,6 +97,7 @@ class _BgChartState extends State<BgChart> {
           ttirColor: Color(s.integer('ttirColor')),
           dotBright: s.integer('dotBright') / 100.0,
           profiles: s.flag('profileShow') ? app.profiles : null,
+          basalProfiles: app.profiles,
         ),
       ),
     );
@@ -157,6 +158,7 @@ class _BgPainter extends CustomPainter {
   final Color ttirColor;
   final double dotBright;
   final List<ProfileDoc>? profiles; // null = profile not shown
+  final List<ProfileDoc> basalProfiles; // scheduled basal between temp basals
 
   _BgPainter({
     required this.entries,
@@ -192,6 +194,7 @@ class _BgPainter extends CustomPainter {
     required this.ttirColor,
     required this.dotBright,
     required this.profiles,
+    required this.basalProfiles,
   });
 
   static void _dotted(Canvas c, Offset a, Offset b, Paint p, {double on = 2, double off = 3}) {
@@ -368,25 +371,24 @@ class _BgPainter extends CustomPainter {
     // Temp basal.
     if (showBasal) {
       final base = size.height - bottomLabels - 2;
-      final temps = treatments.where((t) => t.absolute != null && (t.duration ?? 0) > 0).toList();
+      final segs = basalSegments(treatments, basalProfiles, tStart, now);
       var maxRate = 0.5;
-      for (final t in temps) {
-        maxRate = math.max(maxRate, t.absolute!);
+      for (final g in segs) {
+        maxRate = math.max(maxRate, g.rate);
       }
       final fill = Paint()..color = basalBar;
+      // Scheduled basal (no temp basal running) a little lighter.
+      final fillSched = Paint()..color = basalBar.withValues(alpha: basalBar.a * 0.55);
       final barMax = basalH - (basalLabels ? basalSize * 1.3 + 4 : 4);
       final runs = <List<double>>[]; // x1, x2, rate, bar top
-      for (var i = 0; i < temps.length; i++) {
-        final t = temps[i];
-        var end = t.t.add(Duration(seconds: (t.duration! * 60).round()));
-        if (i + 1 < temps.length && temps[i + 1].t.isBefore(end)) end = temps[i + 1].t;
-        if (end.isBefore(tStart) || t.t.isAfter(tEnd)) continue;
-        final x1 = math.max(left, x(t.t));
-        final x2 = math.min(left + w, x(end));
-        final hh = t.absolute! / maxRate * barMax;
-        canvas.drawRect(Rect.fromLTRB(x1, base - hh, x2, base), fill);
+      for (final g in segs) {
+        final x1 = math.max(left, x(g.start));
+        final x2 = math.min(left + w, x(g.end));
+        if (x2 - x1 < 0.5) continue;
+        final hh = g.rate / maxRate * barMax;
+        canvas.drawRect(Rect.fromLTRB(x1, base - hh, x2, base), g.temp ? fill : fillSched);
         // Neighbouring bars with the same rate get one label.
-        final r = (t.absolute! * 100).round() / 100;
+        final r = (g.rate * 100).round() / 100;
         if (runs.isNotEmpty && runs.last[2] == r && (x1 - runs.last[1]).abs() < 1.5) {
           runs.last[1] = x2;
         } else {
@@ -707,3 +709,50 @@ Widget _colorRow(String label, String key) => Padding(
         ColorPick(dot: 32, value: app.settings.integer(key), onPick: (v) => app.change((x) => x.set(key, v))),
       ]),
     );
+
+/// One stretch of basal: a temp basal, or the profile's scheduled rate.
+class BasalSeg {
+  final DateTime start, end;
+  final double rate;
+  final bool temp;
+  const BasalSeg(this.start, this.end, this.rate, this.temp);
+}
+
+/// Basal from [from] to [to]: the loop's temp basals and, between them, the
+/// scheduled basal from the profile (as Nightscout draws it).
+List<BasalSeg> basalSegments(List<Treatment> treatments, List<ProfileDoc> profiles, DateTime from, DateTime to) {
+  final temps = treatments.where((t) => t.type == 'Temp Basal' || t.absolute != null).toList()..sort((a, b) => a.t.compareTo(b.t));
+  final out = <BasalSeg>[];
+  void scheduled(DateTime a, DateTime b) {
+    if (profiles.isEmpty || !b.isAfter(a)) return;
+    var t = a;
+    while (t.isBefore(b)) {
+      // Up to the next 30-minute mark (profile changes happen on those).
+      final next30 = DateTime(t.year, t.month, t.day, t.hour, t.minute < 30 ? 30 : 60);
+      final e = next30.isBefore(b) ? next30 : b;
+      final r = profileAt(profiles, t)?.basalAt(t) ?? 0;
+      if (out.isNotEmpty && !out.last.temp && out.last.rate == r && out.last.end == t) {
+        out[out.length - 1] = BasalSeg(out.last.start, e, r, false);
+      } else {
+        out.add(BasalSeg(t, e, r, false));
+      }
+      t = e;
+    }
+  }
+
+  var cursor = from;
+  for (var i = 0; i < temps.length; i++) {
+    final t = temps[i];
+    final mins = t.duration ?? 0;
+    var end = t.t.add(Duration(seconds: (mins * 60).round()));
+    if (i + 1 < temps.length && temps[i + 1].t.isBefore(end)) end = temps[i + 1].t;
+    if (!end.isAfter(from) || !t.t.isBefore(to)) continue;
+    final s = t.t.isBefore(from) ? from : t.t;
+    final e = end.isAfter(to) ? to : end;
+    if (s.isAfter(cursor)) scheduled(cursor, s);
+    if (mins > 0 && t.absolute != null && e.isAfter(s)) out.add(BasalSeg(s, e, t.absolute!, true));
+    if (e.isAfter(cursor)) cursor = e;
+  }
+  if (to.isAfter(cursor)) scheduled(cursor, to);
+  return out;
+}
