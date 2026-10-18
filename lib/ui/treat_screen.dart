@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/nightscout.dart';
 import '../logic/glucose.dart';
 import '../plus.dart';
 import '../state/app_state.dart';
@@ -45,6 +46,7 @@ class _TreatScreenState extends State<TreatScreen> {
   int _minutesAgo = 0;
   final _notes = TextEditingController();
   bool _busy = false;
+  bool _form = !kRemote; // Plus / web: the two big buttons first
 
   @override
   void dispose() {
@@ -105,15 +107,65 @@ class _TreatScreenState extends State<TreatScreen> {
                 Text('${fmtBg(l.mg, mmol)} ${arrowText(l.direction)}', style: kMono.copyWith(color: app.colorFor(l.mg), fontSize: 16)),
             ]),
             const SizedBox(height: 14),
-            if (kPlus)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: FilledButton.icon(
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RemoteScreen())),
-                  icon: const Icon(Icons.settings_remote_outlined),
-                  label: const Text('Loop remote control: override, carbs, bolus'),
+            if (kRemote) ...[
+              Row(children: [
+                Expanded(
+                  child: _bigButton(
+                    icon: Icons.settings_remote_outlined,
+                    title: 'Remote control',
+                    sub: 'Override, carbs, bolus sent to Loop',
+                    selected: false,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RemoteScreen())),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _bigButton(
+                    icon: Icons.edit_note,
+                    title: 'Treatment',
+                    sub: 'Log carbs, insulin, notes…',
+                    selected: _form,
+                    onTap: () => setState(() => _form = !_form),
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 16),
+            ],
+            if (_form) ..._formWidgets(context, t, mmol, allowed, d),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _bigButton({required IconData icon, required String title, required String sub, required bool selected, required VoidCallback onTap}) {
+    return Material(
+      color: selected ? kAccent.withValues(alpha: 0.18) : kCard,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          height: 130,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: selected ? kAccent : kBorder, width: selected ? 2 : 1),
+          ),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(icon, size: 40, color: kAccent),
+            const SizedBox(height: 8),
+            Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 2),
+            Text(sub, textAlign: TextAlign.center, style: const TextStyle(color: kMuted, fontSize: 11)),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _formWidgets(BuildContext context, _EventType t, bool mmol, bool allowed, DeviceInfo? d) {
+    return [
             if (!allowed)
               const Padding(
                 padding: EdgeInsets.only(bottom: 12),
@@ -187,9 +239,6 @@ class _TreatScreenState extends State<TreatScreen> {
                 child: Text('Save ${t.label.toLowerCase()}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               ),
             ),
-          ],
-        );
-      },
-    );
+    ];
   }
 }
