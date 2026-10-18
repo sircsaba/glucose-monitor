@@ -494,12 +494,16 @@ class _DayViewState extends State<DayView> {
     for (final g in groups) {
       g.removeWhere((c) => !c.show);
     }
-    // Patient name: only when one is entered.
-    if (s.str('patientName').trim().isEmpty) {
-      for (final g in groups) {
-        g.removeWhere((c) => c.id == 'name');
+    // Patient name: shown in the middle of the top line (not a line of its own).
+    LineCfg? nameCfg;
+    for (final g in groups) {
+      for (final c in g) {
+        if (c.id == 'name') nameCfg = c;
       }
+      g.removeWhere((c) => c.id == 'name');
     }
+    final patient = s.str('patientName').trim();
+    if (patient.isEmpty) nameCfg = null;
     groups.removeWhere((g) => g.isEmpty);
     if (widget.part == 1) groups.removeWhere((g) => g.first.id == 'graph');
     if (widget.part == 2) groups.removeWhere((g) => g.first.id != 'graph');
@@ -533,9 +537,25 @@ class _DayViewState extends State<DayView> {
       // Top line: a fault ("No Internet", "Libre connection down"...) flashes in
       // the middle, between the reading age and the loop, 150 % of their size.
       final fs = first && !widget.preview ? app.faultStatus : null;
-      final bannerAt = fs == null || fs.isEmpty ? -1 : (spots.length >= 2 ? (spots.length + 1) ~/ 2 : spots.length);
+      final hasBanner = fs != null && fs.isNotEmpty;
+      final mid = spots.length >= 2 ? (spots.length + 1) ~/ 2 : spots.length;
+      final bannerAt = hasBanner ? mid : -1;
+      final nameAt = first && nameCfg != null ? mid : -1;
       final baseSize = g.map((c) => c.size).fold<double>(0, (a, b) => b > a ? b : a);
+      Widget nameW() => Text(patient,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Color(nameCfg!.color),
+            fontSize: nameCfg.size,
+            fontWeight: nameCfg.bold ? FontWeight.w700 : FontWeight.w500,
+          ));
       for (var i = 0; i < spots.length; i++) {
+        if (i == nameAt) {
+          children.add(SizedBox(width: wide ? 10 : 6));
+          children.add(Expanded(flex: 3, child: nameW()));
+        }
         if (i == bannerAt) {
           children.add(SizedBox(width: wide ? 10 : 6));
           children.add(Expanded(flex: 3, child: FaultBanner(status: fs!, size: (baseSize <= 0 ? 16 : baseSize) * 1.5)));
@@ -551,6 +571,10 @@ class _DayViewState extends State<DayView> {
                     Padding(padding: EdgeInsets.only(top: k == 0 ? 0 : sp[k].space), child: cell(sp[k])),
                 ]),
         ));
+      }
+      if (nameAt == spots.length) {
+        children.add(SizedBox(width: wide ? 10 : 6));
+        children.add(Expanded(flex: 3, child: nameW()));
       }
       if (bannerAt == spots.length) {
         children.add(SizedBox(width: wide ? 10 : 6));
