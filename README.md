@@ -114,6 +114,20 @@ Run the workflow again whenever you change the code; each run gets a higher buil
 - English only for now.
 - For information only. Always check with a meter before treating.
 
+## Android signing key (so updates install over the old app)
+
+Add two repository secrets (Settings › Secrets and variables › Actions):
+`ANDROID_KEYSTORE_BASE64` (a keystore file in base64) and
+`ANDROID_KEYSTORE_PASSWORD` (its password; key alias `glucosemonitor`, same
+password). Make your own with:
+
+    keytool -genkeypair -keystore gm.jks -alias glucosemonitor -keyalg RSA -keysize 2048 -validity 10000
+    base64 -w0 gm.jks     # paste the result into ANDROID_KEYSTORE_BASE64
+
+Without them every build has a different key and Android refuses to update
+("package conflicts with an existing package"): uninstall first. Keep a copy
+of the keystore: a new key means one more uninstall.
+
 ## Glucose Monitor Plus (Loop remote control, build it yourself)
 
 Glucose Monitor Plus is the same app with **Loop remote commands**: start or
