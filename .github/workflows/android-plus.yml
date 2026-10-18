@@ -51,8 +51,14 @@ jobs:
             exit 1
           fi
 
+      - name: Name the APK with its version
+        run: |
+          V=$(grep -m1 '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
+          echo "APK_NAME=glucose-monitor-plus-$V-${{ github.run_number }}" >> $GITHUB_ENV
+          mv build/app/outputs/flutter-apk/app-release.apk "glucose-monitor-plus-$V-${{ github.run_number }}.apk"
+
       - name: Save the APK
         uses: actions/upload-artifact@v4
         with:
-          name: glucose-monitor-plus-android
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: ${{ env.APK_NAME }}
+          path: ${{ env.APK_NAME }}.apk
