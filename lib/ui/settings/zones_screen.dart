@@ -255,6 +255,18 @@ class _ZonesScreenState extends State<ZonesScreen> {
                       child: const Text('Back to red, yellow and green'),
                     ),
                   ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: () => app.change((x) {
+                        final r = x.ranges[_sel];
+                        r.cRed = 0xFFFF2020;
+                        r.cYel = 0xFFFFFF00;
+                        r.cGreen = 0xFF4CFF00;
+                      }),
+                      child: const Text('Bright, like Nightscout'),
+                    ),
+                  ),
                 ]),
               ),
               Padding(
