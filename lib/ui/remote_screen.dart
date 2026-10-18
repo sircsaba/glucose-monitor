@@ -499,19 +499,21 @@ class _RemoteScreenState extends State<RemoteScreen> {
           final hasSecret = _otherSite ? (_cmdSecret ?? '').isNotEmpty : (s.flag('apiSecret') || (_savedSecret ?? '').isNotEmpty);
           final loopMax = loop?.maxBolus;
           final bolusLimit = loopMax == null ? _maxBolus : math.min(_maxBolus, loopMax);
+          final allReady = loop?.deviceToken != null && hasSecret && t != null;
+          final checks = <Widget>[
+            Text('Commands go through $_siteName, which sends them to the Loop phone with Apple\'s push service.',
+                style: const TextStyle(color: kMuted, fontSize: 12)),
+            const SizedBox(height: 4),
+            _check(loop?.deviceToken != null,
+                loop == null ? 'No Loop profile on this site yet' : (loop.deviceToken == null ? 'Loop profile without a device token' : 'Loop phone found (${loop.bundleId ?? 'Loop'})')),
+            _check(hasSecret, hasSecret ? 'API secret available' : 'API secret: asked when you send', fix: hasSecret ? null : () => _secret().then((_) => setState(() {})), fixLabel: 'Enter'),
+            _check(t != null, t != null ? 'One-time password set: ${t.code()} (${t.secondsLeft()} s)' : 'One-time password: needed for carbs and bolus',
+                fix: _setupOtp, fixLabel: t != null ? 'Change' : 'Set up'),
+          ];
           return AbsorbPointer(
             absorbing: _sending,
             child: ListView(padding: const EdgeInsets.fromLTRB(14, 12, 14, 30), children: [
-              _card('Ready?', [
-                Text('Commands go through $_siteName, which sends them to the Loop phone with Apple\'s push service.',
-                    style: const TextStyle(color: kMuted, fontSize: 12)),
-                const SizedBox(height: 4),
-                _check(loop?.deviceToken != null,
-                    loop == null ? 'No Loop profile on this site yet' : (loop.deviceToken == null ? 'Loop profile without a device token' : 'Loop phone found (${loop.bundleId ?? 'Loop'})')),
-                _check(hasSecret, hasSecret ? 'API secret available' : 'API secret: asked when you send', fix: hasSecret ? null : () => _secret().then((_) => setState(() {})), fixLabel: 'Enter'),
-                _check(t != null, t != null ? 'One-time password set: ${t.code()} (${t.secondsLeft()} s)' : 'One-time password: needed for carbs and bolus',
-                    fix: _setupOtp, fixLabel: t != null ? 'Change' : 'Set up'),
-              ]),
+              if (!allReady) _card('Ready?', checks),
               _card('Override', [
                 if (active != null)
                   Padding(
@@ -586,6 +588,12 @@ class _RemoteScreenState extends State<RemoteScreen> {
                 ),
               ]),
               if (_sending) const Center(child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator())),
+              const SizedBox(height: 12),
+              _card('Settings', [
+                if (allReady) ...checks,
+                if (allReady) const SizedBox(height: 6),
+                OutlinedButton.icon(onPressed: _settings, icon: const Icon(Icons.tune), label: const Text('Limits, name and command site')),
+              ]),
               const Text(
                 'Remote commands must be turned on in Loop (Settings › Services › Nightscout › Remote Commands). '
                 'Loop checks every command against its own limits and shows a notification on the Loop phone.',
