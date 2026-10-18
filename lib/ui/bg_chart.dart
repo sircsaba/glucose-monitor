@@ -35,6 +35,61 @@ class _BgChartState extends State<BgChart> {
   Offset? _pos;
   Timer? _hide;
 
+  // Going back in time: drag the graph sideways (or the arrows). Older data
+  // than the app keeps (about a day) is loaded from the site as needed.
+  Duration _back = Duration.zero;
+  double _width = 1;
+  List<Entry> _oldEntries = [];
+  List<Treatment> _oldTreats = [];
+  DateTime? _oldFrom; // older data loaded back to here
+  bool _loadingOld = false;
+  static const _maxBack = Duration(days: 90);
+
+  DateTime get _liveEarliest {
+    final e = app.entries;
+    return e.isEmpty ? DateTime.now().subtract(const Duration(hours: 24)) : e.first.t;
+  }
+
+  Future<void> _ensureOld(DateTime viewStart) async {
+    final have = _oldFrom ?? _liveEarliest;
+    if (_loadingOld || !viewStart.isBefore(have.add(const Duration(minutes: 10)))) return;
+    _loadingOld = true;
+    if (mounted) setState(() {});
+    final from = viewStart.subtract(Duration(hours: math.max(6, widget.hours * 2)));
+    try {
+      final c = app.client;
+      final es = await c.entriesBetween(from, have);
+      final ts = await c.treatmentsBetween(from.subtract(const Duration(hours: 12)), have);
+      final em = <int, Entry>{for (final e in _oldEntries) e.t.millisecondsSinceEpoch: e};
+      for (final e in es) {
+        em[e.t.millisecondsSinceEpoch] = e;
+      }
+      final seen = {for (final t in _oldTreats) '${t.t.millisecondsSinceEpoch}|${t.type}'};
+      final tl = [..._oldTreats];
+      for (final t in ts) {
+        if (seen.add('${t.t.millisecondsSinceEpoch}|${t.type}')) tl.add(t);
+      }
+      _oldEntries = em.values.toList()..sort((a, b) => a.t.compareTo(b.t));
+      _oldTreats = tl;
+      _oldFrom = from;
+    } catch (_) {}
+    _loadingOld = false;
+    if (mounted) setState(() {});
+  }
+
+  void _shift(Duration d) {
+    var b = _back + d;
+    if (b < Duration.zero) b = Duration.zero;
+    if (b > _maxBack) b = _maxBack;
+    setState(() => _back = b);
+    _ensureOld(DateTime.now().subtract(b).subtract(Duration(hours: widget.hours)));
+  }
+
+  void _drag(double dx) {
+    final span = widget.hours * 3600.0;
+    _shift(Duration(seconds: (dx / math.max(1, _width) * span).round()));
+  }
+
   void _show(Offset? p, {bool autoHide = false}) {
     _hide?.cancel();
     setState(() => _pos = p);
@@ -59,22 +114,32 @@ class _BgChartState extends State<BgChart> {
     final gridMin = bi >= 0 && bi < 5 ? gridMinutesList()[bi] : (widget.hours <= 3 ? 15 : (widget.hours <= 6 ? 30 : 60));
     final tipBg = s.integer('tipBg');
     final tipTreat = s.integer('tipTreat');
-    Widget chart = SizedBox(
+    final live = _back == Duration.zero;
+    final viewNow = DateTime.now().subtract(_back);
+    var entries = app.entries;
+    var treatments = app.treatments;
+    if (!live) {
+      final liveFrom = _liveEarliest;
+      entries = [..._oldEntries.where((e) => e.t.isBefore(liveFrom)), ...app.entries].where((e) => !e.t.isAfter(viewNow)).toList();
+      final tf = app.treatments.isEmpty ? DateTime.now() : app.treatments.map((t) => t.t).reduce((a, b) => a.isBefore(b) ? a : b);
+      treatments = [..._oldTreats.where((t) => t.t.isBefore(tf)), ...app.treatments].where((t) => !t.t.isAfter(viewNow)).toList();
+    }
+    final plot = SizedBox(
       height: widget.height,
       width: double.infinity,
       child: CustomPaint(
         painter: _BgPainter(
-          entries: app.entries,
-          treatments: app.treatments,
+          entries: entries,
+          treatments: treatments,
           device: app.device,
           ranges: s.ranges,
           mmol: s.mmol,
           hours: widget.hours,
-          showPred: s.flag('showPrediction'),
+          showPred: live && s.flag('showPrediction'),
           showBasal: s.flag('showBasal'),
           showTreat: s.flag('showTreatments'),
           h24: s.flag('time24'),
-          now: DateTime.now(),
+          now: viewNow,
           topMg: s.number('graphTop'),
           dotScale: const [1.0, 1.4, 1.9][s.integer('dotSize').clamp(0, 2)],
           treatScale: (s.integer('treatSize') / 100.0).clamp(0.5, 3.0),
@@ -101,18 +166,58 @@ class _BgChartState extends State<BgChart> {
         ),
       ),
     );
-    if (tipBg == 0 && tipTreat == 0) return chart;
-    return MouseRegion(
-      onHover: (e) => _show(e.localPosition),
-      onExit: (_) => _show(null),
-      child: GestureDetector(
-        onTapDown: (d) => _show(d.localPosition, autoHide: true),
-        onLongPressStart: (d) => _show(d.localPosition),
-        onLongPressMoveUpdate: (d) => _show(d.localPosition),
-        onLongPressEnd: (d) => _show(d.localPosition, autoHide: true),
-        child: chart,
+    final tips = tipBg != 0 || tipTreat != 0;
+    final chart = LayoutBuilder(builder: (context, c) {
+      _width = c.maxWidth;
+      return MouseRegion(
+        onHover: tips ? (e) => _show(e.localPosition) : null,
+        onExit: tips ? (_) => _show(null) : null,
+        child: GestureDetector(
+          onTapDown: tips ? (d) => _show(d.localPosition, autoHide: true) : null,
+          onLongPressStart: tips ? (d) => _show(d.localPosition) : null,
+          onLongPressMoveUpdate: tips ? (d) => _show(d.localPosition) : null,
+          onLongPressEnd: tips ? (d) => _show(d.localPosition, autoHide: true) : null,
+          // Drag right: back in time; drag left: towards now.
+          onHorizontalDragUpdate: (d) => _drag(d.delta.dx),
+          child: plot,
+        ),
+      );
+    });
+    final h24 = s.flag('time24');
+    String when(DateTime t) => '${const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][t.weekday - 1]} ${fmtClock(t, h24)}';
+    final step = Duration(minutes: math.max(15, widget.hours * 30)); // half a screen
+    return Stack(children: [
+      chart,
+      Positioned(
+        right: 4,
+        top: 0,
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (_loadingOld) const Padding(padding: EdgeInsets.all(6), child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))),
+          if (!live)
+            Text('${when(viewNow.subtract(Duration(hours: widget.hours)))} – ${when(viewNow)}', style: const TextStyle(color: kMuted, fontSize: 11)),
+          _arrow(Icons.chevron_left, 'Earlier', () => _shift(step)),
+          if (!live) _arrow(Icons.chevron_right, 'Later', () => _shift(-step)),
+          if (!live)
+            TextButton(
+              style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8), minimumSize: const Size(0, 28), tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+              onPressed: () => setState(() => _back = Duration.zero),
+              child: const Text('Now'),
+            ),
+        ]),
       ),
-    );
+    ]);
+  }
+
+  Widget _arrow(IconData icon, String tip, VoidCallback onTap) => IconButton(
+        tooltip: tip,
+        visualDensity: VisualDensity.compact,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+        iconSize: 20,
+        color: kMuted,
+        onPressed: onTap,
+        icon: Icon(icon),
+      );
   }
 }
 
@@ -239,7 +344,7 @@ class _BgPainter extends CustomPainter {
     final span = tEnd.difference(tStart).inSeconds.toDouble();
     double x(DateTime t) => left + t.difference(tStart).inSeconds / span * w;
 
-    final visible = entries.where((e) => e.t.isAfter(tStart)).toList();
+    final visible = entries.where((e) => e.t.isAfter(tStart) && !e.t.isAfter(tEnd)).toList();
     final rr = activeRange(ranges, now);
     // Top of the graph: fixed from settings, or just above the high line and
     // the highest reading. Rounded up to the next grid line.
