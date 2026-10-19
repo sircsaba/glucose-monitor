@@ -145,6 +145,19 @@ def profile():
             'sens': sched([(0, 55), (7, 50), (20, 55)]),
             'target_low': sched([(0, 100)]), 'target_high': sched([(0, 115)]),
         }},
+        # What Loop uploads about itself: needed by the Plus remote screen.
+        'loopSettings': {
+            'deviceToken': 'demo-device-token', 'bundleIdentifier': 'com.example.loopkit.Loop',
+            'dosingEnabled': True, 'maximumBolus': 6, 'maximumBasalRatePerHour': 3,
+            'overridePresets': [
+                {'name': 'Running', 'symbol': '🏃', 'duration': 3600, 'insulinNeedsScaleFactor': 0.6,
+                 'targetRange': [140, 160]},
+                {'name': 'Pre-meal', 'symbol': '🍽️', 'duration': 3600, 'insulinNeedsScaleFactor': 1.0,
+                 'targetRange': [80, 90]},
+                {'name': 'Sick day', 'symbol': '🤒', 'duration': 0, 'insulinNeedsScaleFactor': 1.2,
+                 'targetRange': [110, 130]},
+            ],
+        },
     }]
 
 
