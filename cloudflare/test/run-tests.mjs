@@ -114,7 +114,7 @@ await test('web app is shown at the server address; /api stays the API', async (
   const e = makeEnv({ WEB_APP_URL: web });
   const home = await call(e, 'GET', '/');
   assert.equal(home.status, 200);
-  assert.match(String(home.data), /Glucose Monitor/);
+  assert.match(String(home.data), /Monitor Glucose/);
   const js = await call(e, 'GET', '/main.dart.js');
   assert.equal(js.status, 200);
   assert.match(String(js.data), /console/);

@@ -464,7 +464,7 @@ function need(have, level) {
 
 // ---------------------------------------------------------------- web app
 
-// The browser version of the Glucose Monitor app is built once and published on
+// The browser version of the Monitor Glucose app is built once and published on
 // GitHub Pages. Each server shows it at its own address, so the app reads this
 // server without any cross-site setup, and app updates reach everyone at once.
 // WEB_APP_URL = "none" turns it off; another address uses your own build.

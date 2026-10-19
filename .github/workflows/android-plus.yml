@@ -1,4 +1,4 @@
-name: Build Glucose Monitor Plus (Android)
+name: Build Monitor Glucose Plus (Android)
 
 on:
   workflow_dispatch:
@@ -7,9 +7,9 @@ jobs:
   android:
     runs-on: ubuntu-latest
     env:
-      # Glucose Monitor Plus: Loop remote commands. Its own name and app ID, so it
+      # Monitor Glucose Plus: Loop remote commands. Its own name and app ID, so it
       # installs next to the regular app.
-      APP_NAME: ${{ vars.PLUS_APP_NAME || 'Glucose Monitor Plus' }}
+      APP_NAME: ${{ vars.PLUS_APP_NAME || 'Monitor Glucose Plus' }}
       BUNDLE_ID: ${{ vars.PLUS_BUNDLE_ID || 'com.monitorglucoseplus.app' }}
     steps:
       - uses: actions/checkout@v5

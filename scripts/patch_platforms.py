@@ -9,7 +9,7 @@ import re
 import shutil
 import sys
 
-APP_NAME = os.environ.get('APP_NAME') or 'Glucose Monitor'
+APP_NAME = os.environ.get('APP_NAME') or 'Monitor Glucose'
 BUNDLE_ID = os.environ.get('BUNDLE_ID') or 'com.monitorglucose.app'
 
 
@@ -130,7 +130,7 @@ def patch_ios():
     p['CFBundleName'] = APP_NAME[:15]
     p['ITSAppUsesNonExemptEncryption'] = False
     p['UIApplicationSupportsIndirectInputEvents'] = True
-    # Glucose Monitor Plus reads Loop's one-time password QR code from a photo.
+    # Monitor Glucose Plus reads Loop's one-time password QR code from a photo.
     p['NSCameraUsageDescription'] = "Take a photo of Loop's one-time password QR code (remote commands)."
     p['NSPhotoLibraryUsageDescription'] = "Choose a screenshot of Loop's one-time password QR code (remote commands)."
     # The phone's lock (Face ID or passcode) confirms commands sent to Loop.

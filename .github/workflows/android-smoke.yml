@@ -1,10 +1,10 @@
-name: Test Glucose Monitor (Android start, emulator)
+name: Test Monitor Glucose (Android start, emulator)
 
 on:
   workflow_dispatch:
     inputs:
       plus:
-        description: 'Glucose Monitor Plus'
+        description: 'Monitor Glucose Plus'
         type: boolean
         default: true
 
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
-      APP_NAME: Glucose Monitor Test
+      APP_NAME: Monitor Glucose Test
       BUNDLE_ID: com.monitorglucose.smoke
     steps:
       - uses: actions/checkout@v5

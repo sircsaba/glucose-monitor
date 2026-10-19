@@ -46,7 +46,7 @@ class RemoteSecrets {
   static const cmdSecret = 'gm_cmd_url_secret';
 }
 
-/// Loop remote control (Glucose Monitor Plus): overrides, carbs and boluses,
+/// Loop remote control (Monitor Glucose Plus): overrides, carbs and boluses,
 /// sent through Nightscout or your own server with Apple's push service. No
 /// Apple keys here: the site has them. Loop's device token comes from the
 /// profile; carbs and boluses need Loop's one-time password (its QR code,

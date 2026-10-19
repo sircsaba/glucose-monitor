@@ -258,7 +258,7 @@ class Settings {
     'graphButtons': [1, 2, 3, 6, 12], // the 5 buttons above the graph, in hours
     'graphTop': 0, // 0 = auto, else the top of the graph in mg/dL
     'dotSize': 0, // 0 small, 1 medium, 2 large
-    // Glucose Monitor Plus: Loop remote control limits and name.
+    // Monitor Glucose Plus: Loop remote control limits and name.
     'remoteMaxBolus': 2.0,
     'remoteMaxCarbs': 50.0,
     'remoteName': '',

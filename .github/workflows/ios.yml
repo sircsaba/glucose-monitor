@@ -1,4 +1,4 @@
-name: Build Glucose Monitor (iPhone, TestFlight)
+name: Build Monitor Glucose (iPhone, TestFlight)
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ jobs:
   ios:
     runs-on: macos-latest
     env:
-      APP_NAME: ${{ vars.APP_NAME || 'Glucose Monitor' }}
+      APP_NAME: ${{ vars.APP_NAME || 'Monitor Glucose' }}
       BUNDLE_ID: ${{ vars.BUNDLE_ID || 'com.monitorglucose.app' }}
       TEAMID: ${{ secrets.TEAMID }}
       FASTLANE_KEY_ID: ${{ secrets.FASTLANE_KEY_ID }}

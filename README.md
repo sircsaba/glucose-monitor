@@ -1,4 +1,4 @@
-# Glucose Monitor (iPhone and Android)
+# Monitor Glucose (iPhone and Android)
 
 > **Free server for Loop and Trio users:** see [`cloudflare/README.md`](cloudflare/README.md),
 > a one-click, free Nightscout-compatible server (copy, relay or standalone) on Cloudflare.
@@ -10,8 +10,8 @@ You do not need a Mac. GitHub builds both apps in the cloud, the same way as an 
 
 | Workflow | What it makes | Where it goes |
 |---|---|---|
-| **Build Glucose Monitor (Android)** | `app-release.apk` | Download from the GitHub run, install on the phone |
-| **Build Glucose Monitor (iPhone, TestFlight)** | signed iPhone app | Uploaded to App Store Connect › TestFlight |
+| **Build Monitor Glucose (Android)** | `app-release.apk` | Download from the GitHub run, install on the phone |
+| **Build Monitor Glucose (iPhone, TestFlight)** | signed iPhone app | Uploaded to App Store Connect › TestFlight |
 
 ---
 
@@ -45,7 +45,7 @@ The `android/` and `ios/` folders are not stored here: each build creates them f
      cd glucose_monitor
      git init -b main
      git add .
-     git commit -m "Glucose Monitor app"
+     git commit -m "Monitor Glucose app"
      git remote add origin https://github.com/sircsaba/glucose-monitor.git
      git push -u origin main
      ```
@@ -54,7 +54,7 @@ Uploading to `main` starts the Android build by itself.
 
 ## Step 2 — Get the Android app
 
-1. Repository › **Actions** › **Build Glucose Monitor (Android)** › the latest run (green tick, about 8–10 minutes).
+1. Repository › **Actions** › **Build Monitor Glucose (Android)** › the latest run (green tick, about 8–10 minutes).
 2. Under **Artifacts**, download `glucose-monitor-android` (a zip), unzip it: `app-release.apk`.
 3. Copy the APK to the phone and open it. Allow "install unknown apps" for your file manager when Android asks.
 
@@ -84,11 +84,11 @@ Uploading to `main` starts the Android build by itself.
 | `GH_PAT` | The token from 5 |
 | `MATCH_PASSWORD` | A password you make up (it encrypts Match-Secrets; keep it) |
 
-Optional, same page, **Variables** tab: `APP_NAME` (name under the icon, default "Glucose Monitor") and `BUNDLE_ID` (only if you registered a different one).
+Optional, same page, **Variables** tab: `APP_NAME` (name under the icon, default "Monitor Glucose") and `BUNDLE_ID` (only if you registered a different one).
 
 ## Step 4 — Build the iPhone app
 
-1. Repository › **Actions** › **Build Glucose Monitor (iPhone, TestFlight)** › **Run workflow** › Run. About 20–30 minutes.
+1. Repository › **Actions** › **Build Monitor Glucose (iPhone, TestFlight)** › **Run workflow** › Run. About 20–30 minutes.
    The first run creates your distribution certificate and stores it in `Match-Secrets`.
 2. App Store Connect › your app › **TestFlight**. The build appears after Apple processes it (10–30 minutes). Answer the export-compliance question if asked (the app uses no special encryption).
 3. TestFlight › *Internal Testing* › **+** › add yourself (and your wife) as testers.
@@ -128,9 +128,9 @@ Without them every build has a different key and Android refuses to update
 ("package conflicts with an existing package"): uninstall first. Keep a copy
 of the keystore: a new key means one more uninstall.
 
-## Glucose Monitor Plus (Loop remote control, build it yourself)
+## Monitor Glucose Plus (Loop remote control, build it yourself)
 
-Glucose Monitor Plus is the same app with **Loop remote commands**: start or
+Monitor Glucose Plus is the same app with **Loop remote commands**: start or
 cancel an override, send carbs, send a bolus. It is not in the stores: you
 build it on GitHub with your own accounts, and it installs next to the regular
 app (its own name and app ID, `<your bundle ID>.plus`).
@@ -139,7 +139,7 @@ app (its own name and app ID, `<your bundle ID>.plus`).
 
 - **Nightscout** uses its own `LOOP_APNS_KEY`, `LOOP_APNS_KEY_ID` and
   `LOOP_DEVELOPER_TEAM_ID` settings (the same as for Loop Caregiver / Careportal).
-- **Your own Glucose Monitor server (WHC)** uses `loop_apns_key_file`,
+- **Your own Monitor Glucose server (WHC)** uses `loop_apns_key_file`,
   `loop_apns_key_id`, `loop_team_id` in `config.php`, or finds the key of the
   Loop heartbeat installed next to it.
 
@@ -152,13 +152,13 @@ site's API secret (asked once, can be remembered on the phone).
 
 **Build it:**
 
-- Android: Actions › **Build Glucose Monitor Plus (Android)** › Run workflow,
+- Android: Actions › **Build Monitor Glucose Plus (Android)** › Run workflow,
   then install the APK from the run's Artifacts.
 - iPhone: first create the app record once: App Store Connect › Apps › + ›
-  New App, name e.g. "Glucose Monitor Plus <your name>", Bundle ID
+  New App, name e.g. "Monitor Glucose Plus <your name>", Bundle ID
   `<your bundle ID>.plus` (the first Plus build creates this ID; run it once,
   let it fail at the upload, then create the app record and run it again).
-  Then Actions › **Build Glucose Monitor Plus (iPhone, TestFlight)** › Run
+  Then Actions › **Build Monitor Glucose Plus (iPhone, TestFlight)** › Run
   workflow. Same secrets as the regular iPhone build.
 - Optional repository variables: `PLUS_APP_NAME`, `PLUS_BUNDLE_ID`.
 

@@ -50,7 +50,7 @@ return [
     'copy_first_hours' => 30,          // the first copy fetches this many hours
 
     // The web app at this site's address (https://your-site/). '' = the
-    // published Glucose Monitor app; 'none' = only the API, no web app.
+    // published Monitor Glucose app; 'none' = only the API, no web app.
     'web_app_url' => '',
 
     // One-time import of the whole history from a Nightscout (lib/import.php,
