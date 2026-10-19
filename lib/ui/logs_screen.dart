@@ -175,7 +175,7 @@ class _LogsScreenState extends State<LogsScreen> {
         'push' => 'Each heartbeat push sent to Loop',
         'loop' => 'Each loop run uploaded by Loop, with the time since the last',
         'treatment' => 'Boluses, carbs, overrides (not temp basals)',
-        'remote' => 'Remote commands sent to Loop (Glucose Monitor Plus, Loop Caregiver)',
+        'remote' => 'Remote commands sent to Loop (Monitor Glucose Plus, Loop Caregiver)',
         _ => 'LibreLinkUp / Nightscout copy problems and recoveries',
       };
 

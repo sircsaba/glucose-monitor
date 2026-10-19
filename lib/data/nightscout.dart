@@ -462,7 +462,7 @@ class NightscoutClient {
     return info;
   }
 
-  // ---------- event log (only on your own Glucose Monitor server)
+  // ---------- event log (only on your own Monitor Glucose server)
 
   /// Headers for a change that needs the API secret: the one given, or the
   /// app's own when it is connected with the API secret.
@@ -475,7 +475,7 @@ class NightscoutClient {
   }
 
   Never _logError(http.Response r) {
-    if (r.statusCode == 404) throw NsException('This site has no event log. Only your own Glucose Monitor server keeps one.');
+    if (r.statusCode == 404) throw NsException('This site has no event log. Only your own Monitor Glucose server keeps one.');
     if (r.statusCode == 401 || r.statusCode == 403) throw NsException('The API secret is needed for this (wrong or missing)');
     throw NsException('The site answered with error ${r.statusCode}');
   }
@@ -528,7 +528,7 @@ class NightscoutClient {
 
   /// Sends a Loop remote command (override, cancel, carbs, bolus) through the
   /// site, which pushes it to the Loop phone with Apple's push service:
-  /// Nightscout with its LOOP_APNS_* settings, or your own Glucose Monitor
+  /// Nightscout with its LOOP_APNS_* settings, or your own Monitor Glucose
   /// server with the heartbeat's key. Needs the API secret.
   Future<void> sendLoopCommand(Map<String, dynamic> body, {String? secret}) async {
     final http.Response r;

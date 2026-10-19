@@ -1,4 +1,4 @@
-name: Build Glucose Monitor (Web)
+name: Build Monitor Glucose (Web)
 
 # Builds the browser version of the app and publishes it on GitHub Pages.
 # Every glucose server (cloudflare/) shows it at its own address.
@@ -25,7 +25,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     env:
-      APP_NAME: ${{ vars.APP_NAME || 'Glucose Monitor' }}
+      APP_NAME: ${{ vars.APP_NAME || 'Monitor Glucose' }}
     steps:
       - uses: actions/checkout@v5
 

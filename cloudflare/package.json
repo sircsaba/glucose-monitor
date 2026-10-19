@@ -16,7 +16,7 @@
   "cloudflare": {
     "bindings": {
       "API_SECRET": {
-        "description": "Your server's secret, 12 characters or more. Type it in Loop or Trio (as the Nightscout API secret) or in the Glucose Monitor app. **Relay mode:** you may use your Nightscout API secret here."
+        "description": "Your server's secret, 12 characters or more. Type it in Loop or Trio (as the Nightscout API secret) or in the Monitor Glucose app. **Relay mode:** you may use your Nightscout API secret here."
       },
       "READ_TOKENS": {
         "description": "Read-only keys for followers, separated by commas (e.g. `readable-mom,readable-school`)."

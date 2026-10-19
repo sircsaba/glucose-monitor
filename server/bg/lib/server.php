@@ -1,6 +1,6 @@
 <?php
 // Glucose server: a small Nightscout-compatible API (v1) for Loop's
-// "Inforap" service and for the Glucose Monitor app.
+// "Inforap" service and for the Monitor Glucose app.
 // Data is kept in MySQL; each record's full JSON is stored as text.
 
 declare(strict_types=1);
@@ -815,7 +815,7 @@ final class Server
     // ------------------------------------------------------------ web app
 
     /**
-     * Shows the browser version of the Glucose Monitor app at this server's own
+     * Shows the browser version of the Monitor Glucose app at this server's own
      * address. The app is published once on GitHub Pages; this fetches its files,
      * keeps a copy for one minute in lib/.webcache/, and serves them from here.
      * 'web_app_url' => 'none' in config.php turns it off. Returns false when the

@@ -1,7 +1,7 @@
 <?php
 // Loop remote commands (override, cancel override, carbs, bolus), sent to the
 // Loop phone with an Apple push, exactly like Nightscout's
-// POST /api/v2/notifications/loop. Used by Glucose Monitor Plus, Loop Caregiver
+// POST /api/v2/notifications/loop. Used by Monitor Glucose Plus, Loop Caregiver
 // and anything else that talks to Nightscout.
 //
 // The Apple push key: 'loop_apns_key_file', 'loop_apns_key_id' and

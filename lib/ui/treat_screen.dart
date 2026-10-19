@@ -62,7 +62,7 @@ class _TreatScreenState extends State<TreatScreen> {
     final m = <String, dynamic>{
       'eventType': t.nsType,
       'created_at': when.toUtc().toIso8601String(),
-      'enteredBy': app.settings.str('enteredBy').isEmpty ? 'Glucose Monitor app' : app.settings.str('enteredBy'),
+      'enteredBy': app.settings.str('enteredBy').isEmpty ? 'Monitor Glucose app' : app.settings.str('enteredBy'),
     };
     if (t.carbs) m['carbs'] = _carbs;
     if (t.insulin) m['insulin'] = double.parse(_insulin.toStringAsFixed(2));

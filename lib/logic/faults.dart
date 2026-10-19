@@ -2,7 +2,7 @@
 // top line of the home screen ("No Internet", "Libre connection down"...).
 //
 // Inputs come from the app itself (could it reach its site? is the internet up?)
-// and, with your own Glucose Monitor server, from its /api/v1/health report:
+// and, with your own Monitor Glucose server, from its /api/v1/health report:
 // the LibreLinkUp job, the newest reading and loop there, the main Nightscout,
 // and whether Loop is reading its glucose from that server (backup source).
 

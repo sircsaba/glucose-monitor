@@ -1,4 +1,4 @@
-name: Check Glucose Monitor (iPhone build, no signing)
+name: Check Monitor Glucose (iPhone build, no signing)
 
 # Builds the iPhone app and its widget without signing or uploading, to check
 # that everything compiles. Nothing is sent to TestFlight.

@@ -41,9 +41,9 @@ Future<Uint8List> buildReportPdf(ReportData d, Set<int> which) async {
   final mmol = app.mmol;
   final s = app.settings;
   final tightColor = Color(s.integer('ttirColor'));
-  final site = s.str('siteName').isNotEmpty ? s.str('siteName') : 'Glucose Monitor';
+  final site = s.str('siteName').isNotEmpty ? s.str('siteName') : 'Monitor Glucose';
   final period = '${dayTitle(d.from)}  to  ${dayTitle(d.to)}';
-  final doc = pw.Document(title: 'Glucose report', author: 'Glucose Monitor');
+  final doc = pw.Document(title: 'Glucose report', author: 'Monitor Glucose');
   const light = ChartTheme.light;
 
   final small = pw.TextStyle(fontSize: 8, color: PdfColors.grey700);
@@ -87,7 +87,7 @@ Future<Uint8List> buildReportPdf(ReportData d, Set<int> which) async {
   }
 
   pw.Widget footer(pw.Context ctx) => pw.Row(children: [
-        pw.Expanded(child: pw.Text('Glucose Monitor  ·  for information only, not for treatment decisions', style: small)),
+        pw.Expanded(child: pw.Text('Monitor Glucose  ·  for information only, not for treatment decisions', style: small)),
         pw.Text('Page ${ctx.pageNumber} of ${ctx.pagesCount}', style: small),
       ]);
 

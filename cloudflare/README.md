@@ -2,7 +2,7 @@
 
 Your own copy of your diabetes data, on a free Cloudflare account, in about 15 minutes.
 It works **with** Nightscout (or without it) and speaks the same language, so Loop, Trio,
-follower apps and the Glucose Monitor app can use it.
+follower apps and the Monitor Glucose app can use it.
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/sircsaba/glucose-monitor/tree/main/cloudflare)
 
@@ -67,7 +67,7 @@ GitHub account (Cloudflare puts a copy of the code in it so it can update the se
 
 5. Click **Deploy**. After a minute or two you get your address, like
    `https://glucose-server.yourname.workers.dev`. Write it down.
-6. Open that address in a browser: you should see the **Glucose Monitor web app** asking to connect
+6. Open that address in a browser: you should see the **Monitor Glucose web app** asking to connect
    (or a page saying **The glucose server is running**). See *Step 5 — See your data in a browser*.
 
 > **Changing a setting later:** Cloudflare dashboard › Workers & Pages › **glucose-server** ›
@@ -105,13 +105,13 @@ Any app that reads Nightscout can read the server with a **read token**:
 - Token: one of your `READ_TOKENS` (or `CARE_TOKENS` to log carbs and notes)
 - In apps that only take an address, add it to the address: `https://YOUR-ADDRESS?token=readable-mom`
 
-The **Glucose Monitor** app (night view, red/yellow/green zones per time of day, soft-music
+The **Monitor Glucose** app (night view, red/yellow/green zones per time of day, soft-music
 alarms) connects the same way: Settings › Data & general › site address + access token.
 
 ## Step 5 — See your data in a browser
 
 Open your server's address (`https://glucose-server.yourname.workers.dev`) in any browser, on a
-computer, tablet or phone. It shows the **Glucose Monitor app**, the same as on the phone: graph,
+computer, tablet or phone. It shows the **Monitor Glucose app**, the same as on the phone: graph,
 big glucose number and arrow, night view, zones per time of day, IOB / COB, sensor and site ages.
 
 1. The address is already filled in. Choose **Access token** and type one of your `READ_TOKENS`

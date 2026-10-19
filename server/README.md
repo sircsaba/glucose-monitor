@@ -1,7 +1,7 @@
 # Glucose server (on WHC)
 
-Your own Nightscout-compatible server. Loop's **Glucose Monitor Service** sends its data here,
-while the normal Nightscout service keeps sending to Nightscout. The Glucose Monitor
+Your own Nightscout-compatible server. Loop's **Monitor Glucose Service** sends its data here,
+while the normal Nightscout service keeps sending to Nightscout. The Monitor Glucose
 app can read from either.
 
 It must live at the **root of its own address**, for example `https://bg.inforap.com`
@@ -45,7 +45,7 @@ It must live at the **root of its own address**, for example `https://bg.inforap
 1. GitHub › `sircsaba/LoopWorkspace` › *Actions* › **4. Build Loop Manual** › *Run workflow* ›
    in **Use workflow from** choose **inforap-service** › *Run workflow*.
 2. Install the new Loop build from TestFlight.
-3. Loop › Settings › Services › **Add Service** › **Glucose Monitor Service** › Site URL `https://bg.inforap.com`, API Secret = your `api_secret` › Login.
+3. Loop › Settings › Services › **Add Service** › **Monitor Glucose Service** › Site URL `https://bg.inforap.com`, API Secret = your `api_secret` › Login.
    Keep the Nightscout service as it is: both upload at the same time.
 
 ## Libre 3 readings straight from LibreLinkUp (recommended)
@@ -120,13 +120,13 @@ are skipped, so it never makes duplicates.
 ## Web app at your own address
 
 Opening your site (for example `https://bg.inforap.com`) in a browser shows the
-Glucose Monitor web app, the same as on the phone. The first time, enter your
+Monitor Glucose web app, the same as on the phone. The first time, enter your
 site address and your read token. The data stays under `/api/v1/...`.
 The app files come from the published copy on GitHub Pages and are refreshed
 every minute (a copy is kept in `lib/.webcache/`, so it still opens if GitHub is
 down). To turn it off, put `'web_app_url' => 'none',` in `config.php`.
 
-## Glucose Monitor app
+## Monitor Glucose app
 
 Settings › Data & general › tap the site address › `https://bg.inforap.com`, then either
 **API secret** (full access) or **Access token** with one of your `read_tokens` / `care_tokens`.

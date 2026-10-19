@@ -165,7 +165,7 @@ class _TreatmentLogScreenState extends State<TreatmentLogScreen> {
     doc.addPage(pw.MultiPage(
       pageTheme: pw.PageTheme(pageFormat: PdfPageFormat.letter.landscape, margin: const pw.EdgeInsets.all(24)),
       footer: (c) => pw.Row(children: [
-        pw.Expanded(child: pw.Text('Glucose Monitor - treatment log', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700))),
+        pw.Expanded(child: pw.Text('Monitor Glucose - treatment log', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700))),
         pw.Text('Page ${c.pageNumber} of ${c.pagesCount}', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
       ]),
       build: (_) => [

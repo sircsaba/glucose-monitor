@@ -21,16 +21,16 @@ platform :ios do
     # Plain Ruby here runs inside the fastlane folder, hence "..".
     has_widget = File.exist?("../ios/BGWidget/Info.plist")
 
-    # App IDs (the app, e.g. Glucose Monitor Plus, and its widget): created the first time.
+    # App IDs (the app, e.g. Monitor Glucose Plus, and its widget): created the first time.
     Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.from(hash: api_key)
     unless Spaceship::ConnectAPI::BundleId.find(bundle_id)
       UI.message("Creating the App ID #{bundle_id}")
-      Spaceship::ConnectAPI::BundleId.create(name: ENV["APP_NAME"] || "Glucose Monitor", identifier: bundle_id, platform: "IOS")
+      Spaceship::ConnectAPI::BundleId.create(name: ENV["APP_NAME"] || "Monitor Glucose", identifier: bundle_id, platform: "IOS")
     end
     if has_widget
       unless Spaceship::ConnectAPI::BundleId.find(widget_id)
         UI.message("Creating the App ID #{widget_id}")
-        Spaceship::ConnectAPI::BundleId.create(name: "Glucose Monitor Widget", identifier: widget_id, platform: "IOS")
+        Spaceship::ConnectAPI::BundleId.create(name: "Monitor Glucose Widget", identifier: widget_id, platform: "IOS")
       end
     end
     ids = has_widget ? [bundle_id, widget_id] : [bundle_id]

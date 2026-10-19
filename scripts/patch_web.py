@@ -11,7 +11,7 @@ import re
 import shutil
 import sys
 
-name = os.environ.get("APP_NAME", "Glucose Monitor")
+name = os.environ.get("APP_NAME", "Monitor Glucose")
 step = sys.argv[1] if len(sys.argv) > 1 else "web"
 
 if step == "web":

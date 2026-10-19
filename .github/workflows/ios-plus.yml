@@ -1,4 +1,4 @@
-name: Build Glucose Monitor Plus (iPhone, TestFlight)
+name: Build Monitor Glucose Plus (iPhone, TestFlight)
 
 on:
   workflow_dispatch:
@@ -7,8 +7,8 @@ jobs:
   ios:
     runs-on: macos-latest
     env:
-      # Glucose Monitor Plus: Loop remote commands. Its own name and app ID.
-      APP_NAME: ${{ vars.PLUS_APP_NAME || 'Glucose Monitor Plus' }}
+      # Monitor Glucose Plus: Loop remote commands. Its own name and app ID.
+      APP_NAME: ${{ vars.PLUS_APP_NAME || 'Monitor Glucose Plus' }}
       BUNDLE_ID: ${{ vars.PLUS_BUNDLE_ID || format('{0}.plus', vars.BUNDLE_ID || 'com.inforap.glucosemonitor') }}
       TEAMID: ${{ secrets.TEAMID }}
       FASTLANE_KEY_ID: ${{ secrets.FASTLANE_KEY_ID }}
