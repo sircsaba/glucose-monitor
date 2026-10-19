@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../data/nightscout.dart';
+import '../logic/bolus_calc.dart';
 import '../logic/glucose.dart';
 import '../plus.dart';
 import '../state/app_state.dart';
 import '../state/settings.dart';
+import 'bolus_calc_view.dart';
 import 'common.dart';
 import 'remote_screen.dart';
 
@@ -131,6 +133,12 @@ class _TreatScreenState extends State<TreatScreen> {
               ]),
               const SizedBox(height: 16),
             ],
+            OutlinedButton.icon(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BolusCalcScreen())),
+              icon: const Icon(Icons.calculate_outlined),
+              label: const Text('Bolus calculator'),
+            ),
+            const SizedBox(height: 14),
             if (_form) ..._formWidgets(context, t, mmol, allowed, d),
           ],
         );
@@ -184,13 +192,25 @@ class _TreatScreenState extends State<TreatScreen> {
                   onMinus: () => setState(() => _carbs = (_carbs - 5).clamp(0, 300)),
                   onPlus: () => setState(() => _carbs = (_carbs + 5).clamp(0, 300)),
                 ),
-              if (t.insulin)
+              if (t.insulin) ...[
                 StepRow(
                   label: 'Insulin',
                   value: '${fmtU(_insulin)} U',
-                  onMinus: () => setState(() => _insulin = (_insulin - 0.5).clamp(0.0, 30.0)),
-                  onPlus: () => setState(() => _insulin = (_insulin + 0.5).clamp(0.0, 30.0)),
+                  onMinus: () => setState(() => _insulin = (_insulin - 0.05).clamp(0.0, 30.0)),
+                  onPlus: () => setState(() => _insulin = (_insulin + 0.05).clamp(0.0, 30.0)),
                 ),
+                Builder(builder: (_) {
+                  final c = BolusCalc.now(carbs: t.carbs ? _carbs.toDouble() : 0);
+                  if (!c.hasProfile) return const SizedBox.shrink();
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: () => setState(() => _insulin = c.total),
+                      child: Text('Calculator: ${fmtU(c.total)} U (use it)'),
+                    ),
+                  );
+                }),
+              ],
               if (t.target) ...[
                 StepRow(
                   label: 'Target',

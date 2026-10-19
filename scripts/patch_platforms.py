@@ -46,6 +46,15 @@ def patch_android():
         for n in files:
             if n in ('MainActivity.kt', 'MainActivity.java'):
                 main_act = os.path.join(root, n)
+    if main_act and main_act.endswith('.kt'):
+        # The phone lock prompt (local_auth) needs a FlutterFragmentActivity.
+        with open(main_act) as f:
+            ma = f.read()
+        if 'FlutterFragmentActivity' not in ma:
+            ma = ma.replace('import io.flutter.embedding.android.FlutterActivity', 'import io.flutter.embedding.android.FlutterFragmentActivity')
+            ma = ma.replace(': FlutterActivity()', ': FlutterFragmentActivity()')
+            with open(main_act, 'w') as f:
+                f.write(ma)
     if main_act:
         with open(main_act) as f:
             pkg = re.search(r'^package\s+([\w.]+)', f.read(), re.M).group(1)
@@ -124,6 +133,8 @@ def patch_ios():
     # Glucose Monitor Plus reads Loop's one-time password QR code from a photo.
     p['NSCameraUsageDescription'] = "Take a photo of Loop's one-time password QR code (remote commands)."
     p['NSPhotoLibraryUsageDescription'] = "Choose a screenshot of Loop's one-time password QR code (remote commands)."
+    # The phone's lock (Face ID or passcode) confirms commands sent to Loop.
+    p['NSFaceIDUsageDescription'] = "Confirm commands sent to Loop (carbs, bolus, overrides) with Face ID or your passcode."
     with open(plist_path, 'wb') as f:
         plistlib.dump(p, f)
 
