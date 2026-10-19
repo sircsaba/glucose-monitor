@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../logic/bolus_calc.dart';
 import '../logic/glucose.dart';
 import '../state/app_state.dart';
+import '../state/settings.dart';
 import 'common.dart';
 
 String _g(double mg) => '${fmtBg(mg, app.mmol)} ${unitLabel(app.mmol)}';
