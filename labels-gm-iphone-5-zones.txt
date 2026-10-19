@@ -1,0 +1,51 @@
+BackBG zones & time ranges
+Back
+TODAY
+00
+06
+12
+18
+24
+Night 21:00–07:00
+Day 07:00–21:00
+Night
+Day
++ Add range
+Decrease From
+−
+Increase From
++
+Decrease To
+Increase To
+M
+T
+W
+F
+S
+Lower Red below
+Raise Red below
+Lower Yellow below
+Raise Yellow below
+Lower Yellow above
+Raise Yellow above
+Lower Red above
+Raise Red above
+White
+Light grey
+Grey
+Dark grey
+Blue
+Light blue
+Navy
+Deep blue
+Teal
+Green
+Lime
+Yellow
+Light yellow
+Orange
+Coral
+Red
+Dark red
+Pink
+Purple

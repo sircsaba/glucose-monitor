@@ -1,0 +1,21 @@
+BackLoop remote controlSettings
+Back
+Settings
+Enter
+Set up
+Override
+No override running
+🏃 Running
+🍽️ Pre-meal
+🤒 Sick day
+Decrease Carbs
+−
+Increase Carbs
++
+Decrease Absorption time
+Increase Absorption time
+Decrease Eaten
+Increase Eaten
+Decrease Insulin with the carbs
+Increase Insulin with the carbs
+Send 20 g + 0.8 U to Loop

@@ -1,0 +1,14 @@
+Alarms
+All settings ›
+Now using the "Day" range
+SNOOZED NOW
+Nothing is snoozed
+TRY THE ALARMS
+Test red low alarm
+Test yellow low alarm
+Test high alarm
+Alarms sound while the app is open. At night, leave it open in night view with the phone charging.
+Live
+Treat
+Target
+Reports

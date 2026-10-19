@@ -1,0 +1,29 @@
+BackSettings
+Back
+Open night view
+BG zones & time ranges
+Red, yellow and green limits for each time range
+Alarm sounds & snooze
+Soft music, volume over time, snooze buttons
+Day view layout
+Size, colour, line and position of everything on the main screen
+Night view layout
+Size, colour and position of each line
+Night view & checklist
+Brightness, schedule, before-sleep checks
+Before-sleep checklist
+Run the checks now
+Target alert
+Defaults for the Target button: value, sound, vibrate, flash, colour, countdown
+Other alarms
+No data, low predicted, loop, pump, gentle wake-up, quiet hours
+Logs
+Each reading, heartbeat push and loop run, with the time between them
+Treatment log
+Carbs, boluses, SMB, temp basals, overrides: filter and export
+Display & graph
+Units, graph, reports range
+Data & general
+Site, refresh, time format, backup
+Every value here is saved on the phone. Use Data & general › Copy settings to move them to another phone.
+Version demo

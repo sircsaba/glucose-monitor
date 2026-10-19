@@ -1,0 +1,31 @@
+BackLoop remote controlSettings
+Back
+Settings
+EnterSet up−+−+−+−+Send 20 g + 0.8 U to Loop−+No bolus suggestedLimits, name and command siteBolus calculator
+Enter
+Set up
+Override
+No override running
+🏃 Running
+🍽️ Pre-meal
+🤒 Sick day
+Decrease Carbs
+−
+Increase Carbs
++
+Decrease Absorption time
+Increase Absorption time
+Decrease Eaten
+Increase Eaten
+Decrease Insulin with the carbs
+Increase Insulin with the carbs
+Send 20 g + 0.8 U to Loop
+Decrease Bolus
+Increase Bolus
+0.25 U
+0.5 U
+1 U
+2 U
+No bolus suggested
+Limits, name and command site
+Bolus calculator

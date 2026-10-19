@@ -1,0 +1,15 @@
+Add treatment
+6.7 →
+Remote control
+Override, carbs, bolus sent to LoopTreatment
+Log carbs, insulin, notes…
+Remote control
+Override, carbs, bolus sent to Loop
+Treatment
+Log carbs, insulin, notes…
+Bolus calculator
+Live
+Treat
+Target
+Reports
+Alarms
