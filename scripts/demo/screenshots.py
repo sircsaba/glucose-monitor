@@ -55,20 +55,31 @@ async def open_app(ctx, url):
     return page
 
 
-async def tap(page, name):
-    """Tap the first element whose accessible name contains [name]."""
+async def tap(page, name, touch=False):
+    """Tap the element named [name]: an exact accessible name first, else the
+    smallest element whose name contains it (never a whole screen container)."""
     found = await page.evaluate("""(name) => {
-        const all = [...document.querySelectorAll('flt-semantics, [role]')];
-        const hit = all.find(e => ((e.getAttribute('aria-label') || '') + ' ' + (e.textContent || '')).includes(name)
-                                  && e.getBoundingClientRect().width > 0);
-        if (!hit) return null;
-        const r = hit.getBoundingClientRect();
+        const all = [...document.querySelectorAll('flt-semantics, [role]')]
+            .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+        const label = e => (e.getAttribute('aria-label') || '').trim();
+        const own = e => [...e.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim();
+        const area = e => { const r = e.getBoundingClientRect(); return r.width * r.height; };
+        let hits = all.filter(e => label(e) === name || own(e) === name);
+        if (!hits.length) hits = all.filter(e => label(e).startsWith(name) || own(e).startsWith(name));
+        if (!hits.length) hits = all.filter(e => (e.textContent || '').includes(name));
+        if (!hits.length) return null;
+        hits.sort((a, b) => area(a) - area(b));
+        const r = hits[0].getBoundingClientRect();
         return [r.x + r.width / 2, r.y + r.height / 2];
     }""", name)
     if not found:
         print(f'  ! not found: {name}')
         return False
-    await page.mouse.click(found[0], found[1])
+    if touch:
+        await page.touchscreen.tap(found[0], found[1])
+    else:
+        await page.mouse.click(found[0], found[1])
+        await page.mouse.move(2, 2)  # no hover tooltip left on the picture
     await page.wait_for_timeout(2500)
     return True
 
@@ -119,7 +130,8 @@ async def main():
                     "try { localStorage.setItem('flutter.settings', " + json.dumps(stored) + "); } catch (e) {}")
                 page = await open_app(ctx, APP if which == 'app' else PLUS)
                 for s in steps:
-                    await tap(page, s)
+                    await tap(page, s, touch=dev != 'web')
+                await page.wait_for_timeout(1500)  # tooltips and transitions gone
                 await shot(page, f'{group}-{dev}' if group != 'web' else 'web', name)
                 await ctx.close()
         await browser.close()
