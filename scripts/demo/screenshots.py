@@ -33,6 +33,7 @@ SETTINGS = {
 DEVICES = {
     'iphone': dict(viewport={'width': 430, 'height': 932}, device_scale_factor=3, is_mobile=True, has_touch=True),
     'android': dict(viewport={'width': 360, 'height': 720}, device_scale_factor=3, is_mobile=True, has_touch=True),
+    'tablet': dict(viewport={'width': 820, 'height': 1180}, device_scale_factor=2, is_mobile=True, has_touch=True),
     'web': dict(viewport={'width': 1440, 'height': 900}, device_scale_factor=2),
 }
 
@@ -107,6 +108,11 @@ PHONE_PLUS = [
     ('3-remote', 'plus', ['Treat', 'Remote control']),
     ('4-night', 'plus', ['Night view']),
 ]
+TABLET = [
+    ('1-live', 'app', []),
+    ('2-night', 'app', ['Night view']),
+    ('3-reports', 'app', ['Reports']),
+]
 WEB = [
     ('1-live', 'app', []),
     ('2-reports', 'app', ['Reports']),
@@ -117,8 +123,9 @@ WEB = [
 
 async def main():
     async with async_playwright() as p:
-        browser = await p.chromium.launch()
-        jobs = [('iphone', 'gm', PHONE_GM), ('android', 'gm', PHONE_GM),
+        # The demo site gets a neutral name instead of 127.0.0.1 on screen.
+        browser = await p.chromium.launch(args=['--host-resolver-rules=MAP my-site.example 127.0.0.1'])
+        jobs = [('iphone', 'gm', PHONE_GM), ('android', 'gm', PHONE_GM), ('tablet', 'gm', TABLET),
                 ('iphone', 'plus', PHONE_PLUS), ('android', 'plus', PHONE_PLUS), ('web', 'web', WEB)]
         for dev, group, shots in jobs:
             for name, which, steps in shots:
