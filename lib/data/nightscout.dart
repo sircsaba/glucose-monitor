@@ -90,6 +90,7 @@ class DeviceInfo {
   String overrideName = '';
   DateTime? overrideEnd; // null: until cancelled
   double? overrideMultiplier;
+  double? recommendedBolus; // Loop's own suggestion (no new carbs)
 
   /// The prediction line drawn on the graph.
   List<double> get mainPrediction => predLines.isEmpty ? const [] : predLines.first;
@@ -398,6 +399,7 @@ class NightscoutClient {
       }
       final l = ds['loop'];
       if (l is Map && info.loopTime == null) {
+        info.recommendedBolus = _d(l['recommendedBolus']);
         final iob = l['iob'];
         if (iob is Map) info.iob = _d(iob['iob']);
         final cob = l['cob'];

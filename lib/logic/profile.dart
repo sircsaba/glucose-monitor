@@ -23,6 +23,8 @@ class ProfileDoc {
   final List<TimedValue> basal; // U/h
   final List<TimedValue> carbRatio; // g/U
   final List<TimedValue> sens; // mg/dL per U
+  final List<TimedValue> targetLow; // mg/dL
+  final List<TimedValue> targetHigh; // mg/dL
   /// Loop only: what remote commands need.
   final bool isLoop;
   final List<OverridePreset> presets;
@@ -35,6 +37,8 @@ class ProfileDoc {
     required this.basal,
     required this.carbRatio,
     required this.sens,
+    this.targetLow = const [],
+    this.targetHigh = const [],
     this.isLoop = false,
     this.presets = const [],
     this.deviceToken,
@@ -55,6 +59,8 @@ class ProfileDoc {
   double basalAt(DateTime t) => _at(basal, t) ?? 0;
   double? carbRatioAt(DateTime t) => _at(carbRatio, t);
   double? sensAt(DateTime t) => _at(sens, t);
+  double? targetLowAt(DateTime t) => _at(targetLow, t);
+  double? targetHighAt(DateTime t) => _at(targetHigh, t);
 
   /// Scheduled basal for one whole day, in units.
   double get dailyBasal {
@@ -135,6 +141,8 @@ List<ProfileDoc> parseProfiles(dynamic j) {
       basal: _list(p['basal']),
       carbRatio: _list(p['carbratio']),
       sens: mmol ? _list(p['sens'], factor: 18.0182) : sensList,
+      targetLow: _targets(p['target_low']),
+      targetHigh: _targets(p['target_high']),
       isLoop: ls is Map,
       presets: presets,
       deviceToken: ls is Map ? ls['deviceToken']?.toString() : null,
@@ -152,4 +160,11 @@ ProfileDoc? profileAt(List<ProfileDoc> profiles, DateTime t) {
     if (!p.start.isAfter(t)) return p;
   }
   return profiles.isEmpty ? null : profiles.last;
+}
+
+/// Target values in mg/dL (mmol/L ones, under 30, are converted).
+List<TimedValue> _targets(dynamic x) {
+  final l = _list(x);
+  if (l.isNotEmpty && l.every((v) => v.v < 30)) return _list(x, factor: 18.0182);
+  return l;
 }
