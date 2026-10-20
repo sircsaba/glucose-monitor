@@ -150,6 +150,14 @@ class _BgChartState extends State<BgChart> {
           basalText: Color(s.integer('basalTextColor')),
           basalSize: s.number('basalTextSize').clamp(7.0, 30.0),
           basalBold: s.flag('basalTextBold'),
+          smbShow: s.flag('smbShow'),
+          smbScale: (s.integer('smbDotSize') / 100.0).clamp(0.5, 4.0),
+          smbColor: Color(s.integer('smbColor')),
+          smbLabels: s.flag('smbLabels'),
+          smbTextSize: s.number('smbTextSize').clamp(7.0, 30.0),
+          smbTextBold: s.flag('smbTextBold'),
+          smbTextColor: Color(s.integer('smbTextColor')),
+          smbMinLabel: s.number('smbMinLabel'),
           presets: s.flag('presetShow'),
           presetColor: Color(s.integer('presetColor')),
           presetSize: s.number('presetTextSize').clamp(7.0, 30.0),
@@ -253,6 +261,14 @@ class _BgPainter extends CustomPainter {
   final Color basalText;
   final double basalSize;
   final bool basalBold;
+  final bool smbShow;
+  final double smbScale;
+  final Color smbColor;
+  final bool smbLabels;
+  final double smbTextSize;
+  final bool smbTextBold;
+  final Color smbTextColor;
+  final double smbMinLabel;
   final bool presets;
   final Color presetColor;
   final double presetSize;
@@ -289,6 +305,14 @@ class _BgPainter extends CustomPainter {
     required this.basalText,
     required this.basalSize,
     required this.basalBold,
+    required this.smbShow,
+    required this.smbScale,
+    required this.smbColor,
+    required this.smbLabels,
+    required this.smbTextSize,
+    required this.smbTextBold,
+    required this.smbTextColor,
+    required this.smbMinLabel,
     required this.presets,
     required this.presetColor,
     required this.presetSize,
@@ -537,7 +561,9 @@ class _BgPainter extends CustomPainter {
       }
 
       final fs = 9.5 * k;
-      for (final t in treatments) {
+      var smbLabelEnd = double.negativeInfinity;
+      final sorted = [...treatments]..sort((a, b) => a.t.compareTo(b.t));
+      for (final t in sorted) {
         if (t.t.isAfter(tEnd)) continue;
         if (t.t.isBefore(tStart)) continue;
         final tx = x(t.t);
@@ -553,9 +579,28 @@ class _BgPainter extends CustomPainter {
         }
         if ((t.insulin ?? 0) > 0) {
           if (t.isSmb) {
-            final cy = lineY == null ? top - 3 * k : math.max(top, lineY - 5 * k);
-            canvas.drawCircle(Offset(tx, cy), 2 * k, Paint()..color = kAccent);
+            if (!smbShow) continue;
+            final r = 2 * k * smbScale;
+            final cy = lineY == null ? top - 1 * k - r : math.max(top, lineY - 3 * k - r);
+            canvas.drawCircle(Offset(tx, cy), r, Paint()..color = smbColor);
             hits.add(_Hit(Offset(tx, cy), 'SMB ${fmtU(t.insulin!)} U', t.t));
+            if (smbLabels && t.insulin! >= smbMinLabel - 1e-9) {
+              final tp = TextPainter(
+                text: TextSpan(
+                  text: fmtU(t.insulin!),
+                  style: TextStyle(color: smbTextColor, fontSize: smbTextSize, fontWeight: smbTextBold ? FontWeight.w700 : FontWeight.w400),
+                ),
+                textDirection: TextDirection.ltr,
+              )..layout();
+              // Above the dot, skipped where it would cover the previous amount
+              // (SMBs often come every 5 minutes).
+              final lx = tx - tp.width / 2;
+              if (lx >= smbLabelEnd + 2) {
+                final ly = math.max(0.0, cy - r - 1 - tp.height);
+                tp.paint(canvas, Offset(lx, ly));
+                smbLabelEnd = lx + tp.width;
+              }
+            }
           } else {
             final hw = 5 * k;
             final hh = 9 * k;
@@ -785,6 +830,33 @@ List<Widget> graphGridSettings() {
       ),
     setChoice('Mouse over a reading shows', 'tipBg', tips, hint: 'On a phone: tap, or touch and hold and slide'),
     setChoice('Mouse over a treatment shows', 'tipTreat', tips),
+  ];
+}
+
+/// Settings rows for SMBs / automatic boluses on the graph (used in two screens).
+List<Widget> smbSettings() {
+  final s = app.settings;
+  String px(double v) => '${v.toStringAsFixed(v % 1 == 0 ? 0 : 1)} px';
+  return [
+    setSwitch('SMBs on the graph', 'smbShow', hint: 'Dots for SMBs and Loop automatic boluses (needs Treatments on the graph)'),
+    setInt('SMB dot size', 'smbDotSize', step: 25, min: 50, max: 400, unit: '%'),
+    _colorRow('SMB dot colour', 'smbColor'),
+    setSwitch('SMB amounts on the graph', 'smbLabels', hint: 'Units written above each SMB dot, where there is room'),
+    StepRow(
+      label: 'SMB amounts size',
+      value: px(s.number('smbTextSize')),
+      onMinus: () => app.change((x) => x.set('smbTextSize', (x.number('smbTextSize') - 1).clamp(7.0, 30.0).roundToDouble())),
+      onPlus: () => app.change((x) => x.set('smbTextSize', (x.number('smbTextSize') + 1).clamp(7.0, 30.0).roundToDouble())),
+    ),
+    setSwitch('SMB amounts bold', 'smbTextBold'),
+    _colorRow('SMB amounts colour', 'smbTextColor'),
+    StepRow(
+      label: 'Write SMB amounts from',
+      hint: 'Smaller SMBs keep their dot but no number',
+      value: s.number('smbMinLabel') <= 0 ? 'all' : '${fmtU(s.number('smbMinLabel'))} U',
+      onMinus: () => app.change((x) => x.set('smbMinLabel', ((x.number('smbMinLabel') - 0.05) * 100).round().clamp(0, 200) / 100)),
+      onPlus: () => app.change((x) => x.set('smbMinLabel', ((x.number('smbMinLabel') + 0.05) * 100).round().clamp(0, 200) / 100)),
+    ),
   ];
 }
 

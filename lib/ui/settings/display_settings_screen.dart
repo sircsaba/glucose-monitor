@@ -113,9 +113,10 @@ class DisplaySettingsScreen extends StatelessWidget {
           ...graphGridSettings(),
           setSwitch('Prediction', 'showPrediction'),
           setSwitch('Temp basal under graph', 'showBasal'),
-          setSwitch('Treatments on the graph', 'showTreatments', hint: 'Boluses and carbs'),
+          setSwitch('Treatments on the graph', 'showTreatments', hint: 'Boluses, carbs and SMBs'),
           setInt('Treatment size', 'treatSize', step: 10, min: 50, max: 300, unit: '%'),
           setChoice('Treatments placed', 'treatPlace', const ['At the top of the graph', 'On the glucose line']),
+          ...smbSettings(),
         ]),
         Section(title: 'Screen size', children: [
           ChoiceRow(
