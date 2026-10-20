@@ -285,6 +285,15 @@ class Settings {
     'basalTextBold': false,
     'basalTextColor': 0xFF9CC3E0,
     'basalBarColor': 0xFF2B4A63,
+    // SMB / Loop automatic boluses on the graph.
+    'smbShow': true, // dots for SMBs and automatic boluses
+    'smbDotSize': 100, // percent of the normal SMB dot
+    'smbColor': 0xFF5BC0EB,
+    'smbLabels': false, // amount (U) written next to each SMB
+    'smbTextSize': 9.0,
+    'smbTextBold': false,
+    'smbTextColor': 0xFF9CC3E0,
+    'smbMinLabel': 0.0, // only write amounts of at least this many units
     'presetShow': true, // Loop overrides / Trio temp targets on the graph
     'presetColor': 0xFFB39DFF,
     'presetTextSize': 11.0,
