@@ -6,7 +6,11 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/eventlog.php';
-require_once __DIR__ . '/loopremote.php';
+// Optional parts: if one is missing or empty (a hosting virus scanner can
+// empty a file by mistake), only that feature stops; readings keep working.
+foreach (['loopremote.php', 'webapp.php'] as $optional) {
+    if (is_file(__DIR__ . '/' . $optional)) require_once __DIR__ . '/' . $optional;
+}
 
 final class HttpError extends Exception
 {
@@ -224,26 +228,8 @@ final class Server
         if ($path === '/api/v2/notifications/loop') {
             if ($method !== 'POST') throw new HttpError(405, 'Method not allowed');
             $this->need(self::ADMIN);
-            $raw = (string)file_get_contents('php://input');
-            $data = json_decode($raw, true);
-            if (!is_array($data)) parse_str($raw, $data);
-            if (!is_array($data) || !$data) throw new HttpError(400, 'Send the command as JSON or a form');
-            $error = LoopRemote::send($this->db, $this->cfg, $data, (string)($_SERVER['REMOTE_ADDR'] ?? ''));
-            $desc = (string)($data['eventType'] ?? '?')
-                . (isset($data['reason']) && $data['reason'] !== '' ? ' "' . $data['reason'] . '"' : '')
-                . (isset($data['duration']) && (int)$data['duration'] > 0 ? ' ' . (int)$data['duration'] . ' min' : '')
-                . (isset($data['remoteCarbs']) ? ' ' . $data['remoteCarbs'] . ' g' : '')
-                . (isset($data['remoteBolus']) ? ' ' . $data['remoteBolus'] . ' U' : '')
-                . (!empty($data['enteredBy']) ? ' (from ' . $data['enteredBy'] . ')' : '');
-            EventLog::add($this->db, 'remote', $error === null ? "Sent to Loop: $desc" : "NOT sent: $desc · $error");
-            if ($error !== null) {
-                http_response_code(500);
-                header('Content-Type: text/plain; charset=utf-8');
-                echo $error;
-                return;
-            }
-            header('Content-Type: text/plain; charset=utf-8');
-            echo 'OK';
+            if (!class_exists('LoopRemote')) throw new HttpError(503, 'Remote commands are not installed on this server (lib/loopremote.php)');
+            LoopRemote::http($this->db, $this->cfg);
             return;
         }
         if (($parts[0] ?? '') !== 'api' || ($parts[1] ?? '') !== 'v1') {
@@ -812,81 +798,6 @@ final class Server
         throw new HttpError(405, 'Method not allowed');
     }
 
-    // ------------------------------------------------------------ web app
-
-    /**
-     * Shows the browser version of the Monitor Glucose app at this server's own
-     * address. The app is published once on GitHub Pages; this fetches its files,
-     * keeps a copy for one minute in lib/.webcache/, and serves them from here.
-     * 'web_app_url' => 'none' in config.php turns it off. Returns false when the
-     * file can't be served (then '/' shows the plain status page).
-     */
-    private static function serveWebApp(array $cfg, string $path, string $method): bool
-    {
-        $base = trim((string)($cfg['web_app_url'] ?? 'https://sircsaba.github.io/glucose-monitor'));
-        if ($base === '' || strtolower($base) === 'none') return false;
-        $base = rtrim($base, '/');
-        if ($path === '/flutter_service_worker.js') {
-            // Removes an old offline copy of the app from browsers that kept one.
-            header('Content-Type: text/javascript; charset=utf-8');
-            header('Cache-Control: no-store');
-            if ($method !== 'HEAD') {
-                echo "self.addEventListener('install', () => self.skipWaiting());\n"
-                    . "self.addEventListener('activate', (e) => e.waitUntil((async () => {\n"
-                    . "  for (const k of await caches.keys()) await caches.delete(k);\n"
-                    . "  await self.registration.unregister();\n"
-                    . "})()));\n";
-            }
-            return true;
-        }
-        $file = $path === '/' ? '/index.html' : $path;
-        if (strpos($file, '..') !== false || !preg_match('#^/[A-Za-z0-9._/-]+$#', $file)) return false;
-
-        $dir = __DIR__ . '/.webcache';
-        if (!is_dir($dir)) @mkdir($dir, 0700, true);
-        $key = $dir . '/' . sha1($base . $file);
-        $fresh = is_file($key . '.bin') && is_file($key . '.type') && filemtime($key . '.bin') > time() - 60;
-
-        if (!$fresh && function_exists('curl_init')) {
-            $ch = curl_init($base . $file);
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_FOLLOWLOCATION => true,
-                CURLOPT_MAXREDIRS => 3,
-                CURLOPT_TIMEOUT => 30,
-                CURLOPT_CONNECTTIMEOUT => 10,
-                CURLOPT_HEADER => false,
-            ]);
-            $body = curl_exec($ch);
-            $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $type = (string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-            curl_close($ch);
-            if ($body !== false && $code === 200) {
-                @file_put_contents($key . '.bin', $body, LOCK_EX);
-                @file_put_contents($key . '.type', $type ?: 'application/octet-stream', LOCK_EX);
-                $fresh = true;
-            } elseif ($code === 404) {
-                @unlink($key . '.bin');
-                return false;
-            }
-            // GitHub not reachable: an older copy is served if there is one.
-        }
-        if (!is_file($key . '.bin') || !is_file($key . '.type')) return false;
-
-        $etag = '"' . md5_file($key . '.bin') . '"';
-        header('Content-Type: ' . trim((string)file_get_contents($key . '.type')));
-        header('Cache-Control: no-cache');
-        header('ETag: ' . $etag);
-        header('X-Content-Type-Options: nosniff');
-        if (trim((string)($_SERVER['HTTP_IF_NONE_MATCH'] ?? '')) === $etag) {
-            http_response_code(304);
-            return true;
-        }
-        header('Content-Length: ' . filesize($key . '.bin'));
-        if ($method !== 'HEAD') readfile($key . '.bin');
-        return true;
-    }
-
     // ------------------------------------------------------------ entry point
 
     public static function run(array $cfg): void
@@ -900,7 +811,7 @@ final class Server
         // Everything outside /api is the web app (same as the phone app), so this
         // address shows it. No database needed for that.
         $isApi = $path === '/api' || strncmp($path, '/api/', 5) === 0;
-        if (!$isApi && ($method === 'GET' || $method === 'HEAD') && self::serveWebApp($cfg, rawurldecode($path), $method)) {
+        if (!$isApi && ($method === 'GET' || $method === 'HEAD') && class_exists('WebApp') && WebApp::serve($cfg, rawurldecode($path), $method)) {
             return;
         }
         try {

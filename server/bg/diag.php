@@ -8,11 +8,11 @@ echo "PHP " . PHP_VERSION . "\n\n";
 
 $dir = __DIR__;
 echo "Files:\n";
-foreach (['index.php', '.htaccess', 'config.php', 'lib/server.php', 'lib/eventlog.php', 'lib/loopremote.php',
+foreach (['index.php', '.htaccess', 'config.php', 'lib/server.php', 'lib/eventlog.php', 'lib/loopremote.php', 'lib/webapp.php',
           'lib/libre.php', 'lib/copy.php', 'lib/import.php'] as $f) {
     $p = "$dir/$f";
     echo is_file($p)
-        ? sprintf("  ok       %-20s %7d bytes  %s\n", $f, filesize($p), date('Y-m-d H:i', filemtime($p)))
+        ? sprintf("  %-8s %-20s %7d bytes  %s\n", filesize($p) > 0 ? 'ok' : 'EMPTY', $f, filesize($p), date('Y-m-d H:i', filemtime($p)))
         : sprintf("  MISSING  %s\n", $f);
 }
 

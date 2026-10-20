@@ -166,4 +166,29 @@ final class LoopRemote
         $reason = is_string($res) ? (json_decode($res, true)['reason'] ?? $res) : $err;
         return "Loop notification failed: Apple answered HTTP $code $reason";
     }
+
+    /** POST /api/v2/notifications/loop (the caller has checked the API secret). */
+    public static function http(PDO $db, array $cfg): void
+    {
+        $raw = (string)file_get_contents('php://input');
+        $data = json_decode($raw, true);
+        if (!is_array($data)) parse_str($raw, $data);
+        if (!is_array($data) || !$data) throw new HttpError(400, 'Send the command as JSON or a form');
+        $error = self::send($db, $cfg, $data, (string)($_SERVER['REMOTE_ADDR'] ?? ''));
+        $desc = (string)($data['eventType'] ?? '?')
+            . (isset($data['reason']) && $data['reason'] !== '' ? ' "' . $data['reason'] . '"' : '')
+            . (isset($data['duration']) && (int)$data['duration'] > 0 ? ' ' . (int)$data['duration'] . ' min' : '')
+            . (isset($data['remoteCarbs']) ? ' ' . $data['remoteCarbs'] . ' g' : '')
+            . (isset($data['remoteBolus']) ? ' ' . $data['remoteBolus'] . ' U' : '')
+            . (!empty($data['enteredBy']) ? ' (from ' . $data['enteredBy'] . ')' : '');
+        EventLog::add($db, 'remote', $error === null ? "Sent to Loop: $desc" : "NOT sent: $desc · $error");
+        if ($error !== null) {
+            http_response_code(500);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo $error;
+            return;
+        }
+        header('Content-Type: text/plain; charset=utf-8');
+        echo 'OK';
+    }
 }
