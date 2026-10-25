@@ -63,7 +63,7 @@ Uploading to `main` starts the Android build by itself.
 **Apple Developer site** (developer.apple.com › Account):
 
 1. **Team ID:** *Membership details* › Team ID (10 characters).
-2. **App ID:** *Certificates, IDs & Profiles* › *Identifiers* › **+** › *App IDs* › *App* › Bundle ID **Explicit**: `com.monitorglucose.app` › Continue › Register.
+2. **App ID:** *Certificates, IDs & Profiles* › *Identifiers* › **+** › *App IDs* › *App* › Bundle ID **Explicit**: `com.monitorglucose.app` (Plus: `com.monitorglucoseplus.app`) › Continue › Register.
 
 **App Store Connect** (appstoreconnect.apple.com):
 
@@ -167,7 +167,7 @@ Remote Commands. Loop checks every command against its own limits.
 
 ## Publishing on the stores later
 
-- **App Store:** in App Store Connect add screenshots, a description, a privacy-policy web page (it can live on monitorglucose.ca), category Medical, and submit a TestFlight build for review.
+- **App Store:** in App Store Connect add screenshots, a description, a privacy-policy web page (https://monitorglucose.ca/privacy.html), category Medical, and submit a TestFlight build for review.
 - **Google Play:** needs a Google Play developer account and a signing key (the APK here is signed with a test key, fine for your own phones). Ask and I will add a Play Store build.
 
 ## Changing the sounds
