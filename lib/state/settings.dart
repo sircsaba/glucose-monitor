@@ -280,7 +280,13 @@ class Settings {
     'treatSize': 100, // treatment markers on the graph, percent
     'treatPlace': 0, // 0 = top of the graph, 1 = on the glucose line
     'gridLines': true, // dotted grid on the graph
-    'basalLabels': true, // rate written on top of the temp basal bars
+    'basalLabels': true, // rate written on the temp basal bars
+    'basalPos': 0, // 0 top of the graph, 1 under it
+    'basalLabelPos': 0, // 0 above the bars, 1 inside
+    'basalFrom': 216.0, // top position: bars start at 12 mmol/L
+    'dimOn': false, // screen dimmed (button next to the moon)
+    'dimPct': 50, // how much darker
+    'muted': false, // alarm sounds off (bell button)
     'basalTextSize': 10.0,
     'basalTextBold': false,
     'basalTextColor': 0xFF9CC3E0,

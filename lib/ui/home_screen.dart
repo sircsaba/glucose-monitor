@@ -508,7 +508,21 @@ class _DayViewState extends State<DayView> {
     if (widget.part == 1) groups.removeWhere((g) => g.first.id == 'graph');
     if (widget.part == 2) groups.removeWhere((g) => g.first.id != 'graph');
 
+    final dimmed = s.flag('dimOn');
+    final muted = s.flag('muted');
     final icons = Row(mainAxisSize: MainAxisSize.min, children: [
+      IconButton(
+        tooltip: dimmed ? 'Normal brightness' : 'Dim the screen',
+        visualDensity: VisualDensity.compact,
+        onPressed: widget.preview ? null : app.toggleDim,
+        icon: Icon(dimmed ? Icons.brightness_4 : Icons.brightness_6_outlined, color: dimmed ? kAccent : kMuted),
+      ),
+      IconButton(
+        tooltip: muted ? 'Sound is off: tap to turn alarm sounds on' : 'Mute alarm sounds',
+        visualDensity: VisualDensity.compact,
+        onPressed: widget.preview ? null : app.toggleMute,
+        icon: Icon(muted ? Icons.notifications_off : Icons.notifications_outlined, color: muted ? kAmber : kMuted),
+      ),
       IconButton(
         tooltip: 'Night view',
         visualDensity: VisualDensity.compact,

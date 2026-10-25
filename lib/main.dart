@@ -91,6 +91,14 @@ class GlucoseApp extends StatelessWidget {
               ),
             ),
           );
+          // Brightness button: a dark layer over everything (taps go through).
+          if (app.settings.flag('dimOn')) {
+            final a = (app.settings.integer('dimPct').clamp(10, 90)) / 100.0;
+            scaled = Stack(children: [
+              scaled,
+              Positioned.fill(child: IgnorePointer(child: ColoredBox(color: Colors.black.withValues(alpha: a)))),
+            ]);
+          }
           if (!kIsWeb) return scaled;
           // In a browser, the first click or tap allows alarm sounds.
           return Listener(onPointerDown: (_) => app.player.unlock(), child: scaled);

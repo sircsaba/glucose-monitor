@@ -150,6 +150,9 @@ class _BgChartState extends State<BgChart> {
           basalText: Color(s.integer('basalTextColor')),
           basalSize: s.number('basalTextSize').clamp(7.0, 30.0),
           basalBold: s.flag('basalTextBold'),
+          basalTop: s.integer('basalPos') == 0,
+          basalInside: s.integer('basalLabelPos') == 1,
+          basalFromMg: s.number('basalFrom'),
           smbShow: s.flag('smbShow'),
           smbScale: (s.integer('smbDotSize') / 100.0).clamp(0.5, 4.0),
           smbColor: Color(s.integer('smbColor')),
@@ -261,6 +264,9 @@ class _BgPainter extends CustomPainter {
   final Color basalText;
   final double basalSize;
   final bool basalBold;
+  final bool basalTop; // basal at the top of the graph (else under it)
+  final bool basalInside; // rate written inside the bars (else above)
+  final double basalFromMg; // top position: bars start at this glucose line
   final bool smbShow;
   final double smbScale;
   final Color smbColor;
@@ -305,6 +311,9 @@ class _BgPainter extends CustomPainter {
     required this.basalText,
     required this.basalSize,
     required this.basalBold,
+    required this.basalTop,
+    required this.basalInside,
+    required this.basalFromMg,
     required this.smbShow,
     required this.smbScale,
     required this.smbColor,
@@ -355,9 +364,14 @@ class _BgPainter extends CustomPainter {
     const right = 6.0;
     final k = treatScale;
     final top = showTreat && !treatOnLine ? 30.0 * k : (showTreat ? 8.0 + 14 * k : 8.0);
-    const bottomLabels = 16.0;
-    final basalH = showBasal ? (basalLabels ? 30.0 + basalSize * 1.3 : 30.0) : 0.0;
-    final plotBottom = size.height - bottomLabels - basalH - 4;
+    const bottomLabels = 15.0;
+    // Basal under the graph: its own strip below the time labels. At the top:
+    // inside the graph, from the chosen glucose line up.
+    final basalBelow = showBasal && !basalTop;
+    final basalH = basalBelow ? (basalLabels && !basalInside ? 30.0 + basalSize * 1.3 : 30.0) : 0.0;
+    final plotBottom = size.height - bottomLabels - basalH - (basalBelow ? 4 : 1);
+    // Time labels right under the graph.
+    final timeY = plotBottom + bottomLabels / 2 + 1;
     final w = size.width - left - right;
     final plotH = plotBottom - top;
     if (w <= 0 || plotH <= 0) return;
@@ -381,6 +395,8 @@ class _BgPainter extends CustomPainter {
       for (final e in visible) {
         if (e.mg + 5 > maxMg) maxMg = e.mg + 5;
       }
+      // Basal at the top: room above its glucose line.
+      if (showBasal && basalTop) maxMg = math.max(maxMg, basalFromMg + gridStep * 0.9);
       // Round up to the next grid line (10, 12, 14… mmol/L).
       maxMg = minMg + ((maxMg - minMg) / gridStep - 0.01).ceil() * gridStep;
     }
@@ -435,7 +451,7 @@ class _BgPainter extends CustomPainter {
       if (grid) _dotted(canvas, Offset(gx, top), Offset(gx, plotBottom), gridPaint);
       final minutesOfDay = t.hour * 60 + t.minute;
       if ((minutesOfDay ~/ math.max(1, gridMin)) % labelEvery == 0) {
-        _text(canvas, fmtClock(t, h24), Offset(gx, size.height - bottomLabels / 2), center: true);
+        _text(canvas, fmtClock(t, h24), Offset(gx, timeY), center: true);
       }
     }
 
@@ -501,7 +517,20 @@ class _BgPainter extends CustomPainter {
 
     // Temp basal.
     if (showBasal) {
-      final base = size.height - bottomLabels - 2;
+      // Bars stand on [base]; the tallest reaches [barMax] above it.
+      double base;
+      double barMax;
+      if (basalTop) {
+        final from = basalFromMg < maxMg - 5 ? y(basalFromMg) : top + plotH * 0.25;
+        base = from;
+        barMax = math.max(6, base - top - 2 - (basalLabels && !basalInside ? basalSize * 1.3 + 2 : 0));
+        _dotted(canvas, Offset(left, base), Offset(left + w, base), Paint()
+          ..color = basalBar.withValues(alpha: 0.6)
+          ..strokeWidth = 1);
+      } else {
+        base = size.height - 2;
+        barMax = basalH - (basalLabels && !basalInside ? basalSize * 1.3 + 4 : 4);
+      }
       final segs = basalSegments(treatments, basalProfiles, tStart, now);
       var maxRate = 0.5;
       for (final g in segs) {
@@ -510,7 +539,6 @@ class _BgPainter extends CustomPainter {
       final fill = Paint()..color = basalBar;
       // Scheduled basal (no temp basal running) a little lighter.
       final fillSched = Paint()..color = basalBar.withValues(alpha: basalBar.a * 0.55);
-      final barMax = basalH - (basalLabels ? basalSize * 1.3 + 4 : 4);
       final runs = <List<double>>[]; // x1, x2, rate, bar top
       for (final g in segs) {
         final x1 = math.max(left, x(g.start));
@@ -538,10 +566,15 @@ class _BgPainter extends CustomPainter {
             textDirection: TextDirection.ltr,
           )..layout();
           if (run[1] - run[0] < tp.width + 4) continue;
-          tp.paint(canvas, Offset((run[0] + run[1]) / 2 - tp.width / 2, run[3] - tp.height - 1));
+          final barH = base - run[3];
+          final cx = (run[0] + run[1]) / 2 - tp.width / 2;
+          // Inside the bar when asked and it fits (else above it).
+          final inside = basalInside && barH >= tp.height + 2;
+          final ty = inside ? run[3] + (barH - tp.height) / 2 : run[3] - tp.height - 1;
+          tp.paint(canvas, Offset(cx, ty));
         }
       }
-      _text(canvas, 'basal', Offset(left + 2, base - basalH + 8), size: 9);
+      _text(canvas, 'basal', Offset(left + 2, basalTop ? base + 6 : base - basalH + 8), size: 9);
     }
 
     final hits = <_Hit>[];
@@ -802,7 +835,11 @@ List<Widget> graphGridSettings() {
   const tips = ['Nothing', 'Value', 'Value and time', 'Time only'];
   return [
     setSwitch('Grid lines', 'gridLines', hint: 'Dotted lines across and down the graph'),
-    setSwitch('Basal rate on the bars', 'basalLabels', hint: 'U/h written on top of the temp basal bars, where there is room'),
+    setChoice('Basal on the graph', 'basalPos', const ['At the top', 'Under the graph']),
+    if (app.settings.integer('basalPos') == 0)
+      setMg('Basal starts at', 'basalFrom', min: 120, max: 360, hint: 'The basal bars stand on this glucose line and go up to the top of the graph'),
+    setSwitch('Basal rate on the bars', 'basalLabels', hint: 'U/h written on the basal bars, where there is room'),
+    if (app.settings.flag('basalLabels')) setChoice('Basal numbers', 'basalLabelPos', const ['Above the bars', 'In the bars']),
     StepRow(
       label: 'Basal numbers size',
       value: '${app.settings.number('basalTextSize').toStringAsFixed(app.settings.number('basalTextSize') % 1 == 0 ? 0 : 1)} px',

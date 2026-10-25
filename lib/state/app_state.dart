@@ -160,6 +160,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       await player.init().timeout(const Duration(seconds: 5));
     } catch (_) {}
     player.onPreviewEnd = notifyListeners;
+    player.isMuted = () => settings.flag('muted');
     WidgetsBinding.instance.addObserver(this);
     restartTimers();
     if (settings.str('nsUrl').isNotEmpty) refresh(full: true);
@@ -183,6 +184,15 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     _prefs?.setString('settings', settings.encode());
     notifyListeners();
   }
+
+  /// Bell button: alarm sounds off / on. Muting stops a sound that is playing.
+  void toggleMute() {
+    change((s) => s.set('muted', !s.flag('muted')));
+    if (settings.flag('muted')) player.silence();
+  }
+
+  /// Brightness button: the screen darker / normal.
+  void toggleDim() => change((s) => s.set('dimOn', !s.flag('dimOn')));
 
   void change(void Function(Settings s) f) {
     f(settings);

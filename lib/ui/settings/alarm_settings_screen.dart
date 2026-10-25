@@ -8,6 +8,9 @@ class AlarmSettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SettingsPage(title: 'Other alarms', builder: (_) => [
+      Section(title: 'Sound', children: [
+        setSwitch('Mute alarm sounds', 'muted', hint: 'Same as the bell button on the main screen: alarms still show on the screen and vibrate'),
+      ]),
       Section(title: 'Missed readings', children: [
         setSwitch('On', 'noDataOn'),
         setInt('No reading for', 'noDataMin', step: 5, min: 10, max: 60, unit: 'min'),

@@ -264,7 +264,7 @@ class _DayLayoutScreenState extends State<DayLayoutScreen> {
                 setChoice('Treatments placed', 'treatPlace', const ['At the top of the graph', 'On the glucose line']),
                 ...smbSettings(),
                 setSwitch('Prediction', 'showPrediction'),
-                setSwitch('Temp basal under graph', 'showBasal'),
+                setSwitch('Basal on the graph', 'showBasal'),
                 setChoice('Dot size', 'dotSize', const ['Small', 'Medium', 'Large', 'Extra large']),
                 ...ttirSettings(),
               ],

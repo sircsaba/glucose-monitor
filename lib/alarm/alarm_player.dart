@@ -7,6 +7,8 @@ import '../state/settings.dart';
 
 /// Plays alarm sounds with a volume that stays the same, rises or falls.
 class AlarmPlayer {
+  /// True while the sound is muted (bell button): alarms still show and vibrate.
+  bool Function() isMuted = () => false;
   final AudioPlayer _alarm = AudioPlayer();
   final AudioPlayer _preview = AudioPlayer();
   Timer? _ramp;
@@ -52,7 +54,9 @@ class AlarmPlayer {
       _vibe = Timer.periodic(const Duration(seconds: 2), (_) => HapticFeedback.vibrate());
     }
     if (vibrateOnly) return;
-    _delay = Timer(Duration(seconds: delaySec), () => _play(cfg, volumeScale));
+    _delay = Timer(Duration(seconds: delaySec), () {
+      if (!isMuted()) _play(cfg, volumeScale);
+    });
   }
 
   Future<void> _play(SoundCfg cfg, double scale) async {
@@ -76,6 +80,18 @@ class AlarmPlayer {
       _alarm.setVolume(v.clamp(0.0, 1.0));
       if (f >= 1.0) t.cancel();
     });
+  }
+
+  /// Stops the sound only (vibration and the alarm screen go on).
+  Future<void> silence() async {
+    _blocked = null;
+    _ramp?.cancel();
+    _delay?.cancel();
+    _ramp = null;
+    _delay = null;
+    try {
+      await _alarm.stop();
+    } catch (_) {}
   }
 
   Future<void> stop() async {
