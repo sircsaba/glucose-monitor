@@ -247,9 +247,10 @@ try {
     // Right after a new login LibreLinkUp sometimes answers without the list of
     // people (for example a "step" to confirm, or an empty patient ID). Then log
     // in once more instead of asking for readings with an empty patient ID.
-    $hasPatient = fn($c) => is_array($c['data'] ?? null) && array_is_list($c['data'])
-        && $c['data'] && (string)($c['data'][0]['patientId'] ?? '') !== '';
-    if (!$hasPatient($conn) && is_array($conn['data'] ?? null) && array_is_list($conn['data']) && !$conn['data']) {
+    // (No array_is_list(): the cron's PHP can be older than 8.1.)
+    $hasPatient = fn($c) => is_array($c['data'] ?? null) && isset($c['data'][0]) && is_array($c['data'][0])
+        && (string)($c['data'][0]['patientId'] ?? '') !== '';
+    if (!$hasPatient($conn) && ($conn['data'] ?? null) === []) {
         throw new LibreError('This LibreLinkUp account follows nobody: accept the invitation in the LibreLinkUp app');
     }
     if (!$hasPatient($conn)) {
