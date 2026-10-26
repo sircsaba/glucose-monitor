@@ -244,15 +244,36 @@ try {
         }
     }
 
-    $people = $conn['data'] ?? [];
-    if (!$people) throw new LibreError('This LibreLinkUp account follows nobody: accept the invitation in the LibreLinkUp app');
+    // Right after a new login LibreLinkUp sometimes answers without the list of
+    // people (for example a "step" to confirm, or an empty patient ID). Then log
+    // in once more instead of asking for readings with an empty patient ID.
+    $hasPatient = fn($c) => is_array($c['data'] ?? null) && array_is_list($c['data'])
+        && $c['data'] && (string)($c['data'][0]['patientId'] ?? '') !== '';
+    if (!$hasPatient($conn) && is_array($conn['data'] ?? null) && array_is_list($conn['data']) && !$conn['data']) {
+        throw new LibreError('This LibreLinkUp account follows nobody: accept the invitation in the LibreLinkUp app');
+    }
+    if (!$hasPatient($conn)) {
+        $first = 'status ' . ($conn['status'] ?? '?') . ': ' . substr(json_encode($conn['data'] ?? null), 0, 120);
+        $prefer = $s['id'];
+        $s = $doLogin();
+        $fresh = true;
+        $headers = baseHeaders($s['id']) + ['Authorization' => 'Bearer ' . $s['token'], 'Account-Id' => $s['account']];
+        $conn = llu('GET', $s['api'] . '/llu/connections', $headers);
+        if (!$hasPatient($conn)) {
+            $step = isset($conn['data']['step']) ? ' Open the LibreLinkUp app and accept any new terms.' : '';
+            throw new LibreError('LibreLinkUp sent no patient (' . $first . ').' . $step);
+        }
+        jobLog('job', 'LibreLinkUp sent no patient after the login renewal (' . $first . '): logged in again, OK');
+    }
+    $people = $conn['data'];
     $person = $people[0];
     if ($patientWanted !== '') {
         foreach ($people as $p) {
             if (strcasecmp((string)($p['firstName'] ?? ''), $patientWanted) === 0) $person = $p;
         }
     }
-    $pid = rawurlencode((string)$person['patientId']);
+    $pid = rawurlencode((string)($person['patientId'] ?? ''));
+    if ($pid === '') throw new LibreError('LibreLinkUp sent no patient ID for ' . ($person['firstName'] ?? 'this person'));
     $graph = llu('GET', $s['api'] . "/llu/connections/$pid/graph", $headers);
     $list = readings($graph);
 
