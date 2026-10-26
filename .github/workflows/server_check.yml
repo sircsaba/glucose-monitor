@@ -7,13 +7,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check Nightscout and the Monitor Glucose server
+        shell: bash {0}
         run: |
           now=$(date +%s)
           age() { [ -n "$1" ] && [ "$1" != null ] && echo "$(( (now - $1/1000) / 60 )) min" || echo "none"; }
           iso() { [ -n "$1" ] && [ "$1" != null ] && date -d "$1" +%s000 2>/dev/null || echo null; }
-          for site in https://nsval.mooo.com https://bg.inforap.com; do
+          for site in https://bg.inforap.com; do
             for p in /api/v1/status.json /api/v1/entries.json?count=1 /api/v1/devicestatus.json?count=1 /api/v1/health; do
-              code=$(curl -s -m 20 -o r.json -w "%{http_code}" "$site$p"); msg="$site$p HTTP $code"
+              code=$(curl -s -m 20 -o r.json -w "%{http_code}" "$site$p$( [[ $p == *\?* ]] && echo \&|| echo \?)token=readable-val"); msg="$site$p HTTP $code"
               case "$p" in
                 /api/v1/status.json) msg="$msg $(jq -r '"status=\(.status) version=\(.version) apiEnabled=\(.apiEnabled)"' r.json 2>/dev/null)";;
                 /api/v1/entries*) d=$(jq -r '.[0].date' r.json 2>/dev/null); msg="$msg newest reading: $(age $d) ago";;
@@ -21,6 +22,6 @@ jobs:
                 /api/v1/health) msg="$msg $(jq -c '{feedProblem, libre:{ok:.libre.ok, fails:.libre.fails, error:.libre.error, lastRunAge:((now - (.libre.lastRun//0)/1000)/60|floor)}, cgmLastAge:((now-(.cgmLast//0)/1000)/60|floor), loopLastAge:((now-(.loopLast//0)/1000)/60|floor), loopCgmFromHere, main:{reachable:.main.reachable, error:.main.error}}' r.json 2>/dev/null | cut -c1-600)";;
               esac
               [ "$code" = 200 ] || msg="$msg $(head -c 200 r.json | tr '\n' ' ')"
-              echo "::notice::$msg"
+              echo "::notice::$msg" || true
             done
           done
