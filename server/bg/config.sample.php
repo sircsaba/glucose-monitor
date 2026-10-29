@@ -63,6 +63,11 @@ return [
     // get readings, does Loop upload to it). Leave '' if you have none.
     'main_nightscout_url' => '',       // e.g. 'https://nsval.mooo.com'
     'main_nightscout_token' => '',     // a read token, if that site is not public
+    // The food list lives on the main Nightscout: this server passes it through,
+    // keeps a copy for when Nightscout is down, and sends changes made meanwhile
+    // once it is back. To add or change foods it needs that site's API secret.
+    'main_nightscout_secret' => '',    // the main Nightscout's API_SECRET
+    'food_from_main' => true,          // false: this server keeps its own food list
 
     // Time zone for the times written in the event log (Settings › Logs).
     'timezone' => 'America/Toronto',

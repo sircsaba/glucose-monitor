@@ -600,7 +600,7 @@ class NightscoutClient {
       throw NsException('Cannot reach the site: $e');
     }
     if (r.statusCode == 401 || r.statusCode == 403) {
-      throw NsException('This token is not allowed to change the food list (it needs the careportal role or the API secret)');
+      throw NsException('This token is not allowed to change the food list: use the API secret (or a Nightscout token with the admin role)');
     }
     if (r.statusCode != 200 && r.statusCode != 201) throw NsException('The site answered with error ${r.statusCode}');
     try {

@@ -398,7 +398,21 @@ final class Server
             'loopCgmFromHere' => $fetch > 0 && time() - $fetch < 600,
             'loopCgmFetch' => $fetch > 0 ? $fetch * 1000 : null,
             'main' => $this->mainStatus(),
+            'foodWaiting' => $this->foodHealth(),
         ];
+    }
+
+    /** Sends food changes still waiting for Nightscout; how many are still waiting. */
+    private function foodHealth(): int
+    {
+        try {
+            $this->foodTable();
+            if ($this->foodQueued() === 0) return 0;
+            $this->flushFood();
+            return $this->foodQueued();
+        } catch (Throwable $e) {
+            return 0;
+        }
     }
 
     private function status(): array
@@ -803,7 +817,16 @@ final class Server
 
     // ------------------------------------------------------------ food
 
-    /** Food list, like Nightscout's api/v1/food (the apps' Food screen). */
+    /*
+     * Food list, like Nightscout's api/v1/food (the apps' Food screen).
+     *
+     * With 'main_nightscout_url' set (and 'food_from_main' not false), the
+     * main Nightscout keeps the real list and this server passes reads and
+     * changes through to it, so both addresses show the same foods. Every read
+     * refreshes a local copy, served while Nightscout is down. Changes made
+     * while it is down are kept here and queued, then sent to Nightscout as
+     * soon as it answers again (on the next food request or health check).
+     */
     private function foodTable(): void
     {
         static $done = false;
@@ -813,7 +836,54 @@ final class Server
             ? 'CREATE TABLE IF NOT EXISTS food (id VARCHAR(64) PRIMARY KEY, name VARCHAR(255) NOT NULL DEFAULT \'\', updated_ms BIGINT NOT NULL, doc TEXT NOT NULL)'
             : 'CREATE TABLE IF NOT EXISTS food (id VARCHAR(64) NOT NULL PRIMARY KEY, name VARCHAR(255) NOT NULL DEFAULT \'\', '
               . 'updated_ms BIGINT NOT NULL, doc LONGTEXT NOT NULL, KEY idx_food_name (name)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+        $this->db->exec($sqlite
+            ? 'CREATE TABLE IF NOT EXISTS food_queue (seq INTEGER PRIMARY KEY AUTOINCREMENT, op VARCHAR(8) NOT NULL, id VARCHAR(64) NOT NULL, at_ms BIGINT NOT NULL)'
+            : 'CREATE TABLE IF NOT EXISTS food_queue (seq BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, op VARCHAR(8) NOT NULL, id VARCHAR(64) NOT NULL, '
+              . 'at_ms BIGINT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
         $done = true;
+    }
+
+    /** Main Nightscout for the food list, or null (this server keeps its own list). */
+    private function foodMain(): ?string
+    {
+        if (($this->cfg['food_from_main'] ?? true) === false) return null;
+        $base = trim((string)($this->cfg['main_nightscout_url'] ?? ''));
+        if ($base === '') return null;
+        if (!preg_match('#^https?://#i', $base)) $base = 'https://' . $base;
+        return rtrim($base, '/');
+    }
+
+    /**
+     * A request to the main Nightscout's food list. Returns [HTTP code, JSON or
+     * null]; code 0 when it cannot be reached. Uses 'main_nightscout_secret'
+     * (its API secret, needed to change the list) or 'main_nightscout_token'.
+     */
+    private function nsFood(string $method, string $path, $body = null): array
+    {
+        $base = $this->foodMain();
+        if ($base === null || !function_exists('curl_init')) return [0, null];
+        $secret = (string)($this->cfg['main_nightscout_secret'] ?? '');
+        $token = trim((string)($this->cfg['main_nightscout_token'] ?? ''));
+        $url = $base . $path;
+        if ($secret === '' && $token !== '') $url .= (strpos($path, '?') === false ? '?' : '&') . 'token=' . rawurlencode($token);
+        $h = ['Accept: application/json', 'Content-Type: application/json'];
+        if ($secret !== '') $h[] = 'api-secret: ' . sha1($secret);
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CUSTOMREQUEST => $method,
+            CURLOPT_TIMEOUT => 8,
+            CURLOPT_CONNECTTIMEOUT => 4,
+            CURLOPT_HTTPHEADER => $h,
+        ]);
+        if ($body !== null) curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        $res = curl_exec($ch);
+        $code = $res === false ? 0 : (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        // A server error or a timeout counts as "down": the change is queued.
+        if ($code >= 500) $code = 0;
+        $j = is_string($res) ? json_decode($res, false) : null;
+        return [$code, $j];
     }
 
     private function saveFood(object $doc): object
@@ -827,9 +897,100 @@ final class Server
         return $doc;
     }
 
+    private function queueFood(string $op, string $id): void
+    {
+        // One entry per food: the latest change is what gets sent.
+        $this->db->prepare('DELETE FROM food_queue WHERE id = ?')->execute([$id]);
+        $st = $this->db->prepare('INSERT INTO food_queue (op, id, at_ms) VALUES (?, ?, ?)');
+        $st->execute([$op, $id, (int)round(microtime(true) * 1000)]);
+    }
+
+    private function foodQueued(): int
+    {
+        return (int)$this->db->query('SELECT COUNT(*) FROM food_queue')->fetchColumn();
+    }
+
+    /** Sends the queued changes to Nightscout; false when it is still down. */
+    private function flushFood(): bool
+    {
+        if ($this->foodMain() === null) return true;
+        $rows = $this->db->query('SELECT seq, op, id FROM food_queue ORDER BY seq')->fetchAll();
+        if (!$rows) return true;
+        $sent = 0;
+        foreach ($rows as $r) {
+            $id = (string)$r['id'];
+            $ok = false;
+            if ($r['op'] === 'delete') {
+                [$code] = $this->nsFood('DELETE', '/api/v1/food/' . rawurlencode($id));
+                if ($code === 0) break;
+                $ok = true; // gone there too, or never there (404)
+            } else {
+                $docs = $this->fetchDocs('SELECT doc FROM food WHERE id = ?', [$id]);
+                if (!$docs) {
+                    $ok = true;
+                } elseif (strncmp($id, 'local-', 6) === 0) {
+                    // Made here while Nightscout was down: create it there; it gets Nightscout's id.
+                    $d = $docs[0];
+                    unset($d->_id);
+                    [$code, $j] = $this->nsFood('POST', '/api/v1/food', $d);
+                    if ($code === 0) break;
+                    $new = is_array($j) ? ($j[0]->_id ?? null) : ($j->_id ?? null);
+                    if ($code >= 200 && $code < 300 && is_string($new) && $new !== '') {
+                        $d->_id = $new;
+                        $this->db->prepare('DELETE FROM food WHERE id = ?')->execute([$id]);
+                        $this->saveFood($d);
+                        $ok = true;
+                    }
+                } else {
+                    [$code] = $this->nsFood('PUT', '/api/v1/food', $docs[0]);
+                    if ($code === 0) break;
+                    $ok = $code >= 200 && $code < 300;
+                }
+            }
+            if (!$ok) break; // refused (permission): keep it queued, try again later
+            $this->db->prepare('DELETE FROM food_queue WHERE seq = ?')->execute([$r['seq']]);
+            $sent++;
+        }
+        if ($sent > 0) {
+            EventLog::add($this->db, 'job', "Food list: $sent change" . ($sent > 1 ? 's' : '') . ' made while Nightscout was down sent to it');
+        }
+        return $this->foodQueued() === 0;
+    }
+
+    /** The food list: from Nightscout (refreshing the local copy), else the local copy. */
+    private function foodList(): array
+    {
+        if ($this->foodMain() !== null) {
+            $flushed = $this->flushFood();
+            [$code, $j] = $this->nsFood('GET', '/api/v1/food.json?count=20000');
+            if ($code === 200 && is_array($j)) {
+                // Keep foods still waiting to be sent (when the queue could not be emptied).
+                $keep = [];
+                if (!$flushed) {
+                    foreach ($this->db->query('SELECT id FROM food_queue')->fetchAll() as $q) $keep[(string)$q['id']] = true;
+                }
+                $this->db->beginTransaction();
+                try {
+                    $all = $this->db->query('SELECT id FROM food')->fetchAll();
+                    $del = $this->db->prepare('DELETE FROM food WHERE id = ?');
+                    foreach ($all as $row) if (!isset($keep[(string)$row['id']])) $del->execute([$row['id']]);
+                    foreach ($j as $d) {
+                        if (is_object($d) && isset($d->_id) && !isset($keep[(string)$d->_id])) $this->saveFood($d);
+                    }
+                    $this->db->commit();
+                } catch (Throwable $e) {
+                    $this->db->rollBack();
+                    throw $e;
+                }
+            }
+        }
+        return $this->fetchDocs('SELECT doc FROM food ORDER BY name LIMIT ' . $this->count(5000, 20000), []);
+    }
+
     private function food(string $method, string $sub): void
     {
         $this->foodTable();
+        $main = $this->foodMain() !== null;
         if ($method === 'GET') {
             $this->need(self::READ);
             if ($sub !== '' && $sub !== 'quickpicks' && $sub !== 'regular') {
@@ -838,7 +999,7 @@ final class Server
                 self::out($docs[0]);
                 return;
             }
-            $docs = $this->fetchDocs('SELECT doc FROM food ORDER BY name LIMIT ' . $this->count(5000, 20000), []);
+            $docs = $this->foodList();
             if ($sub === 'quickpicks') $docs = array_values(array_filter($docs, fn($d) => ($d->type ?? '') === 'quickpick'));
             if ($sub === 'regular') $docs = array_values(array_filter($docs, fn($d) => ($d->type ?? 'food') === 'food'));
             self::out($docs);
@@ -846,12 +1007,58 @@ final class Server
         }
         if ($method === 'POST' || $method === 'PUT') {
             $this->need(self::CARE);
-            $saved = array_map(fn($d) => $this->saveFood($d), self::body());
-            self::out($method === 'PUT' && count($saved) === 1 ? $saved[0] : $saved);
+            $out = [];
+            foreach (self::body() as $d) {
+                $isNew = $method === 'POST' && empty($d->_id);
+                if ($main) {
+                    if ($isNew) {
+                        [$code, $j] = $this->nsFood('POST', '/api/v1/food', $d);
+                        $new = is_array($j) ? ($j[0]->_id ?? null) : ($j->_id ?? null);
+                        if ($code >= 200 && $code < 300 && is_string($new)) {
+                            $d->_id = $new;
+                            $out[] = $this->saveFood($d);
+                            continue;
+                        }
+                        if ($code !== 0) throw new HttpError(502, "Nightscout refused the food (HTTP $code): check main_nightscout_secret in config.php");
+                        // Nightscout down: keep it here with a temporary id and send it later.
+                        $d->_id = 'local-' . self::newId();
+                        $out[] = $this->saveFood($d);
+                        $this->queueFood('save', $d->_id);
+                        continue;
+                    }
+                    $id = (string)($d->_id ?? '');
+                    if (strncmp($id, 'local-', 6) !== 0) {
+                        [$code] = $this->nsFood('PUT', '/api/v1/food', $d);
+                        if ($code >= 200 && $code < 300) {
+                            $out[] = $this->saveFood($d);
+                            continue;
+                        }
+                        if ($code !== 0) throw new HttpError(502, "Nightscout refused the change (HTTP $code): check main_nightscout_secret in config.php");
+                    }
+                    $out[] = $this->saveFood($d);
+                    $this->queueFood('save', (string)$d->_id);
+                    continue;
+                }
+                $out[] = $this->saveFood($d);
+            }
+            self::out($method === 'PUT' && count($out) === 1 ? $out[0] : $out);
             return;
         }
         if ($method === 'DELETE' && $sub !== '') {
             $this->need(self::CARE);
+            if ($main) {
+                if (strncmp($sub, 'local-', 6) === 0) {
+                    // Never reached Nightscout: just forget it.
+                    $this->db->prepare('DELETE FROM food_queue WHERE id = ?')->execute([$sub]);
+                } else {
+                    [$code] = $this->nsFood('DELETE', '/api/v1/food/' . rawurlencode($sub));
+                    if ($code === 0) {
+                        $this->queueFood('delete', $sub);
+                    } elseif ($code >= 400 && $code !== 404) {
+                        throw new HttpError(502, "Nightscout refused to delete it (HTTP $code): check main_nightscout_secret in config.php");
+                    }
+                }
+            }
             $st = $this->db->prepare('DELETE FROM food WHERE id = ?');
             $st->execute([$sub]);
             self::out(['n' => $st->rowCount(), 'ok' => 1]);
