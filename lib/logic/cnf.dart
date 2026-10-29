@@ -51,7 +51,9 @@ class CnfFood {
 class Cnf {
   final List<CnfFood> foods;
   final Map<int, CnfFood> byId;
-  Cnf(this.foods) : byId = {for (final f in foods) f.id: f};
+  /// Food group names (English, French) by group number.
+  final Map<int, (String, String)> groups;
+  Cnf(this.foods, [this.groups = const {}]) : byId = {for (final f in foods) f.id: f};
 
   static Cnf? _cache;
   static Future<Cnf> load() async => _cache ??= parse(await rootBundle.loadString('assets/cnf.json'));
@@ -72,7 +74,15 @@ class Cnf {
         for (final m in r[5] as List) (ms[(m[0] as num).toInt()].$1, ms[(m[0] as num).toInt()].$2, (m[1] as num).toDouble())
       ]));
     }
-    return Cnf(foods);
+    final groups = <int, (String, String)>{};
+    final g = j['groups'];
+    if (g is Map) {
+      g.forEach((k, v) {
+        final id = int.tryParse(k.toString());
+        if (id != null && v is List && v.length >= 2) groups[id] = (v[0].toString(), v[1].toString());
+      });
+    }
+    return Cnf(foods, groups);
   }
 
   /// Best matches for an ingredient name (English or French), best first.

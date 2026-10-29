@@ -11,6 +11,7 @@ import 'bolus_calc_view.dart';
 import 'common.dart';
 import 'barcode_scan_screen.dart';
 import 'food_edit_screen.dart';
+import 'food_lookup_screen.dart';
 import 'recipe_builder_screen.dart';
 import 'meal_plan_screen.dart';
 import 'remote_screen.dart';
@@ -117,6 +118,39 @@ class _FoodScreenState extends State<FoodScreen> {
         ],
       ),
     );
+  }
+
+  /// New food: look it up by name (nutrition filled in) or type it in.
+  Future<void> _newFood() async {
+    final how = await showModalBottomSheet<String>(
+      context: context,
+      builder: (c) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: const Icon(Icons.manage_search),
+            title: const Text('Look up by name'),
+            subtitle: const Text('BBQ chicken, banana, a store product… the nutrition is filled in'),
+            onTap: () => Navigator.pop(c, 'lookup'),
+          ),
+          ListTile(leading: const Icon(Icons.qr_code_scanner), title: const Text('Scan a barcode'), onTap: () => Navigator.pop(c, 'scan')),
+          ListTile(leading: const Icon(Icons.edit_outlined), title: const Text('Enter it myself'), onTap: () => Navigator.pop(c, 'manual')),
+        ]),
+      ),
+    );
+    if (!mounted || how == null) return;
+    if (how == 'lookup') return _lookup('');
+    if (how == 'scan') return _scan();
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => FoodEditScreen(food: Food(name: ''), isNew: true, onAddToMeal: _addToMeal)));
+  }
+
+  Future<void> _lookup(String q) async {
+    final saved = await Navigator.push<Food>(context, MaterialPageRoute(builder: (_) => FoodLookupScreen(query: q, onAddToMeal: _addToMeal)));
+    if (saved != null && mounted) {
+      setState(() {
+        _search.clear();
+        _filter = 'all';
+      });
+    }
   }
 
   Future<void> _showBarcode(String code) async {
@@ -300,12 +334,7 @@ class _FoodScreenState extends State<FoodScreen> {
         title: const Text('Food'),
         actions: [
           IconButton(onPressed: _busy ? null : _scan, icon: const Icon(Icons.qr_code_scanner), tooltip: 'Scan a barcode'),
-          IconButton(
-            onPressed: () => Navigator.push(
-                context, MaterialPageRoute(builder: (_) => FoodEditScreen(food: Food(name: ''), isNew: true, onAddToMeal: _addToMeal))),
-            icon: const Icon(Icons.add),
-            tooltip: 'New food',
-          ),
+          IconButton(onPressed: _newFood, icon: const Icon(Icons.add), tooltip: 'New food'),
           PopupMenuButton<String>(
             tooltip: 'Recipes',
             icon: const Icon(Icons.menu_book_outlined),
@@ -376,13 +405,23 @@ class _FoodScreenState extends State<FoodScreen> {
                             padding: const EdgeInsets.all(24),
                             child: Text(
                               app.foods.isEmpty
-                                  ? 'No foods yet. Scan a barcode (top right) or add one with +.\n\nFoods are kept in your Nightscout food list, so every phone, tablet and the web app see the same ones.'
+                                  ? 'No foods yet. Scan a barcode (top right), or tap + to look a food up by name.\n\nFoods are kept in your Nightscout food list, so every phone, tablet and the web app see the same ones.'
                                   : 'Nothing here. Try All, or mark foods as favorites with the star.',
                               textAlign: TextAlign.center,
                               style: const TextStyle(color: kMuted, height: 1.5),
                             ),
                           ),
                         for (final f in shown) _tile(f),
+                        if (_search.text.trim().length >= 2)
+                          Card(
+                            margin: const EdgeInsets.only(top: 6),
+                            child: ListTile(
+                              leading: const Icon(Icons.manage_search, color: kAccent),
+                              title: Text('Look up “${_search.text.trim()}”'),
+                              subtitle: const Text('Generic foods and store products, with the nutrition filled in'),
+                              onTap: () => _lookup(_search.text.trim()),
+                            ),
+                          ),
                       ]),
                     ),
             ),
