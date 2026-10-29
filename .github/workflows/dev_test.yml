@@ -20,11 +20,13 @@ jobs:
           UA='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
           for u in "ricardo https://www.ricardocuisine.com/en/recipes/5537-banana-bread" \
                    "allrecipes https://www.allrecipes.com/recipe/20144/banana-banana-bread/" \
-                   "simplyrecipes https://www.simplyrecipes.com/recipes/banana_bread/" \
-                   "bbc https://www.bbcgoodfood.com/recipes/easy-banana-bread" \
-                   "coupdepouce https://www.coupdepouce.com/recettes/desserts/pain-aux-bananes" \
-                   "kingarthur https://www.kingarthurbaking.com/recipes/gluten-free-banana-bread-recipe" \
-                   "seriouseats https://www.seriouseats.com/the-food-lab-best-chocolate-chip-cookie-recipe"; do
+                   "bbc https://www.bbcgoodfood.com/recipes/banana-bread" \
+                   "kingarthur https://www.kingarthurbaking.com/recipes/classic-banana-bread-recipe" \
+                   "budgetbytes https://www.budgetbytes.com/banana-bread/" \
+                   "cookieandkate https://cookieandkate.com/healthy-banana-bread-recipe/" \
+                   "marmiton https://www.marmiton.org/recettes/recette_cake-a-la-banane_15196.aspx" \
+                   "recettesqc https://www.recettes.qc.ca/recettes/recette/pain-aux-bananes-14" \
+                   "coupdepouce https://www.coupdepouce.com/recettes/desserts/pain-aux-bananes"; do
             set -- $u; curl -sL -m 25 -A "$UA" -H 'Accept-Language: en-CA,en;q=0.9' -o "$1.html" "$2" || true
             echo "$1: $(wc -c < $1.html 2>/dev/null) bytes"
           done

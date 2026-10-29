@@ -401,15 +401,38 @@ class _PdfDoc {
     final lx = _Lexer(content);
     final args = <Object?>[];
     _Font? font;
-    double? lastY;
-    double lineX = 0;
     double fontSize = 10;
+    // Where the text is (line matrix), and where the last text was shown.
+    double lx0 = 0, ly0 = 0;
+    double? lastX, lastY;
+    var charsSince = 0;
     void newline() {
       if (out.isNotEmpty && !out.toString().endsWith('\n')) out.write('\n');
     }
 
+    void space() {
+      final t = out.toString();
+      if (t.isNotEmpty && !t.endsWith(' ') && !t.endsWith('\n')) out.write(' ');
+    }
+
+    // Text moved to (x, y): a new line when it goes up or down, a space when
+    // it jumps right further than the text shown since.
+    void moved(double x, double y) {
+      if (lastY != null && (y - lastY!).abs() > fontSize * 0.4 + 0.5) {
+        newline();
+      } else if (lastX != null) {
+        final gap = x - (lastX! + charsSince * fontSize * 0.45);
+        if (gap > fontSize * 0.15 || x < lastX!) space();
+      }
+      lastX = x;
+      lastY = y;
+      charsSince = 0;
+    }
+
     void show(Uint8List s) {
-      out.write((font ?? _Font.plain).text(s));
+      final t = (font ?? _Font.plain).text(s);
+      out.write(t);
+      charsSince += t.length;
     }
 
     while (!lx.end) {
@@ -421,40 +444,39 @@ class _PdfDoc {
       }
       switch (t.v) {
         case 'BT':
-          lineX = 0;
+          lx0 = 0;
+          ly0 = 0;
         case 'Tf':
           if (args.length >= 2 && args[0] is _Name) {
             font = _font(fonts[(args[0] as _Name).v]);
             final sz = args[1];
-            if (sz is num) fontSize = sz.toDouble().abs();
+            if (sz is num && sz != 0) fontSize = sz.toDouble().abs();
           }
         case 'Td' || 'TD':
           if (args.length >= 2 && args[0] is num && args[1] is num) {
-            final tx = (args[0] as num).toDouble(), ty = (args[1] as num).toDouble();
-            if (ty.abs() > 0.5) {
-              newline();
-              lineX = tx;
-            } else if (tx - lineX > fontSize * 0.3 || tx > 1.5) {
-              if (out.isNotEmpty && !out.toString().endsWith(' ') && !out.toString().endsWith('\n')) out.write(' ');
-            }
-            if (ty.abs() <= 0.5) lineX = tx;
+            lx0 += (args[0] as num).toDouble();
+            ly0 += (args[1] as num).toDouble();
+            moved(lx0, ly0);
           }
         case 'Tm':
-          if (args.length >= 6 && args[5] is num) {
-            final y = (args[5] as num).toDouble();
-            if (lastY != null && (y - lastY).abs() > 1) {
-              newline();
-            } else if (out.isNotEmpty && !out.toString().endsWith(' ') && !out.toString().endsWith('\n')) {
-              out.write(' ');
-            }
-            lastY = y;
+          if (args.length >= 6 && args[4] is num && args[5] is num) {
+            final a0 = args[0], d0 = args[3];
+            // A scaled matrix with "1 Tf": the size is in the matrix.
+            if (a0 is num && d0 is num && fontSize <= 1.01) fontSize = d0.toDouble().abs() > 0 ? d0.toDouble().abs() * fontSize : fontSize;
+            lx0 = (args[4] as num).toDouble();
+            ly0 = (args[5] as num).toDouble();
+            moved(lx0, ly0);
           }
         case 'T*':
           newline();
+          lastY = null;
+          lastX = null;
         case 'Tj':
           if (args.isNotEmpty && args.last is Uint8List) show(args.last as Uint8List);
         case "'" || '"':
           newline();
+          lastY = null;
+          lastX = null;
           if (args.isNotEmpty && args.last is Uint8List) show(args.last as Uint8List);
         case 'TJ':
           final a = args.isNotEmpty ? args.last : null;
@@ -463,7 +485,7 @@ class _PdfDoc {
               if (x is Uint8List) {
                 show(x);
               } else if (x is num && x < -180) {
-                if (!out.toString().endsWith(' ')) out.write(' ');
+                space();
               }
             }
           }

@@ -88,6 +88,8 @@ class _RemoteScreenState extends State<RemoteScreen> {
   late bool _carbInsulinEdited = widget.carbInsulin != null;
   bool _sending = false;
   Timer? _tick;
+  // The section shown under the cards: override, carbs, bolus or settings.
+  late String? _section = widget.carbs != null ? 'carbs' : (widget.bolus != null && widget.carbs == null ? 'bolus' : null);
 
   @override
   void initState() {
@@ -639,131 +641,173 @@ class _RemoteScreenState extends State<RemoteScreen> {
             absorbing: _sending,
             child: ListView(padding: const EdgeInsets.fromLTRB(14, 12, 14, 30), children: [
               if (!allReady) _card('Ready?', checks),
-              _card('Override', [
-                if (active != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Text(
-                        'Running: ${active.name.isEmpty ? 'override' : _presetLabel(loop, active.name)}'
-                        '${active.end == null ? ' (until cancelled)' : ' until ${fmtClock(active.end!, s.flag('time24'))}'}',
-                        style: const TextStyle(color: _kOn, fontSize: 16, fontWeight: FontWeight.w700)),
-                  ),
-                if (loop == null || loop.presets.isEmpty)
-                  const Text('No override presets in Loop\'s profile yet.', style: TextStyle(color: kMuted, fontSize: 13))
-                else
-                  Wrap(spacing: 8, runSpacing: 8, children: [
-                    for (final p in loop.presets)
-                      ActionChip(
-                        label: Text(p.label,
-                            style: active != null && active.name == p.name
-                                ? const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)
-                                : null),
-                        backgroundColor: active != null && active.name == p.name ? _kOn : null,
-                        side: active != null && active.name == p.name ? const BorderSide(color: _kOn) : null,
-                        onPressed: () => _override(p),
-                      ),
-                  ]),
-                const SizedBox(height: 8),
-                if (active != null)
-                  OutlinedButton.icon(onPressed: _cancelOverride, icon: const Icon(Icons.stop_circle_outlined), label: const Text('Cancel override'))
-                else
-                  const Text('No override running', style: TextStyle(color: kMuted, fontSize: 13)),
-              ]),
-              _card('Carbs', [
-                StepRow(
-                  label: 'Carbs',
-                  value: '${_carbs.round()} g',
-                  onMinus: () => setState(() => _carbs = (_carbs - 5).clamp(1.0, _maxCarbs)),
-                  onPlus: () => setState(() => _carbs = (_carbs + 5).clamp(1.0, _maxCarbs)),
+              CardGrid([
+                BigCard(
+                  icon: Icons.tune_outlined,
+                  title: 'Override',
+                  sub: active != null ? 'Running: ${active.name.isEmpty ? 'override' : _presetLabel(loop, active.name)}' : 'None running',
+                  subColor: active != null ? _kOn : null,
+                  selected: _section == 'override',
+                  onTap: () => setState(() => _section = _section == 'override' ? null : 'override'),
                 ),
-                StepRow(
-                  label: 'Absorption time',
-                  value: '${fmtU(_absorption)} h',
-                  onMinus: () => setState(() => _absorption = (_absorption - 0.5).clamp(0.5, 8.0)),
-                  onPlus: () => setState(() => _absorption = (_absorption + 0.5).clamp(0.5, 8.0)),
+                BigCard(
+                  icon: Icons.restaurant,
+                  title: 'Carbs',
+                  sub: '${_carbs.round()} g${carbInsulin > 0 ? ' + ${fmtU(carbInsulin)} U' : ''}',
+                  selected: _section == 'carbs',
+                  onTap: () => setState(() => _section = _section == 'carbs' ? null : 'carbs'),
                 ),
-                StepRow(
-                  label: 'Eaten',
-                  value: _carbsAgo == 0 ? 'now' : '$_carbsAgo min ago',
-                  onMinus: () => setState(() => _carbsAgo = (_carbsAgo - 15).clamp(0, 120)),
-                  onPlus: () => setState(() => _carbsAgo = (_carbsAgo + 15).clamp(0, 120)),
+                BigCard(
+                  icon: Icons.water_drop_outlined,
+                  title: 'Bolus',
+                  sub: bolus > 0 ? '${fmtU(bolus)} U${_bolusEdited ? '' : ' suggested'}' : 'No bolus suggested',
+                  selected: _section == 'bolus',
+                  onTap: () => setState(() => _section = _section == 'bolus' ? null : 'bolus'),
                 ),
-                StepRow(
-                  label: 'Insulin with the carbs',
-                  hint: _carbInsulinEdited
-                      ? 'Changed by you (suggested ${fmtU(lim(calcCarbs.total))} U)'
-                      : 'Suggested by the calculator${calcCarbs.total > bolusLimit ? ' (cut to the ${fmtU(bolusLimit)} U limit)' : ''}',
-                  value: '${fmtU(carbInsulin)} U',
-                  onMinus: () => setState(() {
-                    _carbInsulin = ((carbInsulin - 0.05).clamp(0.0, bolusLimit) * 100).round() / 100;
-                    _carbInsulinEdited = true;
-                  }),
-                  onPlus: () => setState(() {
-                    _carbInsulin = ((carbInsulin + 0.05).clamp(0.0, bolusLimit) * 100).round() / 100;
-                    _carbInsulinEdited = true;
-                  }),
-                  last: true,
-                ),
-                if (_carbInsulinEdited)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton(onPressed: () => setState(() => _carbInsulinEdited = false), child: Text('Use the suggestion (${fmtU(lim(calcCarbs.total))} U)')),
-                  ),
-                _calcTile(calcCarbs),
-                const SizedBox(height: 8),
-                FilledButton(
-                  onPressed: () => _sendCarbs(carbInsulin),
-                  child: Text(carbInsulin > 0 ? 'Send ${_carbs.round()} g + ${fmtU(carbInsulin)} U to Loop' : 'Send ${_carbs.round()} g to Loop'),
+                BigCard(
+                  icon: Icons.settings_outlined,
+                  title: 'Settings',
+                  sub: allReady ? 'Limits, one-time password, site' : 'Something to set up',
+                  subColor: allReady ? null : kAmber,
+                  selected: _section == 'settings',
+                  onTap: () => setState(() => _section = _section == 'settings' ? null : 'settings'),
                 ),
               ]),
-              _card('Bolus', [
-                StepRow(
-                  label: 'Bolus',
-                  hint: '${_bolusEdited ? 'Changed by you' : 'Suggested by the calculator (correction − IOB)'} · limit ${fmtU(bolusLimit)} U'
-                      '${loopMax != null ? ' (yours or Loop\'s maximum, the lower)' : ''}',
-                  value: '${fmtU(bolus)} U',
-                  onMinus: () => setState(() {
-                    _bolus = ((bolus - 0.05).clamp(0.0, bolusLimit) * 100).round() / 100;
-                    _bolusEdited = true;
-                  }),
-                  onPlus: () => setState(() {
-                    _bolus = ((bolus + 0.05).clamp(0.0, bolusLimit) * 100).round() / 100;
-                    _bolusEdited = true;
-                  }),
-                  last: true,
+              const SizedBox(height: 12),
+              if (_section == null)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Text('Tap a card.', textAlign: TextAlign.center, style: TextStyle(color: kMuted)),
                 ),
-                Wrap(spacing: 6, children: [
-                  for (final v in [0.25, 0.5, 1.0, 2.0])
-                    if (v <= bolusLimit)
-                      ActionChip(
-                          label: Text('${fmtU(v)} U'),
-                          onPressed: () => setState(() {
-                                _bolus = v;
-                                _bolusEdited = true;
-                              })),
-                  if (_bolusEdited) ActionChip(label: Text('Suggested ${fmtU(lim(calcBolus.total))} U'), onPressed: () => setState(() => _bolusEdited = false)),
+              if (_section == 'override')
+                _card('Override', [
+                  if (active != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Text(
+                          'Running: ${active.name.isEmpty ? 'override' : _presetLabel(loop, active.name)}'
+                          '${active.end == null ? ' (until cancelled)' : ' until ${fmtClock(active.end!, s.flag('time24'))}'}',
+                          style: const TextStyle(color: _kOn, fontSize: 16, fontWeight: FontWeight.w700)),
+                    ),
+                  if (loop == null || loop.presets.isEmpty)
+                    const Text('No override presets in Loop\'s profile yet.', style: TextStyle(color: kMuted, fontSize: 13))
+                  else
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      for (final p in loop.presets)
+                        ActionChip(
+                          label: Text(p.label,
+                              style: active != null && active.name == p.name
+                                  ? const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)
+                                  : null),
+                          backgroundColor: active != null && active.name == p.name ? _kOn : null,
+                          side: active != null && active.name == p.name ? const BorderSide(color: _kOn) : null,
+                          onPressed: () => _override(p),
+                        ),
+                    ]),
+                  const SizedBox(height: 8),
+                  if (active != null)
+                    OutlinedButton.icon(onPressed: _cancelOverride, icon: const Icon(Icons.stop_circle_outlined), label: const Text('Cancel override'))
+                  else
+                    const Text('No override running', style: TextStyle(color: kMuted, fontSize: 13)),
                 ]),
-                _calcTile(calcBolus),
-                const SizedBox(height: 8),
-                FilledButton(
-                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFF3D7BF7)),
-                  onPressed: bolus > 0 ? () => _sendBolus(bolus) : null,
-                  child: Text(bolus > 0 ? 'Send ${fmtU(bolus)} U bolus to Loop' : 'No bolus suggested'),
-                ),
-              ]),
+              if (_section == 'carbs')
+                _card('Carbs', [
+                  StepRow(
+                    label: 'Carbs',
+                    value: '${_carbs.round()} g',
+                    onMinus: () => setState(() => _carbs = (_carbs - 5).clamp(1.0, _maxCarbs)),
+                    onPlus: () => setState(() => _carbs = (_carbs + 5).clamp(1.0, _maxCarbs)),
+                  ),
+                  StepRow(
+                    label: 'Absorption time',
+                    value: '${fmtU(_absorption)} h',
+                    onMinus: () => setState(() => _absorption = (_absorption - 0.5).clamp(0.5, 8.0)),
+                    onPlus: () => setState(() => _absorption = (_absorption + 0.5).clamp(0.5, 8.0)),
+                  ),
+                  StepRow(
+                    label: 'Eaten',
+                    value: _carbsAgo == 0 ? 'now' : '$_carbsAgo min ago',
+                    onMinus: () => setState(() => _carbsAgo = (_carbsAgo - 15).clamp(0, 120)),
+                    onPlus: () => setState(() => _carbsAgo = (_carbsAgo + 15).clamp(0, 120)),
+                  ),
+                  StepRow(
+                    label: 'Insulin with the carbs',
+                    hint: _carbInsulinEdited
+                        ? 'Changed by you (suggested ${fmtU(lim(calcCarbs.total))} U)'
+                        : 'Suggested by the calculator${calcCarbs.total > bolusLimit ? ' (cut to the ${fmtU(bolusLimit)} U limit)' : ''}',
+                    value: '${fmtU(carbInsulin)} U',
+                    onMinus: () => setState(() {
+                      _carbInsulin = ((carbInsulin - 0.05).clamp(0.0, bolusLimit) * 100).round() / 100;
+                      _carbInsulinEdited = true;
+                    }),
+                    onPlus: () => setState(() {
+                      _carbInsulin = ((carbInsulin + 0.05).clamp(0.0, bolusLimit) * 100).round() / 100;
+                      _carbInsulinEdited = true;
+                    }),
+                    last: true,
+                  ),
+                  if (_carbInsulinEdited)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(onPressed: () => setState(() => _carbInsulinEdited = false), child: Text('Use the suggestion (${fmtU(lim(calcCarbs.total))} U)')),
+                    ),
+                  _calcTile(calcCarbs),
+                  const SizedBox(height: 8),
+                  FilledButton(
+                    onPressed: () => _sendCarbs(carbInsulin),
+                    child: Text(carbInsulin > 0 ? 'Send ${_carbs.round()} g + ${fmtU(carbInsulin)} U to Loop' : 'Send ${_carbs.round()} g to Loop'),
+                  ),
+                ]),
+              if (_section == 'bolus')
+                _card('Bolus', [
+                  StepRow(
+                    label: 'Bolus',
+                    hint: '${_bolusEdited ? 'Changed by you' : 'Suggested by the calculator (correction − IOB)'} · limit ${fmtU(bolusLimit)} U'
+                        '${loopMax != null ? ' (yours or Loop\'s maximum, the lower)' : ''}',
+                    value: '${fmtU(bolus)} U',
+                    onMinus: () => setState(() {
+                      _bolus = ((bolus - 0.05).clamp(0.0, bolusLimit) * 100).round() / 100;
+                      _bolusEdited = true;
+                    }),
+                    onPlus: () => setState(() {
+                      _bolus = ((bolus + 0.05).clamp(0.0, bolusLimit) * 100).round() / 100;
+                      _bolusEdited = true;
+                    }),
+                    last: true,
+                  ),
+                  Wrap(spacing: 6, children: [
+                    for (final v in [0.25, 0.5, 1.0, 2.0])
+                      if (v <= bolusLimit)
+                        ActionChip(
+                            label: Text('${fmtU(v)} U'),
+                            onPressed: () => setState(() {
+                                  _bolus = v;
+                                  _bolusEdited = true;
+                                })),
+                    if (_bolusEdited) ActionChip(label: Text('Suggested ${fmtU(lim(calcBolus.total))} U'), onPressed: () => setState(() => _bolusEdited = false)),
+                  ]),
+                  _calcTile(calcBolus),
+                  const SizedBox(height: 8),
+                  FilledButton(
+                    style: FilledButton.styleFrom(backgroundColor: const Color(0xFF3D7BF7)),
+                    onPressed: bolus > 0 ? () => _sendBolus(bolus) : null,
+                    child: Text(bolus > 0 ? 'Send ${fmtU(bolus)} U bolus to Loop' : 'No bolus suggested'),
+                  ),
+                ]),
               if (_sending) const Center(child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator())),
               const SizedBox(height: 12),
-              _card('Settings', [
-                if (allReady) ...checks,
-                if (allReady) const SizedBox(height: 6),
-                OutlinedButton.icon(onPressed: _settings, icon: const Icon(Icons.tune), label: const Text('Limits, name and command site')),
-                const SizedBox(height: 6),
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BolusCalcScreen())),
-                  icon: const Icon(Icons.calculate_outlined),
-                  label: const Text('Bolus calculator'),
-                ),
-              ]),
+              if (_section == 'settings')
+                _card('Settings', [
+                  if (allReady) ...checks,
+                  if (allReady) const SizedBox(height: 6),
+                  OutlinedButton.icon(onPressed: _settings, icon: const Icon(Icons.tune), label: const Text('Limits, name and command site')),
+                  const SizedBox(height: 6),
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BolusCalcScreen())),
+                    icon: const Icon(Icons.calculate_outlined),
+                    label: const Text('Bolus calculator'),
+                  ),
+                ]),
               const Text(
                 'Remote commands must be turned on in Loop (Settings › Services › Nightscout › Remote Commands). '
                 'Loop checks every command against its own limits and shows a notification on the Loop phone.',

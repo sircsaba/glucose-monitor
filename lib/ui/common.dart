@@ -424,3 +424,63 @@ class ColorPick extends StatelessWidget {
     ]);
   }
 }
+
+
+/// A big square card button (Treat screen, Remote control): icon, title, one line.
+class BigCard extends StatelessWidget {
+  final IconData icon;
+  final String title, sub;
+  final bool selected;
+  final VoidCallback onTap;
+  final Color? subColor;
+  final double height;
+  const BigCard({super.key, required this.icon, required this.title, required this.sub, required this.onTap, this.selected = false, this.subColor, this.height = 130});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? kAccent.withValues(alpha: 0.18) : kCard,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          height: height,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: selected ? kAccent : kBorder, width: selected ? 2 : 1),
+          ),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(icon, size: 40, color: kAccent),
+            const SizedBox(height: 8),
+            Text(title, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 2),
+            Text(sub, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: subColor ?? kMuted, fontSize: 11.5)),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Cards two by two; an odd last card takes the whole width.
+class CardGrid extends StatelessWidget {
+  final List<Widget> cards;
+  const CardGrid(this.cards, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < cards.length; i += 2) {
+      rows.add(Padding(
+        padding: EdgeInsets.only(bottom: i + 2 < cards.length ? 12 : 0),
+        child: Row(children: [
+          Expanded(child: cards[i]),
+          if (i + 1 < cards.length) ...[const SizedBox(width: 12), Expanded(child: cards[i + 1])],
+        ]),
+      ));
+    }
+    return Column(children: rows);
+  }
+}

@@ -112,45 +112,37 @@ class _TreatScreenState extends State<TreatScreen> {
             ]),
             const SizedBox(height: 14),
             const MealPlanBanner(),
-            if (kRemote) ...[
-              Row(children: [
-                Expanded(
-                  child: _bigButton(
-                    icon: Icons.settings_remote_outlined,
-                    title: 'Remote control',
-                    sub: 'Override, carbs, bolus sent to Loop',
-                    selected: false,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RemoteScreen())),
-                  ),
+            CardGrid([
+              if (kRemote)
+                BigCard(
+                  icon: Icons.settings_remote_outlined,
+                  title: 'Remote control',
+                  sub: 'Override, carbs, bolus sent to Loop',
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RemoteScreen())),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _bigButton(
-                    icon: Icons.edit_note,
-                    title: 'Treatment',
-                    sub: 'Log carbs, insulin, notes…',
-                    selected: _form,
-                    onTap: () => setState(() => _form = !_form),
-                  ),
-                ),
-              ]),
-              const SizedBox(height: 16),
-            ],
-            SizedBox(
-              height: 52,
-              child: FilledButton.tonalIcon(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FoodScreen())),
-                icon: const Icon(Icons.restaurant_menu),
-                label: Text(app.meal.isEmpty ? 'Food: favorites, barcode, meals' : 'Food: meal of ${app.meal.carbs.round()} g carbs',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              BigCard(
+                icon: Icons.edit_note,
+                title: 'Treatment',
+                sub: 'Log carbs, insulin, notes…',
+                selected: _form,
+                onTap: () => setState(() => _form = !_form),
               ),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BolusCalcScreen())),
-              icon: const Icon(Icons.calculate_outlined),
-              label: const Text('Bolus calculator'),
-            ),
+              BigCard(
+                icon: Icons.restaurant_menu,
+                title: 'Food',
+                sub: !app.meal.isEmpty
+                    ? 'Meal of ${app.meal.carbs.round()} g carbs'
+                    : (app.lunchToday != null ? 'School lunch: ${app.lunchToday!.waiting.length} in the box' : 'Favorites, barcode, recipes, lunch'),
+                selected: !app.meal.isEmpty,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FoodScreen())),
+              ),
+              BigCard(
+                icon: Icons.calculate_outlined,
+                title: 'Bolus calculator',
+                sub: 'Carbs, correction and insulin on board',
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BolusCalcScreen())),
+              ),
+            ]),
             const SizedBox(height: 14),
             if (_form) ..._formWidgets(context, t, mmol, allowed, d),
           ],
@@ -159,31 +151,7 @@ class _TreatScreenState extends State<TreatScreen> {
     );
   }
 
-  Widget _bigButton({required IconData icon, required String title, required String sub, required bool selected, required VoidCallback onTap}) {
-    return Material(
-      color: selected ? kAccent.withValues(alpha: 0.18) : kCard,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Container(
-          height: 130,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: selected ? kAccent : kBorder, width: selected ? 2 : 1),
-          ),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(icon, size: 40, color: kAccent),
-            const SizedBox(height: 8),
-            Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 2),
-            Text(sub, textAlign: TextAlign.center, style: const TextStyle(color: kMuted, fontSize: 11)),
-          ]),
-        ),
-      ),
-    );
-  }
+
 
   List<Widget> _formWidgets(BuildContext context, _EventType t, bool mmol, bool allowed, DeviceInfo? d) {
     return [
