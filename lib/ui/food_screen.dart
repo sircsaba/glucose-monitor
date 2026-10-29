@@ -291,7 +291,7 @@ class _FoodScreenState extends State<FoodScreen> {
               Section(children: [
                 StepRow(
                   label: 'How much',
-                  value: '${fmtAmount(amount)} ${f.unit}',
+                  value: '${fmtAmount(amount)} ${unitFor(amount, f.unit)}',
                   onMinus: () => set(() => amount = (amount - step).clamp(step, 5000.0)),
                   onPlus: () => set(() => amount = amount + step),
                 ),
@@ -473,7 +473,7 @@ class _FoodScreenState extends State<FoodScreen> {
         subtitle: Text(
           [
             if (f.brand.isNotEmpty) f.brand,
-            '${fmtAmount(f.carbs)} g carbs / ${fmtAmount(f.portion)} ${f.unit}',
+            '${fmtAmount(f.carbs)} g carbs / ${fmtAmount(f.portion)} ${unitFor(f.portion, f.unit)}',
             if (f.n.energy != null) '${f.n.energy!.round()} kcal',
             if (f.meals.isNotEmpty) f.meals.map((m) => mealLabels[m]).join(', '),
           ].join(' · '),
@@ -517,7 +517,7 @@ class _FoodScreenState extends State<FoodScreen> {
             child: ListView(shrinkWrap: true, children: [
               for (final i in meal.items)
                 Row(children: [
-                  Expanded(child: Text('${i.food.name}  ${fmtAmount(i.amount)} ${i.food.unit}', overflow: TextOverflow.ellipsis)),
+                  Expanded(child: Text('${i.food.name}  ${fmtAmount(i.amount)} ${unitFor(i.amount, i.food.unit)}', overflow: TextOverflow.ellipsis)),
                   Text('${fmtAmount(((i.n.carbs ?? 0) * 10).round() / 10)} g', style: kMono.copyWith(color: kMuted)),
                   IconButton(
                     visualDensity: VisualDensity.compact,

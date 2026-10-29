@@ -367,7 +367,7 @@ class Meal {
   }
 
   /// "Scrambled eggs 2 pieces, Bacon 30 g, Dragon fruit 100 g"
-  String describe() => items.map((i) => '${i.food.name} ${fmtAmount(i.amount)} ${i.food.unit}').join(', ');
+  String describe() => items.map((i) => '${i.food.name} ${fmtAmount(i.amount)} ${unitFor(i.amount, i.food.unit)}').join(', ');
 
   /// Kept on the treatment so meals can be analysed later.
   List<Map<String, dynamic>> toFoodsJson() => [
@@ -381,5 +381,9 @@ class Meal {
           }
       ];
 }
+
+/// "2 pieces", "1 slice", "30 g".
+String unitFor(double amount, String unit) =>
+    const {'piece', 'slice', 'cup', 'serving'}.contains(unit) && amount != 1 ? '${unit}s' : unit;
 
 String fmtAmount(double v) => v == v.roundToDouble() ? v.round().toString() : v.toStringAsFixed(1);

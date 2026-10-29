@@ -110,7 +110,7 @@ void main() {
       expect(m.carbs, closeTo(1 + 0.8 + 19.5, 0.001));
       expect(m.total.energy, closeTo(180 + 320 + 90, 0.001));
       expect(m.gluten, Gluten.unsure);
-      expect(m.describe(), 'Scrambled eggs 2 piece, Bacon 60 g, Dragon fruit 150 g');
+      expect(m.describe(), 'Scrambled eggs 2 pieces, Bacon 60 g, Dragon fruit 150 g');
       expect(m.toFoodsJson().length, 3);
     });
   });
