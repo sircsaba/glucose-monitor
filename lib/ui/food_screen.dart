@@ -1,9 +1,12 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../data/nightscout.dart';
 import '../logic/barcode.dart';
 import '../logic/food.dart';
+import '../logic/recipe_ai.dart';
 import '../plus.dart';
 import '../state/app_state.dart';
 import 'bolus_calc_view.dart';
@@ -131,6 +134,128 @@ class _FoodScreenState extends State<FoodScreen> {
     await Navigator.push(context, MaterialPageRoute(builder: (_) => FoodEditScreen(food: f!, isNew: true, onAddToMeal: _addToMeal)));
   }
 
+  // ------------------------------------------------------------ recipes
+
+  Future<void> _recipeFromPhotos() async {
+    if (await RecipeAi.key() == null) return _aiSettings();
+    if (!mounted) return;
+    final how = await showModalBottomSheet<String>(
+      context: context,
+      builder: (c) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(leading: const Icon(Icons.photo_camera_outlined), title: const Text('Take a photo (one page at a time)'), onTap: () => Navigator.pop(c, 'camera')),
+          ListTile(leading: const Icon(Icons.photo_library_outlined), title: const Text('Choose photos or screenshots (all pages)'), onTap: () => Navigator.pop(c, 'gallery')),
+        ]),
+      ),
+    );
+    if (how == null) return;
+    final images = <Uint8List>[];
+    try {
+      if (how == 'gallery') {
+        for (final f in await ImagePicker().pickMultiImage(maxWidth: 2400)) {
+          images.add(await f.readAsBytes());
+        }
+      } else {
+        while (true) {
+          final f = await ImagePicker().pickImage(source: ImageSource.camera, maxWidth: 2400);
+          if (f == null) break;
+          images.add(await f.readAsBytes());
+          if (!mounted) return;
+          final more = await showDialog<bool>(
+            context: context,
+            builder: (d) => AlertDialog(
+              title: Text('${images.length} page${images.length > 1 ? 's' : ''}'),
+              content: const Text('Another page of this recipe (for example the steps)?'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('No, read it')),
+                FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Another page')),
+              ],
+            ),
+          );
+          if (more != true || images.length >= 6) break;
+        }
+      }
+    } catch (e) {
+      if (mounted) toast(context, 'Could not open the picture: $e');
+      return;
+    }
+    if (images.isEmpty) return;
+    await _readRecipe(images: images);
+  }
+
+  Future<void> _recipeFromText() async {
+    if (await RecipeAi.key() == null) return _aiSettings();
+    if (!mounted) return;
+    final c = TextEditingController();
+    final text = await showDialog<String>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: const Text('Paste the recipe'),
+        content: SizedBox(
+          width: 520,
+          child: TextField(controller: c, minLines: 8, maxLines: 16, decoration: const InputDecoration(hintText: 'Ingredients and steps, copied from a website or a message')),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(d, c.text), child: const Text('Read it')),
+        ],
+      ),
+    );
+    if (text == null || text.trim().isEmpty) return;
+    await _readRecipe(text: text);
+  }
+
+  Future<void> _readRecipe({List<Uint8List> images = const [], String text = ''}) async {
+    setState(() => _busy = true);
+    try {
+      final f = await RecipeAi.read(images: images, text: text);
+      if (!mounted) return;
+      setState(() => _busy = false);
+      toast(context, 'Check the numbers, then save');
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => FoodEditScreen(food: f, isNew: true, onAddToMeal: _addToMeal)));
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        toast(context, e.toString().replaceFirst('Exception: ', ''));
+      }
+    }
+  }
+
+  Future<void> _aiSettings() async {
+    final key = TextEditingController(text: await RecipeAi.key() ?? '');
+    final model = TextEditingController(text: await RecipeAi.model());
+    if (!mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: const Text('Recipe reading (AI)'),
+        content: SizedBox(
+          width: 520,
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text(
+              'Recipes are read by an AI model on your own key (from console.anthropic.com › API keys). '
+              'About 1–3 cents per recipe. The photo goes only to the AI service, and you check the numbers before saving.',
+              style: TextStyle(color: kMuted, fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 10),
+            TextField(controller: key, obscureText: true, decoration: const InputDecoration(labelText: 'API key', hintText: 'sk-ant-...')),
+            TextField(controller: model, decoration: const InputDecoration(labelText: 'Model')),
+            const SizedBox(height: 6),
+            const Text('The key stays on this device (secure storage). Enter it on each device you use.', style: TextStyle(color: kMuted, fontSize: 12)),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await RecipeAi.save(key.text, model.text);
+      if (mounted) toast(context, key.text.trim().isEmpty ? 'AI key removed' : 'AI key saved on this device');
+    }
+  }
+
   // ------------------------------------------------------------ meal
 
   void _addToMeal(Food f, [double? amount]) {
@@ -232,6 +357,20 @@ class _FoodScreenState extends State<FoodScreen> {
                 context, MaterialPageRoute(builder: (_) => FoodEditScreen(food: Food(name: ''), isNew: true, onAddToMeal: _addToMeal))),
             icon: const Icon(Icons.add),
             tooltip: 'New food',
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Recipes',
+            icon: const Icon(Icons.menu_book_outlined),
+            onSelected: (v) {
+              if (v == 'photo') _recipeFromPhotos();
+              if (v == 'text') _recipeFromText();
+              if (v == 'ai') _aiSettings();
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'photo', child: ListTile(leading: Icon(Icons.photo_camera_outlined), title: Text('Scan a recipe (photos)'))),
+              PopupMenuItem(value: 'text', child: ListTile(leading: Icon(Icons.content_paste), title: Text('Paste a recipe (text)'))),
+              PopupMenuItem(value: 'ai', child: ListTile(leading: Icon(Icons.key_outlined), title: Text('Recipe reading (AI key)'))),
+            ],
           ),
         ],
       ),

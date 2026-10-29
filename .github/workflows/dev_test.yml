@@ -1,0 +1,22 @@
+name: Dev test (analyze and tests, output to the check-out branch)
+on:
+  push:
+    branches: [food]
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter create --org com.monitorglucose --project-name glucose_monitor --platforms web . >/dev/null
+      - run: flutter pub get >/dev/null
+      - name: Analyze and test
+        run: |
+          (flutter analyze --no-fatal-infos 2>&1 | grep -v "^ *info " | tail -40) > out.txt || true
+          echo "----- tests" >> out.txt
+          (flutter test --reporter expanded 2>&1 | grep -v "^[0-9:+ ]*loading" | tail -120) >> out.txt || true
+          mkdir o && cp out.txt o/ && cd o && git init -q -b check-out && git add . && git -c user.name=ci -c user.email=ci@x commit -qm out && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" check-out

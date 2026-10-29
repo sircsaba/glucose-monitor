@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../logic/food.dart';
 import '../state/app_state.dart';
 import 'common.dart';
+import 'recipe_screen.dart';
 
 const kGlutenFree = Color(0xFF3DBE7A);
 const kGlutenBad = Color(0xFFFF4D5A);
@@ -234,6 +235,19 @@ class _FoodEditScreenState extends State<FoodEditScreen> {
       ),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 40), children: [
         if (f.source == 'barcode' || f.gluten != Gluten.unknown) GlutenBanner(f),
+        if (f.recipe != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: OutlinedButton.icon(
+              onPressed: () {
+                _collect();
+                Navigator.push(context, MaterialPageRoute(builder: (_) => RecipeScreen(food: f)));
+              },
+              icon: const Icon(Icons.menu_book_outlined),
+              label: Text('Recipe: ${(f.recipe!['steps'] is List ? (f.recipe!['steps'] as List).length : 0)} steps, '
+                  '${fmtAmount(num_(f.recipe!['servings']) ?? 1)} servings'),
+            ),
+          ),
         _field(_name, 'Name'),
         Row(children: [
           Expanded(child: _field(_brand, 'Brand')),
