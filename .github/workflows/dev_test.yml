@@ -14,7 +14,23 @@ jobs:
           channel: stable
       - run: flutter create --org com.monitorglucose --project-name glucose_monitor --platforms web . >/dev/null
       - run: flutter pub get >/dev/null
+      - name: Fetch a few real recipe pages
+        run: |
+          mkdir -p /tmp/pages && cd /tmp/pages
+          UA='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
+          for u in "ricardo https://www.ricardocuisine.com/en/recipes/5537-banana-bread" \
+                   "allrecipes https://www.allrecipes.com/recipe/20144/banana-banana-bread/" \
+                   "simplyrecipes https://www.simplyrecipes.com/recipes/banana_bread/" \
+                   "bbc https://www.bbcgoodfood.com/recipes/easy-banana-bread" \
+                   "coupdepouce https://www.coupdepouce.com/recettes/desserts/pain-aux-bananes" \
+                   "kingarthur https://www.kingarthurbaking.com/recipes/gluten-free-banana-bread-recipe" \
+                   "seriouseats https://www.seriouseats.com/the-food-lab-best-chocolate-chip-cookie-recipe"; do
+            set -- $u; curl -sL -m 25 -A "$UA" -H 'Accept-Language: en-CA,en;q=0.9' -o "$1.html" "$2" || true
+            echo "$1: $(wc -c < $1.html 2>/dev/null) bytes"
+          done
       - name: Analyze and test
+        env:
+          RECIPE_PAGES: /tmp/pages
         run: |
           (flutter analyze --no-fatal-infos 2>&1 | grep -v "^ *info " | tail -40) > out.txt || true
           echo "----- tests" >> out.txt

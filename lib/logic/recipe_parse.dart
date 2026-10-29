@@ -206,6 +206,22 @@ ParsedRecipe splitRecipe(String text) {
   return ParsedRecipe(title, ing, steps, servings);
 }
 
+/// A pasted list of ingredients: one per line (bullets, numbers and headings
+/// like "Ingredients" or "For the sauce:" are left out). Lines joined with
+/// commas or semicolons on one line ("2 eggs, 1 cup milk") are split too.
+List<String> ingredientLines(String text) {
+  final out = <String>[];
+  for (var l in text.split(RegExp(r'\r?\n'))) {
+    l = l.trim().replaceFirst(RegExp(r'^([-•*·▪●◦–]|\d{1,2}[.)])\s+'), '').trim();
+    if (l.isEmpty || _ingHead.hasMatch(l) || _stepHead.hasMatch(l)) continue;
+    if (RegExp(r'^(for the|pour la|pour le|pour les)\b.*:$', caseSensitive: false).hasMatch(l) || (l.endsWith(':') && l.length < 40)) continue;
+    // "2 eggs; 1 cup milk" or "2 eggs, 1 cup milk, 3 bananas": split before each amount.
+    final parts = l.split(RegExp(r'\s*[;,]\s*(?=(\d|[½⅓⅔¼¾⅛]))'));
+    out.addAll(parts.map((x) => x.trim()).where((x) => x.isNotEmpty));
+  }
+  return out;
+}
+
 // ------------------------------------------------------------- one ingredient
 
 /// An ingredient with its match in the Canadian Nutrient File (or in the

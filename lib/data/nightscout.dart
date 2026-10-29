@@ -624,6 +624,64 @@ class NightscoutClient {
 
   /// A product from Open Food Facts (free, world-wide, Canada and USA included);
   /// null when the barcode is unknown there.
+  /// The HTML of a recipe page, through this site (the web app: browsers
+  /// cannot read other sites). Needs a Monitor Glucose server.
+  Future<String> recipePageVia(String url) async {
+    final http.Response r;
+    try {
+      r = await http.get(_uri('/api/v1/recipepage', {'url': url}), headers: _headers).timeout(const Duration(seconds: 30));
+    } catch (e) {
+      throw NsException('Cannot reach the site: $e');
+    }
+    return _recipePageAnswer(r);
+  }
+
+  static String _recipePageAnswer(http.Response r) {
+    if (r.statusCode == 404) throw NsException('Reading a web address in the browser needs your Monitor Glucose server (bg.inforap.com). Or use the phone app.');
+    Object? j;
+    try {
+      j = jsonDecode(utf8.decode(r.bodyBytes));
+    } catch (_) {}
+    if (r.statusCode != 200 || j is! Map || j['html'] is! String) {
+      throw NsException(j is Map && j['message'] != null ? j['message'].toString() : 'The server answered with error ${r.statusCode}');
+    }
+    return j['html'] as String;
+  }
+
+  /// The HTML of a recipe page: read directly on the phone; in the browser
+  /// through the server the web app comes from (or the connected site).
+  static Future<String> recipePage(String url, {NightscoutClient? via}) async {
+    var u = url.trim();
+    if (!RegExp(r'^https?://', caseSensitive: false).hasMatch(u)) u = 'https://$u';
+    if (kIsWeb) {
+      try {
+        final r = await http.get(Uri.base.resolve('/api/v1/recipepage').replace(queryParameters: {'url': u})).timeout(const Duration(seconds: 30));
+        if (r.statusCode != 404) return _recipePageAnswer(r);
+      } catch (e) {
+        if (e is NsException) rethrow;
+      }
+      if (via != null) return via.recipePageVia(u);
+      throw NsException('Reading a web address in the browser needs your Monitor Glucose server. Or use the phone app.');
+    }
+    final http.Response r;
+    try {
+      r = await http.get(Uri.parse(u), headers: const {
+        // Many recipe sites only answer browsers.
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-CA,en;q=0.9,fr-CA;q=0.8',
+      }).timeout(const Duration(seconds: 30));
+    } catch (e) {
+      throw NsException('Cannot reach that page: $e');
+    }
+    if (r.statusCode != 200) throw NsException('That site answered with error ${r.statusCode}');
+    try {
+      return utf8.decode(r.bodyBytes);
+    } catch (_) {
+      return latin1.decode(r.bodyBytes);
+    }
+  }
+
   static Future<Food?> lookupBarcode(String barcode) async {
     final code = barcode.replaceAll(RegExp(r'[^0-9]'), '');
     if (code.length < 8) throw NsException('That barcode is too short');

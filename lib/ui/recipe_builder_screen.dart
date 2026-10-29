@@ -15,7 +15,10 @@ import 'nutrition_label.dart';
 class RecipeBuilderScreen extends StatefulWidget {
   final String text;
   final Food? existing; // a saved recipe to change
-  const RecipeBuilderScreen({super.key, this.text = '', this.existing});
+  final String sourceUrl; // the web page it came from
+  final String servingText; // "muffin", from the page
+  final int? prepMinutes, cookMinutes;
+  const RecipeBuilderScreen({super.key, this.text = '', this.existing, this.sourceUrl = '', this.servingText = '', this.prepMinutes, this.cookMinutes});
   @override
   State<RecipeBuilderScreen> createState() => _RecipeBuilderScreenState();
 }
@@ -31,6 +34,9 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
   final Set<String> _meals = {};
   bool _favorite = false;
   bool _busy = false;
+  late final String _sourceUrl = widget.sourceUrl.isNotEmpty ? widget.sourceUrl : (widget.existing?.recipe?['sourceUrl'] ?? '').toString();
+  late final int? _prep = widget.prepMinutes ?? num_(widget.existing?.recipe?['prepMinutes'])?.toInt();
+  late final int? _cook = widget.cookMinutes ?? num_(widget.existing?.recipe?['cookMinutes'])?.toInt();
 
   @override
   void initState() {
@@ -43,6 +49,7 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
         _loadExisting(e);
       } else if (widget.text.trim().isNotEmpty) {
         _read(widget.text);
+        if (widget.servingText.isNotEmpty) _serving.text = '1 ${widget.servingText}';
       }
     });
   }
@@ -207,6 +214,41 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
     });
   }
 
+  /// Paste many ingredients at once (one per line).
+  Future<void> _pasteList() async {
+    final c = TextEditingController();
+    final text = await showDialog<String>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: const Text('Paste ingredients'),
+        content: SizedBox(
+          width: 420,
+          child: TextField(
+            controller: c,
+            autofocus: true,
+            minLines: 6,
+            maxLines: 14,
+            decoration: const InputDecoration(hintText: '2 cups rice flour\n3 ripe bananas\n1/3 cup maple syrup\n…', helperText: 'One ingredient per line'),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(d, c.text), child: const Text('Add them')),
+        ],
+      ),
+    );
+    c.dispose();
+    if (text == null) return;
+    final lines = ingredientLines(text);
+    if (lines.isEmpty) return;
+    setState(() {
+      for (final l in lines) {
+        _ing.add(_match(l));
+      }
+    });
+    if (mounted) toast(context, '${lines.length} ingredient${lines.length > 1 ? 's' : ''} added');
+  }
+
   Future<void> _editLine(RecipeIngredient? i) async {
     final c = TextEditingController(text: i?.line ?? '');
     final g = TextEditingController(text: i?.grams == null ? '' : fmtAmount((i!.grams! * 10).round() / 10));
@@ -215,7 +257,13 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
       builder: (d) => AlertDialog(
         title: Text(i == null ? 'Add an ingredient' : 'Ingredient'),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: c, autofocus: i == null, decoration: const InputDecoration(labelText: 'As in the recipe', hintText: '2 cups rice flour')),
+          TextField(
+            controller: c,
+            autofocus: i == null,
+            minLines: 1,
+            maxLines: i == null ? 8 : 2,
+            decoration: InputDecoration(labelText: 'As in the recipe', hintText: '2 cups rice flour', helperText: i == null ? 'Several? One per line, or paste a list' : null),
+          ),
           if (i != null) TextField(controller: g, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Weight', suffixText: 'g')),
         ]),
         actions: [
@@ -229,7 +277,9 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
     if (r == null || r.$1.trim().isEmpty) return;
     setState(() {
       if (i == null) {
-        _ing.add(_match(r.$1.trim()));
+        for (final l in ingredientLines(r.$1)) {
+          _ing.add(_match(l));
+        }
       } else if (r.$1.trim() != i.line) {
         final idx = _ing.indexOf(i);
         _ing[idx] = _match(r.$1.trim());
@@ -279,6 +329,9 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
         'ingredients': [for (final i in _ing) i.toJson()],
         'steps': _steps.text.split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
         'nutritionSource': 'Canadian Nutrient File 2015 (Health Canada)',
+        if (_sourceUrl.isNotEmpty) 'sourceUrl': _sourceUrl,
+        if (_prep != null) 'prepMinutes': _prep,
+        if (_cook != null) 'cookMinutes': _cook,
       };
     setState(() => _busy = true);
     try {
@@ -328,6 +381,7 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
         const SizedBox(height: 18),
         Row(children: [
           const Expanded(child: Text('Ingredients', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+          TextButton.icon(onPressed: _pasteList, icon: const Icon(Icons.content_paste), label: const Text('Paste list')),
           TextButton.icon(onPressed: () => _editLine(null), icon: const Icon(Icons.add), label: const Text('Add')),
         ]),
         if (unmatched > 0)

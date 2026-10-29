@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../data/nightscout.dart';
 import '../logic/barcode.dart';
 import '../logic/food.dart';
 import '../logic/ocr.dart';
+import '../logic/pdf_text.dart';
+import '../logic/recipe_web.dart';
 import '../plus.dart';
 import '../state/app_state.dart';
 import 'bolus_calc_view.dart';
@@ -238,6 +241,79 @@ class _FoodScreenState extends State<FoodScreen> {
     await Navigator.push(context, MaterialPageRoute(builder: (_) => RecipeBuilderScreen(text: text.toString())));
   }
 
+  /// A PDF of a recipe: its text read directly; a scanned PDF read like photos (phone).
+  Future<void> _recipeFromPdf() async {
+    FilePickerResult? pick;
+    try {
+      pick = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: const ['pdf'], withData: true);
+    } catch (e) {
+      if (mounted) toast(context, 'Could not open the file: $e');
+      return;
+    }
+    final bytes = pick?.files.firstOrNull?.bytes;
+    if (bytes == null || !mounted) return;
+    setState(() => _busy = true);
+    var text = '';
+    try {
+      text = pdfText(bytes);
+      if (pdfLooksScanned(text)) {
+        if (ocrAvailable) {
+          if (mounted) toast(context, 'This PDF is made of pictures: reading the pages…');
+          text = await readTextFromPdfPages(bytes) ?? '';
+        } else {
+          text = '';
+          if (mounted) toast(context, 'This PDF is made of pictures (a scan). Open it with the phone app: it reads scanned pages.');
+        }
+      }
+    } catch (e) {
+      if (mounted) toast(context, 'Could not read this PDF: $e');
+    }
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (text.trim().isEmpty) return;
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => RecipeBuilderScreen(text: text)));
+  }
+
+  /// A recipe web page: the recipe written in the page for search engines (no AI).
+  Future<void> _recipeFromWeb() async {
+    final c = TextEditingController();
+    final url = await showDialog<String>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: const Text('Recipe from a web address'),
+        content: TextField(
+          controller: c,
+          autofocus: true,
+          keyboardType: TextInputType.url,
+          decoration: const InputDecoration(hintText: 'https://www.ricardocuisine.com/…', helperText: 'Copy the address from the browser and paste it here'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(d, c.text.trim()), child: const Text('Read the recipe')),
+        ],
+      ),
+    );
+    c.dispose();
+    if (url == null || url.isEmpty || !mounted) return;
+    setState(() => _busy = true);
+    WebRecipe? r;
+    try {
+      final html = await NightscoutClient.recipePage(url, via: app.client);
+      r = recipeFromHtml(html, url: url);
+      if (r == null && mounted) toast(context, 'No recipe found on that page. Copy the recipe text and use "Type or paste a recipe".');
+    } catch (e) {
+      if (mounted) toast(context, e.toString());
+    }
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (r == null) return;
+    await Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => RecipeBuilderScreen(
+                text: r!.toText(), sourceUrl: url, servingText: r.servingText, prepMinutes: r.prepMinutes, cookMinutes: r.cookMinutes)));
+  }
+
   // ------------------------------------------------------------ meal
 
   void _addToMeal(Food f, [double? amount]) {
@@ -340,12 +416,16 @@ class _FoodScreenState extends State<FoodScreen> {
             icon: const Icon(Icons.menu_book_outlined),
             onSelected: (v) {
               if (v == 'photo') _recipeFromPhotos();
+              if (v == 'pdf') _recipeFromPdf();
+              if (v == 'web') _recipeFromWeb();
               if (v == 'text') Navigator.push(context, MaterialPageRoute(builder: (_) => const RecipeBuilderScreen()));
               if (v == 'ca' || v == 'us') app.change((x) => x.set('labelFormat', v == 'us' ? 1 : 0));
             },
             itemBuilder: (_) => [
               if (ocrAvailable)
                 const PopupMenuItem(value: 'photo', child: ListTile(leading: Icon(Icons.photo_camera_outlined), title: Text('Scan a recipe (photos)'))),
+              const PopupMenuItem(value: 'pdf', child: ListTile(leading: Icon(Icons.picture_as_pdf_outlined), title: Text('Recipe from a PDF file'))),
+              const PopupMenuItem(value: 'web', child: ListTile(leading: Icon(Icons.link), title: Text('Recipe from a web address'))),
               const PopupMenuItem(value: 'text', child: ListTile(leading: Icon(Icons.edit_note), title: Text('Type or paste a recipe'))),
               const PopupMenuDivider(),
               CheckedPopupMenuItem(value: 'ca', checked: app.settings.integer('labelFormat') != 1, child: const Text('Canadian nutrition label')),

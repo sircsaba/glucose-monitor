@@ -84,6 +84,11 @@ class _RecipeScreenState extends State<RecipeScreen> {
               style: const TextStyle(color: kMuted, fontSize: 13),
             ),
           ),
+        if ((r['sourceUrl'] ?? '').toString().isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: SelectableText('From ${r['sourceUrl']}', style: const TextStyle(color: kMuted, fontSize: 12)),
+          ),
         const SizedBox(height: 16),
         Text('Ingredients${k != 1 ? ' (amounts for ${fmtAmount(_base)}, carbs for ${fmtAmount(_servings)})' : ''}',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),

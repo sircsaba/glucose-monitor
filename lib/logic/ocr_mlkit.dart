@@ -1,4 +1,7 @@
-import 'dart:io' show Platform;
+import 'dart:io' show Directory, File, Platform;
+import 'dart:typed_data';
+
+import 'package:printing/printing.dart';
 
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
@@ -31,4 +34,27 @@ Future<String?> readTextFromImage(String path) async {
   } finally {
     await r.close();
   }
+}
+
+/// The text of a scanned PDF (pages that are pictures): each page is drawn as
+/// an image on the phone and read like a photo. At most [maxPages] pages.
+Future<String?> readTextFromPdfPages(Uint8List pdf, {int maxPages = 8, void Function(int page)? onPage}) async {
+  if (!ocrAvailable) return null;
+  final dir = await Directory.systemTemp.createTemp('mg_pdf');
+  final out = StringBuffer();
+  try {
+    var n = 0;
+    await for (final page in Printing.raster(pdf, dpi: 200)) {
+      if (n >= maxPages) break;
+      onPage?.call(++n);
+      final f = File('${dir.path}/page$n.png');
+      await f.writeAsBytes(await page.toPng());
+      out.writeln(await readTextFromImage(f.path) ?? '');
+    }
+  } finally {
+    try {
+      await dir.delete(recursive: true);
+    } catch (_) {}
+  }
+  return out.toString();
 }

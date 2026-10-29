@@ -8,7 +8,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/eventlog.php';
 // Optional parts: if one is missing or empty (a hosting virus scanner can
 // empty a file by mistake), only that feature stops; readings keep working.
-foreach (['loopremote.php', 'webapp.php'] as $optional) {
+foreach (['loopremote.php', 'webapp.php', 'recipepage.php'] as $optional) {
     if (is_file(__DIR__ . '/' . $optional)) require_once __DIR__ . '/' . $optional;
 }
 
@@ -280,6 +280,14 @@ final class Server
                 return;
             case 'food':
                 $this->food($method, $sub);
+                return;
+            case 'recipepage':
+                // The web app's "recipe from a web address": browsers cannot read
+                // other sites, so this server fetches the page. Only for the web
+                // app served from here (same origin) or with a read key.
+                if (($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '') !== 'same-origin') $this->need(self::READ);
+                if (!class_exists('RecipePage')) throw new HttpError(503, 'Recipe pages are not installed on this server (lib/recipepage.php)');
+                self::out(RecipePage::fetch((string)($_GET['url'] ?? '')));
                 return;
         }
         throw new HttpError(404, 'Not found');

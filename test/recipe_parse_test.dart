@@ -43,6 +43,19 @@ void main() {
     });
   });
 
+  test('a pasted ingredient list', () {
+    expect(ingredientLines('''
+Ingredients
+• 2 cups rice flour
+- 3 ripe bananas
+1. 1/3 cup maple syrup
+
+For the glaze:
+2 eggs, 1 cup milk; 1 tsp vanilla
+Salt, pepper
+'''), ['2 cups rice flour', '3 ripe bananas', '1/3 cup maple syrup', '2 eggs', '1 cup milk', '1 tsp vanilla', 'Salt, pepper']);
+  });
+
   test('a recipe with headings', () {
     final r = splitRecipe('''
 Banana muffins
