@@ -32,8 +32,11 @@ class _FoodScreenState extends State<FoodScreen> {
   @override
   void initState() {
     super.initState();
-    if (!app.foodsLoaded) app.loadFoods().then((_) {
-      if (mounted && app.foods.isNotEmpty && !app.foods.any((f) => f.favorite)) setState(() => _filter = 'all');
+    // Always fetch the list again: foods added on another phone or computer
+    // show up (the last list stays on screen meanwhile).
+    final first = !app.foodsLoaded;
+    app.loadFoods().then((_) {
+      if (mounted && first && app.foods.isNotEmpty && !app.foods.any((f) => f.favorite)) setState(() => _filter = 'all');
     });
     final h = DateTime.now().hour;
     // Start on the meal of the time of day when there are no favorites yet.
