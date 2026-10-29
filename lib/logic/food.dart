@@ -6,57 +6,79 @@ enum Gluten { free, contains, unsure, unknown }
 const mealTypes = ['breakfast', 'lunch', 'supper', 'snack'];
 const mealLabels = {'breakfast': 'Breakfast', 'lunch': 'Lunch', 'supper': 'Supper', 'snack': 'Snack'};
 
+/// Nutrients kept for a food, in label order: g, kcal or mg (see [nutrientUnit]).
+const nutrientKeys = [
+  'energy', 'fat', 'satFat', 'transFat', 'cholesterol', 'sodium', 'carbs', 'fiber', 'sugars', 'protein',
+  'potassium', 'calcium', 'iron',
+];
+const nutrientUnit = {
+  'energy': 'kcal', 'cholesterol': 'mg', 'sodium': 'mg', 'potassium': 'mg', 'calcium': 'mg', 'iron': 'mg',
+};
+
 /// Nutrition of one portion (or of 100 g in [Food.per100]).
 class Nutrition {
-  final double? carbs, energy, protein, fat, fiber, sugars, sodium; // g, kcal, g, g, g, g, mg
-  const Nutrition({this.carbs, this.energy, this.protein, this.fat, this.fiber, this.sugars, this.sodium});
+  final Map<String, double> v;
+  const Nutrition._(this.v);
 
-  Nutrition operator +(Nutrition o) => Nutrition(
-        carbs: _add(carbs, o.carbs),
-        energy: _add(energy, o.energy),
-        protein: _add(protein, o.protein),
-        fat: _add(fat, o.fat),
-        fiber: _add(fiber, o.fiber),
-        sugars: _add(sugars, o.sugars),
-        sodium: _add(sodium, o.sodium),
-      );
+  Nutrition({
+    double? carbs, double? energy, double? protein, double? fat, double? fiber, double? sugars, double? sodium,
+    double? satFat, double? transFat, double? cholesterol, double? potassium, double? calcium, double? iron,
+  }) : v = {
+          if (carbs != null) 'carbs': carbs,
+          if (energy != null) 'energy': energy,
+          if (protein != null) 'protein': protein,
+          if (fat != null) 'fat': fat,
+          if (fiber != null) 'fiber': fiber,
+          if (sugars != null) 'sugars': sugars,
+          if (sodium != null) 'sodium': sodium,
+          if (satFat != null) 'satFat': satFat,
+          if (transFat != null) 'transFat': transFat,
+          if (cholesterol != null) 'cholesterol': cholesterol,
+          if (potassium != null) 'potassium': potassium,
+          if (calcium != null) 'calcium': calcium,
+          if (iron != null) 'iron': iron,
+        };
 
-  Nutrition times(double k) => Nutrition(
-        carbs: _mul(carbs, k),
-        energy: _mul(energy, k),
-        protein: _mul(protein, k),
-        fat: _mul(fat, k),
-        fiber: _mul(fiber, k),
-        sugars: _mul(sugars, k),
-        sodium: _mul(sodium, k),
-      );
+  static const empty = Nutrition._({});
 
-  static double? _add(double? a, double? b) => a == null && b == null ? null : (a ?? 0) + (b ?? 0);
-  static double? _mul(double? a, double k) => a == null ? null : a * k;
+  double? operator [](String k) => v[k];
+  double? get carbs => v['carbs'];
+  double? get energy => v['energy'];
+  double? get protein => v['protein'];
+  double? get fat => v['fat'];
+  double? get fiber => v['fiber'];
+  double? get sugars => v['sugars'];
+  double? get sodium => v['sodium'];
+  bool get isEmpty => v.isEmpty;
 
-  Map<String, dynamic> toJson() => {
-        if (carbs != null) 'carbs': _r(carbs!),
-        if (energy != null) 'energy': _r(energy!),
-        if (protein != null) 'protein': _r(protein!),
-        if (fat != null) 'fat': _r(fat!),
-        if (fiber != null) 'fiber': _r(fiber!),
-        if (sugars != null) 'sugars': _r(sugars!),
-        if (sodium != null) 'sodium': _r(sodium!),
-      };
+  Nutrition operator +(Nutrition o) {
+    final m = Map<String, double>.from(v);
+    o.v.forEach((k, x) => m[k] = (m[k] ?? 0) + x);
+    return Nutrition._(m);
+  }
 
-  factory Nutrition.fromJson(Map<String, dynamic>? j) => j == null
-      ? const Nutrition()
-      : Nutrition(
-          carbs: num_(j['carbs']),
-          energy: num_(j['energy']),
-          protein: num_(j['protein']),
-          fat: num_(j['fat']),
-          fiber: num_(j['fiber']),
-          sugars: num_(j['sugars']),
-          sodium: num_(j['sodium']),
-        );
+  Nutrition times(double k) => Nutrition._({for (final e in v.entries) e.key: e.value * k});
 
-  static double _r(double v) => (v * 10).round() / 10;
+  /// Same values with one nutrient changed (null removes it).
+  Nutrition withValue(String k, double? x) {
+    final m = Map<String, double>.from(v);
+    x == null ? m.remove(k) : m[k] = x;
+    return Nutrition._(m);
+  }
+
+  Map<String, dynamic> toJson() => {for (final k in nutrientKeys) if (v[k] != null) k: _r(v[k]!)};
+
+  factory Nutrition.fromJson(Map<String, dynamic>? j) {
+    if (j == null) return empty;
+    final m = <String, double>{};
+    for (final k in nutrientKeys) {
+      final x = num_(j[k]);
+      if (x != null) m[k] = x;
+    }
+    return Nutrition._(m);
+  }
+
+  static double _r(double v) => (v * 100).round() / 100;
 }
 
 double? num_(dynamic v) {
@@ -100,8 +122,8 @@ class Food {
     this.portion = 100,
     this.unit = 'g',
     this.portionText = '',
-    this.n = const Nutrition(),
-    this.per100 = const Nutrition(),
+    this.n = Nutrition.empty,
+    this.per100 = Nutrition.empty,
     this.barcode = '',
     this.gluten = Gluten.unknown,
     List<String>? glutenWhy,
@@ -136,8 +158,7 @@ class Food {
   }
 
   static const _known = {
-    '_id', 'type', 'name', 'brand', 'category', 'portion', 'unit', 'portionText', 'carbs', 'energy',
-    'protein', 'fat', 'fiber', 'sugars', 'sodium', 'per100', 'barcode', 'gluten', 'glutenWhy', 'ingredients',
+    '_id', 'type', 'name', 'brand', 'category', 'portion', 'unit', 'portionText', ...nutrientKeys, 'per100', 'barcode', 'gluten', 'glutenWhy', 'ingredients',
     'allergens', 'meals', 'favorite', 'source', 'notes', 'recipe', 'gi',
   };
 
@@ -183,7 +204,7 @@ class Food {
         'unit': unit,
         if (portionText.isNotEmpty) 'portionText': portionText,
         ...n.toJson(),
-        'carbs': Nutrition._r(n.carbs ?? 0), // Nightscout's food editor expects a number
+        'carbs': ((n.carbs ?? 0) * 10).round() / 10, // Nightscout's food editor expects a number
         if (per100.carbs != null || per100.energy != null) 'per100': per100.toJson(),
         if (barcode.isNotEmpty) 'barcode': barcode,
         'gluten': gluten.name,
@@ -297,7 +318,11 @@ Food? foodFromOff(Map<String, dynamic> j, String barcode) {
   double? kcal100 = num_(nm['energy-kcal_100g']);
   final kj100 = num_(nm['energy-kj_100g'] ?? nm['energy_100g']);
   if (kcal100 == null && kj100 != null) kcal100 = kj100 / 4.184;
-  final sodium100 = num_(nm['sodium_100g']);
+  double? mg(String k) {
+    final x = num_(nm[k]);
+    return x == null ? null : x * 1000; // Open Food Facts keeps these in g
+  }
+
   final per100 = Nutrition(
     carbs: num_(nm['carbohydrates_100g']),
     energy: kcal100,
@@ -305,7 +330,13 @@ Food? foodFromOff(Map<String, dynamic> j, String barcode) {
     fat: num_(nm['fat_100g']),
     fiber: num_(nm['fiber_100g']),
     sugars: num_(nm['sugars_100g']),
-    sodium: sodium100 == null ? null : sodium100 * 1000, // g -> mg
+    sodium: mg('sodium_100g'),
+    satFat: num_(nm['saturated-fat_100g']),
+    transFat: num_(nm['trans-fat_100g']),
+    cholesterol: mg('cholesterol_100g'),
+    potassium: mg('potassium_100g'),
+    calcium: mg('calcium_100g'),
+    iron: mg('iron_100g'),
   );
   final serving = num_(p['serving_quantity']);
   final servingUnit = (p['serving_quantity_unit'] ?? '').toString().toLowerCase();
@@ -355,7 +386,7 @@ class MealItem {
 
 class Meal {
   final List<MealItem> items = [];
-  Nutrition get total => items.fold(const Nutrition(), (a, i) => a + i.n);
+  Nutrition get total => items.fold(Nutrition.empty, (a, i) => a + i.n);
   double get carbs => total.carbs ?? 0;
   bool get isEmpty => items.isEmpty;
 

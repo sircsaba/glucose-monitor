@@ -300,6 +300,7 @@ class Settings {
     'smbTextBold': false,
     'smbTextColor': 0xFF9CC3E0,
     'smbMinLabel': 0.0, // only write amounts of at least this many units
+    'labelFormat': 0, // nutrition label on recipes: 0 Canada (bilingual), 1 United States
     'presetShow': true, // Loop overrides / Trio temp targets on the graph
     'presetColor': 0xFFB39DFF,
     'presetTextSize': 11.0,

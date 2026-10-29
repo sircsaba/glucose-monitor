@@ -105,15 +105,18 @@ class _FoodEditScreenState extends State<FoodEditScreen> {
   late final _barcode = TextEditingController(text: f.barcode);
   late final _portion = TextEditingController(text: fmtAmount(f.portion));
   late final Map<String, TextEditingController> _nut = {
-    'carbs': TextEditingController(text: _v(f.n.carbs)),
-    'energy': TextEditingController(text: _v(f.n.energy)),
-    'protein': TextEditingController(text: _v(f.n.protein)),
-    'fat': TextEditingController(text: _v(f.n.fat)),
-    'fiber': TextEditingController(text: _v(f.n.fiber)),
-    'sugars': TextEditingController(text: _v(f.n.sugars)),
-    'sodium': TextEditingController(text: _v(f.n.sodium)),
+    for (final k in nutrientKeys) k: TextEditingController(text: _v(f.n[k])),
   };
   bool _busy = false;
+
+  // Carbs first: that is the number used for insulin.
+  static const _order = ['carbs', 'energy', 'fiber', 'sugars', 'protein', 'fat', 'satFat', 'transFat', 'cholesterol', 'sodium',
+    'potassium', 'calcium', 'iron'];
+  static const _names = {
+    'carbs': 'Carbs', 'energy': 'Calories', 'fiber': 'Fibre', 'sugars': 'Sugars', 'protein': 'Protein', 'fat': 'Fat',
+    'satFat': 'Saturated fat', 'transFat': 'Trans fat', 'cholesterol': 'Cholesterol', 'sodium': 'Sodium',
+    'potassium': 'Potassium', 'calcium': 'Calcium', 'iron': 'Iron',
+  };
 
   static String _v(double? x) => x == null ? '' : fmtAmount((x * 10).round() / 10);
 
@@ -132,13 +135,9 @@ class _FoodEditScreenState extends State<FoodEditScreen> {
     if ((f.unit == 'g' || f.unit == 'ml') && f.per100.carbs != null) {
       setState(() {
         f.setPortion(v);
-        _nut['carbs']!.text = _v(f.n.carbs);
-        _nut['energy']!.text = _v(f.n.energy);
-        _nut['protein']!.text = _v(f.n.protein);
-        _nut['fat']!.text = _v(f.n.fat);
-        _nut['fiber']!.text = _v(f.n.fiber);
-        _nut['sugars']!.text = _v(f.n.sugars);
-        _nut['sodium']!.text = _v(f.n.sodium);
+        for (final k in nutrientKeys) {
+          _nut[k]!.text = _v(f.n[k]);
+        }
       });
     }
   }
@@ -153,15 +152,11 @@ class _FoodEditScreenState extends State<FoodEditScreen> {
     f.notes = _notes.text.trim();
     f.barcode = _barcode.text.trim();
     f.portion = num_(_portion.text) ?? f.portion;
-    f.n = Nutrition(
-      carbs: num_(_nut['carbs']!.text),
-      energy: num_(_nut['energy']!.text),
-      protein: num_(_nut['protein']!.text),
-      fat: num_(_nut['fat']!.text),
-      fiber: num_(_nut['fiber']!.text),
-      sugars: num_(_nut['sugars']!.text),
-      sodium: num_(_nut['sodium']!.text),
-    );
+    var n = Nutrition.empty;
+    for (final k in nutrientKeys) {
+      n = n.withValue(k, num_(_nut[k]!.text));
+    }
+    f.n = n;
   }
 
   Future<void> _save({bool addToMeal = false}) async {
@@ -277,10 +272,15 @@ class _FoodEditScreenState extends State<FoodEditScreen> {
         ]),
         const SizedBox(height: 14),
         const Text('Nutrition of one portion', style: TextStyle(color: kMuted, fontSize: 13)),
-        Row(children: [_num('carbs', 'Carbs', 'g'), const SizedBox(width: 10), _num('energy', 'Calories', 'kcal')]),
-        Row(children: [_num('protein', 'Protein', 'g'), const SizedBox(width: 10), _num('fat', 'Fat', 'g')]),
-        Row(children: [_num('fiber', 'Fiber', 'g'), const SizedBox(width: 10), _num('sugars', 'Sugars', 'g')]),
-        Row(children: [_num('sodium', 'Sodium', 'mg'), const SizedBox(width: 10), const Expanded(child: SizedBox())]),
+        for (var i = 0; i < _order.length; i += 2)
+          Row(children: [
+            _num(_order[i], _names[_order[i]]!, nutrientUnit[_order[i]] ?? 'g'),
+            const SizedBox(width: 10),
+            if (i + 1 < _order.length)
+              _num(_order[i + 1], _names[_order[i + 1]]!, nutrientUnit[_order[i + 1]] ?? 'g')
+            else
+              const Expanded(child: SizedBox()),
+          ]),
         if (f.per100.carbs != null)
           Padding(
             padding: const EdgeInsets.only(top: 6),

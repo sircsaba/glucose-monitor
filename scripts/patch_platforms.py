@@ -117,6 +117,9 @@ def patch_android():
         elif not gradle.endswith('.kts') and 'minifyEnabled' not in g:
             g = re.sub(r'(buildTypes\s*\{\s*release\s*\{)', r'\1\n            minifyEnabled false\n            shrinkResources false', g, count=1)
         g = re.sub(r'applicationId\s+"[^"]*"', f'applicationId "{BUNDLE_ID}"', g)
+        # Live barcode scanner (mobile_scanner) needs Android 6+; the app says Android 7+.
+        g = re.sub(r'minSdk\s*=\s*flutter\.minSdkVersion', 'minSdk = 24', g)
+        g = re.sub(r'minSdkVersion\s+flutter\.minSdkVersion', 'minSdkVersion 24', g)
         with open(gradle, 'w') as f:
             f.write(g)
     print('Android patched:', APP_NAME, BUNDLE_ID)
@@ -144,17 +147,26 @@ def patch_ios():
     # Tests target first, then the app itself.
     x = re.sub(r'PRODUCT_BUNDLE_IDENTIFIER = [^;]*\.RunnerTests;', f'PRODUCT_BUNDLE_IDENTIFIER = {BUNDLE_ID}.RunnerTests;', x)
     x = re.sub(r'PRODUCT_BUNDLE_IDENTIFIER = (?![^;]*RunnerTests)[^;]*;', f'PRODUCT_BUNDLE_IDENTIFIER = {BUNDLE_ID};', x)
+    x = re.sub(r'IPHONEOS_DEPLOYMENT_TARGET = (\d+(?:\.\d+)?);',
+               lambda m: m.group(0) if float(m.group(1)) >= 15.5 else 'IPHONEOS_DEPLOYMENT_TARGET = 15.5;', x)
     with open(proj, 'w') as f:
         f.write(x)
 
+    patch_podfile()
+    print('iOS patched:', APP_NAME, BUNDLE_ID)
+
+
+def patch_podfile():
+    """Podfile platform (run again after `flutter build ios --config-only` creates it)."""
     podfile = 'ios/Podfile'
     if os.path.exists(podfile):
         with open(podfile) as f:
             pod = f.read()
-        pod = re.sub(r"^#?\s*platform :ios, '[^']*'", "platform :ios, '13.0'", pod, count=1, flags=re.M)
+        # On-phone text reading of recipes (Google ML Kit) needs iOS 15.5.
+        pod = re.sub(r"^#?\s*platform :ios, '[^']*'", "platform :ios, '15.5'", pod, count=1, flags=re.M)
         with open(podfile, 'w') as f:
             f.write(pod)
-    print('iOS patched:', APP_NAME, BUNDLE_ID)
+        print('Podfile: iOS 15.5')
 
 
 if __name__ == '__main__':
@@ -163,3 +175,5 @@ if __name__ == '__main__':
         patch_android()
     if which in ('ios', 'all'):
         patch_ios()
+    if which == 'podfile':
+        patch_podfile()

@@ -48,6 +48,7 @@ jobs:
       - name: Prepare the Xcode project
         run: |
           scripts/step.sh "Prepare Xcode project" flutter build ios --release --config-only --no-codesign --build-number=$BUILD_NUMBER
+          python3 scripts/patch_platforms.py podfile
           if [ -f ios/Podfile ]; then
             cd ios && ../scripts/step.sh "pod install" pod install
           fi

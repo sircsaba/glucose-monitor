@@ -4,6 +4,9 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../logic/food.dart';
 import 'common.dart';
 import 'food_edit_screen.dart';
+import 'nutrition_label.dart';
+import 'recipe_builder_screen.dart';
+import '../state/app_state.dart';
 
 /// A saved recipe: ingredients (with their carbs), the steps to make it, and a
 /// cooking mode that keeps the screen on and lets you tick the steps.
@@ -93,8 +96,10 @@ class _RecipeScreenState extends State<RecipeScreen> {
                 Padding(padding: const EdgeInsets.only(right: 6, top: 2), child: GlutenBadge(i['gluten'] == 'contains' ? Gluten.contains : Gluten.unsure)),
               Expanded(
                 child: Text.rich(TextSpan(children: [
-                  TextSpan(text: '${i['amount'] ?? ''} ', style: TextStyle(fontWeight: FontWeight.w700, fontSize: fs)),
-                  TextSpan(text: '${i['name'] ?? ''}', style: TextStyle(fontSize: fs)),
+                  // "amount" is the whole line as written ("2 cups rice flour").
+                  TextSpan(text: '${(i['amount'] ?? '').toString().isNotEmpty ? i['amount'] : i['name']}', style: TextStyle(fontSize: fs)),
+                  if (num_(i['grams']) != null)
+                    TextSpan(text: '  ${(num_(i['grams'])! * k).round()} g', style: TextStyle(color: kMuted, fontSize: fs - 3)),
                   if ((i['note'] ?? '').toString().isNotEmpty)
                     TextSpan(text: '  ${i['note']}', style: TextStyle(color: kMuted, fontSize: fs - 3)),
                 ])),
@@ -137,6 +142,24 @@ class _RecipeScreenState extends State<RecipeScreen> {
               ),
             ),
         ],
+        const SizedBox(height: 20),
+        Center(
+          child: NutritionLabel(
+            n: perServing,
+            servingEn: f.portionText.isEmpty ? '1 serving' : f.portionText,
+            servingFr: (f.portionText.isEmpty ? '1 serving' : f.portionText).replaceFirst('serving', 'portion'),
+            servingsPerContainer: _base,
+            us: app.settings.integer('labelFormat') == 1,
+          ),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RecipeBuilderScreen(existing: f))).then((_) {
+            if (mounted) setState(() {});
+          }),
+          icon: const Icon(Icons.edit_outlined),
+          label: const Text('Change the recipe'),
+        ),
         if (f.notes.isNotEmpty) ...[
           const SizedBox(height: 14),
           Text(f.notes, style: const TextStyle(color: kMuted, fontSize: 13, height: 1.4)),

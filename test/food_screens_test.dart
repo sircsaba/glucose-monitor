@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glucose_monitor/logic/food.dart';
-import 'package:glucose_monitor/logic/recipe_ai.dart';
 import 'package:glucose_monitor/ui/food_edit_screen.dart';
 import 'package:glucose_monitor/ui/recipe_screen.dart';
 
@@ -22,22 +21,28 @@ void main() {
       'nutriments': {'carbohydrates_100g': 68, 'energy-kcal_100g': 430, 'fat_100g': 15, 'proteins_100g': 8},
     },
   }, '0000000000031')!;
-  final recipe = recipeFromJson({
-    'name': 'Banana muffins',
-    'servings': 12,
-    'servingText': '1 muffin',
-    'servingGrams': 60,
-    'ingredients': [
-      {'name': 'gluten-free flour blend', 'amount': '2 cups', 'carbs': 160, 'gluten': 'free'},
-      {'name': 'baking powder', 'amount': '2 tsp', 'carbs': 2, 'gluten': 'unsure', 'note': 'check the label'},
-      {'name': 'ripe bananas', 'amount': '3', 'carbs': 81, 'gluten': 'free'},
-    ],
-    'perServing': {'carbs': 25, 'energy': 180},
-    'steps': ['Heat the oven to 180 °C and line a 12-cup muffin pan with paper cups.', 'Mash the bananas.', 'Bake 20 minutes.'],
-    'gluten': 'unsure',
-    'prepMinutes': 15,
-    'cookMinutes': 20,
-  });
+  final recipe = Food(
+    name: 'Banana muffins',
+    source: 'recipe',
+    portion: 60,
+    unit: 'g',
+    portionText: '1 muffin (60 g)',
+    n: Nutrition(carbs: 25, energy: 180, fat: 7, satFat: 1, protein: 3, sodium: 210, fiber: 2, sugars: 11),
+    gluten: Gluten.unsure,
+    glutenWhy: ['Check these labels: baking powder'],
+    recipe: {
+      'servings': 12,
+      'servingText': '1 muffin',
+      'ingredients': [
+        {'name': 'gluten-free flour blend', 'amount': '2 cups gluten-free flour blend', 'grams': 280, 'carbs': 160, 'gluten': 'free'},
+        {'name': 'baking powder', 'amount': '2 tsp baking powder', 'grams': 9, 'carbs': 2, 'gluten': 'unsure'},
+        {'name': 'ripe bananas', 'amount': '3 ripe bananas', 'grams': 354, 'carbs': 81, 'gluten': 'free'},
+      ],
+      'steps': ['Heat the oven to 180 °C and line a 12-cup muffin pan with paper cups.', 'Mash the bananas.', 'Bake 20 minutes.'],
+      'prepMinutes': 15,
+      'cookMinutes': 20,
+    },
+  );
 
   for (final size in [const Size(390, 844), const Size(820, 1180)]) {
     testWidgets('food page from a barcode at ${size.width.round()} wide', (t) async {
