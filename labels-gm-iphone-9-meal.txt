@@ -1,0 +1,46 @@
+BackFoodScan a barcodeNew foodRecipes
+Back
+Scan a barcode
+New food
+Recipes
+Favorites
+All
+Breakfast
+Lunch
+Supper
+Snack
+Gluten-free only
+Remove from favoritesDetails
+Bacon
+GF
+0.4 g carbs / 30 g · 160 kcal · Breakfast, Lunch, Snack
+Remove from favorites
+Details
+Banana muffins
+GF
+25 g carbs / 60 g · 180 kcal · Breakfast, Snack
+Corn tortilla chips
+GF
+Sample Foods · 18 g carbs / 28 g · 140 kcal · Snack
+Dragon fruit
+GF
+13 g carbs / 100 g · 60 kcal · Breakfast, Snack
+Scrambled eggs
+GF
+1 g carbs / 2 piece · 180 kcal · Breakfast
+14 g carbs
+Meal
+GF
+RemoveRemoveRemove
+Scrambled eggs  2 piece
+1 g
+Remove
+Bacon  30 g
+0.4 g
+Dragon fruit  100 g
+13 g
+14.4 g carbs · 400 kcal · protein 23 g · fat 26 g · fiber 3 g
+Calculator
+Send carbs and bolus to Loop now
+Clear the meal
+Prebolus / timer

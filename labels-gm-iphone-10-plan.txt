@@ -1,0 +1,25 @@
+BackMeal insulin
+Back
+Decrease Total bolus
+−
+Increase Total bolus
++
+Loop's own recommendation right now: 0 U (it knows the carbs only once they are entered).
+When
+All now
+Part now, rest later
+Before the meal at a time
+When glucose rises above
+Ring when glucose is at least
+5.5
+Ring anyway after
+If glucose stays below, to decide what to do
+45 min
+Decrease Ring when glucose is at least
+Increase Ring when glucose is at least
+Decrease Ring anyway after
+Increase Ring anyway after
+Now 6.8 mmol/L: already above, it will ring at the next reading
+The plan
+• Bolus: 0 U with the 14 g carbs, when glucose is 5.5 or more (or at 12:54)
+Start the plan
