@@ -405,7 +405,7 @@ class _PdfDoc {
     // Where the text is (line matrix), and where the last text was shown.
     double lx0 = 0, ly0 = 0;
     double? lastX, lastY;
-    var charsSince = 0;
+    var advance = 0.0; // width of the text shown since (lastX, lastY), in text units
     void newline() {
       if (out.isNotEmpty && !out.toString().endsWith('\n')) out.write('\n');
     }
@@ -421,18 +421,19 @@ class _PdfDoc {
       if (lastY != null && (y - lastY!).abs() > fontSize * 0.4 + 0.5) {
         newline();
       } else if (lastX != null) {
-        final gap = x - (lastX! + charsSince * fontSize * 0.45);
-        if (gap > fontSize * 0.15 || x < lastX!) space();
+        final gap = x - (lastX! + advance);
+        if (gap > fontSize * 0.12 || x < lastX! - 0.5) space();
       }
       lastX = x;
       lastY = y;
-      charsSince = 0;
+      advance = 0;
     }
 
     void show(Uint8List s) {
-      final t = (font ?? _Font.plain).text(s);
+      final f = font ?? _Font.plain;
+      final (t, w) = f.textAndWidth(s);
       out.write(t);
-      charsSince += t.length;
+      advance += w * fontSize;
     }
 
     while (!lx.end) {
@@ -484,8 +485,9 @@ class _PdfDoc {
             for (final x in a) {
               if (x is Uint8List) {
                 show(x);
-              } else if (x is num && x < -180) {
-                space();
+              } else if (x is num) {
+                if (x < -180) space();
+                advance -= x / 1000 * fontSize;
               }
             }
           }
@@ -524,9 +526,47 @@ class _PdfDoc {
 class _Font {
   final Map<int, String> map;
   final int bytes; // 1 or 2 bytes a code
-  _Font(this.map, this.bytes);
+  final Map<int, double> widths; // code -> width in em (from the PDF)
+  final double defaultWidth;
+  _Font(this.map, this.bytes, [this.widths = const {}, this.defaultWidth = 0]);
 
   static final plain = _Font(const {}, 1);
+
+  /// The text of [s] and its width in em (font size 1).
+  (String, double) textAndWidth(Uint8List s) {
+    final sb = StringBuffer();
+    var w = 0.0;
+    void one(int code, String ch) {
+      sb.write(ch);
+      w += widths[code] ?? (defaultWidth > 0 ? defaultWidth : _approx(ch));
+    }
+
+    if (bytes == 2) {
+      for (var k = 0; k + 1 < s.length; k += 2) {
+        final c = s[k] << 8 | s[k + 1];
+        one(c, map[c] ?? '');
+      }
+    } else {
+      for (final c in s) {
+        one(c, map[c] ?? _win[c] ?? (c >= 32 ? String.fromCharCode(c) : ''));
+      }
+    }
+    return (sb.toString(), w);
+  }
+
+  /// Width of a letter in Helvetica (most fonts are close enough to tell a word gap).
+  static double _approx(String ch) {
+    if (ch.isEmpty) return 0;
+    if (ch.length > 1) return ch.runes.fold(0.0, (a, r) => a + _approx(String.fromCharCode(r)));
+    const narrow = 'iljtf!.,:;\'|I()[]';
+    if (ch == ' ') return 0.278;
+    if (narrow.contains(ch)) return 0.26;
+    if ('mwMW'.contains(ch)) return 0.85;
+    if (ch.toUpperCase() == ch && ch.toLowerCase() != ch) return 0.68;
+    if ('0123456789'.contains(ch)) return 0.556;
+    if ('rs'.contains(ch)) return 0.45;
+    return 0.54;
+  }
 
   static _Font from(_PdfDoc d, Object? f) {
     if (f is! Map<String, Object?>) return plain;
@@ -587,29 +627,55 @@ class _Font {
         }
       }
     }
-    return _Font(map, two ? 2 : 1);
+    // Widths: simple fonts /FirstChar + /Widths; CID fonts /W in the descendant font.
+    final widths = <int, double>{};
+    var dw = 0.0;
+    final ws = d.get(f['Widths']);
+    final fc = d.get(f['FirstChar']);
+    if (ws is List && fc is int) {
+      for (var k = 0; k < ws.length; k++) {
+        final v = d.get(ws[k]);
+        if (v is num) widths[fc + k] = v / 1000;
+      }
+    }
+    final desc = d.get(f['DescendantFonts']);
+    final cid = desc is List && desc.isNotEmpty ? d.get(desc.first) : null;
+    if (cid is Map<String, Object?>) {
+      final dwv = d.get(cid['DW']);
+      dw = dwv is num ? dwv / 1000 : 1.0;
+      final w = d.get(cid['W']);
+      if (w is List) {
+        var k = 0;
+        while (k < w.length) {
+          final a = d.get(w[k]);
+          final b = k + 1 < w.length ? d.get(w[k + 1]) : null;
+          if (a is int && b is List) {
+            for (var j = 0; j < b.length; j++) {
+              final v = d.get(b[j]);
+              if (v is num) widths[a + j] = v / 1000;
+            }
+            k += 2;
+          } else if (a is int && b is int && k + 2 < w.length) {
+            final v = d.get(w[k + 2]);
+            if (v is num && b - a < 70000) {
+              for (var c = a; c <= b; c++) {
+                widths[c] = v / 1000;
+              }
+            }
+            k += 3;
+          } else {
+            k++;
+          }
+        }
+      }
+    }
+    return _Font(map, two ? 2 : 1, widths, dw);
   }
 
   static String _utf16(String hex) {
     final units = <int>[for (var k = 0; k + 4 <= hex.length; k += 4) int.parse(hex.substring(k, k + 4), radix: 16)];
     if (units.isEmpty && hex.length == 2) return String.fromCharCode(int.parse(hex, radix: 16));
     return String.fromCharCodes(units);
-  }
-
-  String text(Uint8List s) {
-    final sb = StringBuffer();
-    if (bytes == 2) {
-      for (var k = 0; k + 1 < s.length; k += 2) {
-        final c = s[k] << 8 | s[k + 1];
-        final v = map[c];
-        if (v != null) sb.write(v);
-      }
-    } else {
-      for (final c in s) {
-        sb.write(map[c] ?? _win[c] ?? (c >= 32 ? String.fromCharCode(c) : ''));
-      }
-    }
-    return sb.toString();
   }
 
   static const _win = {
