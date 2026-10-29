@@ -45,7 +45,7 @@ String _plain(String s) {
 (double?, String) _qty(String s) {
   var t = s.trimLeft();
   for (final e in _fractions.entries) {
-    t = t.replaceAll(RegExp('(\\d)${e.key}'), '\$1 ${e.key}');
+    t = t.replaceAllMapped(RegExp('(\\d)${e.key}'), (m) => '${m.group(1)} ${e.key}');
   }
   double? total;
   final num = RegExp(r'^(\d+(?:[.,]\d+)?)(?:\s*[-–à]\s*(\d+(?:[.,]\d+)?))?');
@@ -258,7 +258,7 @@ class RecipeIngredient {
   if (u == 'ml') return (q * (f?.gramsPerMl ?? 1.0), true);
   if (f == null) return (null, false);
   final size = RegExp(r'\b(small|medium|large|petite?s?|moyen(ne)?s?|grosses?)\b').firstMatch(_plain(p.name))?.group(1);
-  final sizeEn = switch (size) { 'petit' || 'petite' || 'petits' || 'petites' => 'small', 'gros' || 'grosse' || 'grosses' => 'large', null => null, _ => size!.startsWith('moyen') ? 'medium' : size };
+  final sizeEn = switch (size) { 'petit' || 'petite' || 'petits' || 'petites' => 'small', 'gros' || 'grosse' || 'grosses' => 'large', null => null, _ => size.startsWith('moyen') ? 'medium' : size };
   final piece = f.gramsPerPiece(size: sizeEn);
   if (piece != null) return (q * piece, true);
   return (null, false);
