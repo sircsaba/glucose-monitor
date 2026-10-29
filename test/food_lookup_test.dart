@@ -12,7 +12,7 @@ void main() {
 
   void show(String q) {
     // ignore: avoid_print
-    print('$q -> ${cnf.search(cnfQuery(q), limit: 5).map((f) => '${f.id} ${f.en}').join(' | ')}');
+    print('$q -> ${lookupGeneric(cnf, q, limit: 5).map((f) => '${f.id} ${f.en}').join(' | ')}');
   }
 
   test('what people type finds the right generic food', () {
@@ -20,6 +20,10 @@ void main() {
       show(q);
     }
     expect(cnfQuery('BBQ chicken'), 'roasted chicken');
+    expect(lookupGeneric(cnf, 'apple').first.en, startsWith('Apple, raw'));
+    expect(lookupGeneric(cnf, 'chicken breast').first.id, 842);
+    expect(lookupGeneric(cnf, 'banana').first.id, 1704);
+    expect(lookupGeneric(cnf, 'french fries').first.en, contains('french-fried'));
     final top = cnf.search(cnfQuery('bbq chicken breast'), limit: 5).map((f) => f.id);
     expect(top, contains(842)); // Chicken, broiler, breast, meat, roasted
     expect(cnf.search('banana').first.en.toLowerCase(), contains('banana'));

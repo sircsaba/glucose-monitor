@@ -58,7 +58,7 @@ class _FoodLookupScreenState extends State<FoodLookupScreen> {
   void _searchGeneric() {
     final c = _cnf;
     if (c == null) return;
-    setState(() => _generic = _q.text.trim().length < 2 ? [] : c.search(cnfQuery(_q.text), limit: 40));
+    setState(() => _generic = _q.text.trim().length < 2 ? [] : lookupGeneric(c, _q.text));
   }
 
   Future<void> _searchProducts() async {

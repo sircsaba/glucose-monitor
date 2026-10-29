@@ -22,6 +22,25 @@ String cnfQuery(String q) {
   return s.trim();
 }
 
+/// Generic foods for what was typed, the plain food first: "apple" gives
+/// "Apple, raw" before apple strudel, "chicken breast" roasted before fried.
+List<CnfFood> lookupGeneric(Cnf cnf, String typed, {int limit = 40}) {
+  final q = cnfQuery(typed);
+  final found = cnf.search(q, limit: limit + 20);
+  final words = q.toLowerCase().split(RegExp(r'[^a-zà-ÿ0-9%]+')).where((w) => w.length > 1).toSet();
+  double rank(int i, CnfFood f) {
+    final en = f.en.toLowerCase();
+    final head = en.split(',').first.trim();
+    var r = i.toDouble();
+    if (words.contains(head) || words.contains(head.replaceAll(RegExp(r's$'), '')) || words.any((w) => '${w}s' == head)) r -= 8;
+    if (RegExp(r'\b(fried|breaded|battered|deli|honey glazed)\b').hasMatch(en) && !words.any((w) => en.contains(w) && 'fried breaded battered deli'.contains(w))) r += 6;
+    if (RegExp(r'^(strudel|croissant|pie|muffin|cake|cookie|sauce|juice|babyfood|fast foods|restaurant)').hasMatch(en) && !words.contains(head)) r += 6;
+    return r;
+  }
+  final ranked = [for (var i = 0; i < found.length; i++) (rank(i, found[i]), found[i])]..sort((a, b) => a.$1.compareTo(b.$1));
+  return [for (final r in ranked.take(limit)) r.$2];
+}
+
 /// A portion choice for a generic food.
 class CnfPortion {
   final String label; // "1 breast"
