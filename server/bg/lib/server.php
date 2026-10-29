@@ -399,7 +399,23 @@ final class Server
             'loopCgmFetch' => $fetch > 0 ? $fetch * 1000 : null,
             'main' => $this->mainStatus(),
             'foodWaiting' => $this->foodHealth(),
+            'foodNightscout' => $this->foodCheck(),
         ];
+    }
+
+    /** Can this server read and change the main Nightscout's food list? */
+    private function foodCheck(): ?string
+    {
+        if ($this->foodMain() === null) return null;
+        [$code, $j] = $this->nsFood('GET', '/api/v1/food.json?count=1');
+        if ($code === 0) return 'Nightscout not answering (the list here is used, changes wait)';
+        if ($code !== 200 || !is_array($j)) return "Nightscout refused to give the food list (HTTP $code): check main_nightscout_token or main_nightscout_secret";
+        $secret = trim((string)($this->cfg['main_nightscout_secret'] ?? ''));
+        if ($secret === '') return 'Reading OK; adding foods needs main_nightscout_secret';
+        // Nightscout answers {"message":{"canWrite":true,...}} for a good secret.
+        [$c2, $v] = $this->nsFoodCall('GET', '/api/v1/verifyauth', null, $secret);
+        $ok = $c2 === 200 && is_object($v) && is_object($v->message ?? null) && !empty($v->message->canWrite);
+        return $ok ? 'OK' : 'Reading OK, but main_nightscout_secret is not accepted by Nightscout (adding foods will fail)';
     }
 
     /** Sends food changes still waiting for Nightscout; how many are still waiting. */
@@ -860,9 +876,20 @@ final class Server
      */
     private function nsFood(string $method, string $path, $body = null): array
     {
+        $secret = trim((string)($this->cfg['main_nightscout_secret'] ?? ''));
+        if ($method === 'GET' && $secret !== '') {
+            // Reading: try without the secret first (most sites are readable),
+            // so a wrong secret never hides the list.
+            $r = $this->nsFoodCall($method, $path, $body, '');
+            if ($r[0] !== 401 && $r[0] !== 403) return $r;
+        }
+        return $this->nsFoodCall($method, $path, $body, $secret);
+    }
+
+    private function nsFoodCall(string $method, string $path, $body, string $secret): array
+    {
         $base = $this->foodMain();
         if ($base === null || !function_exists('curl_init')) return [0, null];
-        $secret = (string)($this->cfg['main_nightscout_secret'] ?? '');
         $token = trim((string)($this->cfg['main_nightscout_token'] ?? ''));
         $url = $base . $path;
         if ($secret === '' && $token !== '') $url .= (strpos($path, '?') === false ? '?' : '&') . 'token=' . rawurlencode($token);
