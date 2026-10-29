@@ -136,7 +136,7 @@ class Food {
   }
 
   static const _known = {
-    '_id', 'type', 'name', 'brand', 'category', 'subcategory', 'portion', 'unit', 'portionText', 'carbs', 'energy',
+    '_id', 'type', 'name', 'brand', 'category', 'portion', 'unit', 'portionText', 'carbs', 'energy',
     'protein', 'fat', 'fiber', 'sugars', 'sodium', 'per100', 'barcode', 'gluten', 'glutenWhy', 'ingredients',
     'allergens', 'meals', 'favorite', 'source', 'notes', 'recipe', 'gi',
   };
