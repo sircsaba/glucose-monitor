@@ -208,7 +208,45 @@ class H(BaseHTTPRequestHandler):
             return self._send(devicestatus())
         if path in ('/api/v1/profile', '/api/v1/profiles'):
             return self._send(profile())
+        if path == '/api/v1/food':
+            return self._send(FOODS)
         return self._send({'status': 404, 'message': 'Not found'}, 404)
+
+
+# Demo food list (made-up products, no real brands).
+FOODS = [
+    {'_id': 'f1', 'type': 'food', 'name': 'Scrambled eggs', 'category': 'Eggs', 'portion': 2, 'unit': 'piece',
+     'carbs': 1.0, 'energy': 180, 'protein': 12, 'fat': 14, 'gluten': 'free', 'glutenWhy': ['Set by hand'],
+     'meals': ['breakfast'], 'favorite': True, 'source': 'manual'},
+    {'_id': 'f2', 'type': 'food', 'name': 'Bacon', 'category': 'Meat', 'portion': 30, 'unit': 'g', 'carbs': 0.4,
+     'energy': 160, 'protein': 11, 'fat': 12, 'gluten': 'free', 'meals': ['breakfast', 'lunch', 'snack'], 'favorite': True,
+     'source': 'barcode', 'barcode': '0000000000017', 'per100': {'carbs': 1.3, 'energy': 533, 'protein': 37, 'fat': 40}},
+    {'_id': 'f3', 'type': 'food', 'name': 'Dragon fruit', 'category': 'Fruit', 'portion': 100, 'unit': 'g', 'carbs': 13,
+     'energy': 60, 'fiber': 3, 'gluten': 'free', 'meals': ['breakfast', 'snack'], 'favorite': True, 'source': 'manual'},
+    {'_id': 'f4', 'type': 'food', 'name': 'Corn tortilla chips', 'brand': 'Sample Foods', 'category': 'Snacks', 'portion': 28,
+     'unit': 'g', 'portionText': '28 g (about 12 chips)', 'carbs': 18, 'energy': 140, 'fat': 7, 'gluten': 'free',
+     'glutenWhy': ['Labelled gluten-free, no gluten ingredient listed'], 'ingredients': 'Corn, vegetable oil, salt',
+     'meals': ['snack'], 'favorite': True, 'source': 'barcode', 'barcode': '0000000000024',
+     'per100': {'carbs': 64, 'energy': 500, 'fat': 25}},
+    {'_id': 'f5', 'type': 'food', 'name': 'Granola bar', 'brand': 'Sample Foods', 'category': 'Snacks', 'portion': 35,
+     'unit': 'g', 'carbs': 24, 'energy': 150, 'gluten': 'unsure', 'glutenWhy': ['Contains oats without a gluten-free label'],
+     'ingredients': 'Whole grain oats, honey, almonds', 'meals': ['snack'], 'favorite': False, 'source': 'barcode'},
+    {'_id': 'f6', 'type': 'food', 'name': 'Wheat bread', 'category': 'Bread', 'portion': 1, 'unit': 'slice', 'carbs': 15,
+     'energy': 80, 'gluten': 'contains', 'glutenWhy': ['Ingredients: wheat'], 'meals': ['breakfast', 'lunch'],
+     'favorite': False, 'source': 'barcode'},
+    {'_id': 'f7', 'type': 'food', 'name': 'Banana muffins', 'category': 'Baking', 'portion': 60, 'unit': 'g',
+     'portionText': '1 muffin', 'carbs': 25, 'energy': 180, 'protein': 3, 'fat': 7, 'gluten': 'free',
+     'glutenWhy': ['All ingredients are gluten-free'], 'meals': ['breakfast', 'snack'], 'favorite': True, 'source': 'recipe',
+     'recipe': {'servings': 12, 'servingText': '1 muffin', 'cookMinutes': 20, 'prepMinutes': 15,
+                'ingredients': [{'name': 'gluten-free flour blend', 'amount': '2 cups', 'carbs': 160, 'gluten': 'free'},
+                                {'name': 'ripe bananas', 'amount': '3', 'carbs': 81, 'gluten': 'free'},
+                                {'name': 'eggs', 'amount': '2', 'carbs': 1, 'gluten': 'free'},
+                                {'name': 'maple syrup', 'amount': '1/3 cup', 'carbs': 54, 'gluten': 'free'}],
+                'steps': ['Heat the oven to 180 °C and line a 12-cup muffin pan.', 'Mash the bananas, then whisk in the eggs and syrup.',
+                          'Fold in the flour until just mixed.', 'Fill the cups and bake 20 minutes.']}},
+    {'_id': 'f8', 'type': 'food', 'name': 'Rice, cooked', 'category': 'Grains', 'portion': 150, 'unit': 'g', 'carbs': 42,
+     'energy': 195, 'gluten': 'free', 'meals': ['lunch', 'supper'], 'favorite': False, 'source': 'manual'},
+]
 
 
 if __name__ == '__main__':

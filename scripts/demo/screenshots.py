@@ -108,6 +108,16 @@ PHONE_PLUS = [
     ('3-remote', 'plus', ['Treat', 'Remote control']),
     ('4-night', 'plus', ['Night view']),
 ]
+FOOD = [
+    ('7-food', 'app', ['Treat', 'Food: favorites, barcode, meals']),
+    ('8-amount', 'app', ['Treat', 'Food: favorites, barcode, meals', 'Scrambled eggs']),
+    ('9-meal', 'app', ['Treat', 'Food: favorites, barcode, meals', 'Scrambled eggs', 'Add to the meal',
+                       'Bacon', 'Add to the meal', 'Dragon fruit', 'Add to the meal']),
+    ('10-plan', 'app', ['Treat', 'Food: favorites, barcode, meals', 'Scrambled eggs', 'Add to the meal',
+                        'Dragon fruit', 'Add to the meal', 'Prebolus / timer', 'When glucose rises above']),
+    ('11-product', 'app', ['Treat', 'Food: favorites, barcode, meals', 'All', 'Granola bar']),
+    ('12-recipe', 'app', ['Treat', 'Food: favorites, barcode, meals', 'Banana muffins', 'Add to the meal']),
+]
 TABLET = [
     ('1-live', 'app', []),
     ('2-night', 'app', ['Night view']),
@@ -125,8 +135,11 @@ async def main():
     async with async_playwright() as p:
         # The demo site gets a neutral name instead of 127.0.0.1 on screen.
         browser = await p.chromium.launch(args=['--host-resolver-rules=MAP my-site.example 127.0.0.1'])
-        jobs = [('iphone', 'gm', PHONE_GM), ('android', 'gm', PHONE_GM), ('tablet', 'gm', TABLET),
+        only_food = os.environ.get('ONLY_FOOD') == '1'
+        jobs = [('iphone', 'gm', FOOD), ('iphone', 'plus', FOOD)] if only_food else [('iphone', 'gm', PHONE_GM), ('android', 'gm', PHONE_GM), ('tablet', 'gm', TABLET),
                 ('iphone', 'plus', PHONE_PLUS), ('android', 'plus', PHONE_PLUS), ('web', 'web', WEB)]
+        if only_food:
+            jobs = jobs[:2]
         for dev, group, shots in jobs:
             for name, which, steps in shots:
                 ctx = await browser.new_context(timezone_id='America/Toronto', locale='en-CA', **DEVICES[dev])
