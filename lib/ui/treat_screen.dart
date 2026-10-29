@@ -9,6 +9,7 @@ import '../state/settings.dart';
 import 'bolus_calc_view.dart';
 import 'common.dart';
 import 'food_screen.dart';
+import 'meal_plan_screen.dart';
 import 'remote_screen.dart';
 
 class _EventType {
@@ -110,6 +111,7 @@ class _TreatScreenState extends State<TreatScreen> {
                 Text('${fmtBg(l.mg, mmol)} ${arrowText(l.direction)}', style: kMono.copyWith(color: app.colorFor(l.mg), fontSize: 16)),
             ]),
             const SizedBox(height: 14),
+            const MealPlanBanner(),
             if (kRemote) ...[
               Row(children: [
                 Expanded(

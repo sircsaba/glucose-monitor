@@ -1,4 +1,5 @@
 import 'dart:async' show Timer;
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -8,10 +9,12 @@ import '../alarm/alarm_player.dart';
 import '../data/nightscout.dart';
 import '../logic/faults.dart';
 import '../logic/food.dart';
+import '../logic/meal_plan.dart';
 import '../logic/profile.dart';
 import '../logic/glucose.dart';
 import '../ui/alert_screen.dart';
 import '../ui/checklist_screen.dart';
+import '../ui/meal_plan_screen.dart';
 import '../ui/night_screen.dart';
 import '../ui/target_screen.dart';
 import 'settings.dart';
@@ -150,6 +153,12 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   TargetWatch? target;
   TargetHit? targetHit;
   bool _targetOpen = false;
+
+  // Meal insulin plan (Food screen): steps that ring when due.
+  MealPlan? mealPlan;
+  MealStep? dueStep;
+  String? dueReason;
+  bool _stepOpen = false;
   bool nightOpen = false;
   bool checklistOpen = false;
   String _lastAutoNight = '';
@@ -163,6 +172,11 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     navKey = key;
     _prefs = await SharedPreferences.getInstance();
     settings = Settings.decode(_prefs!.getString('settings'));
+    try {
+      final mp = _prefs!.getString('mealPlan');
+      if (mp != null) mealPlan = MealPlan.fromJson(jsonDecode(mp) as Map<String, dynamic>);
+      if (mealPlan != null && (mealPlan!.finished || DateTime.now().difference(mealPlan!.started).inHours >= 6)) mealPlan = null;
+    } catch (_) {}
     // Never stay on the start screen because the sound player is slow to start.
     try {
       await player.init().timeout(const Duration(seconds: 5));
@@ -460,6 +474,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Works out which alarm (if any) should be sounding now.
   void evaluate() {
+    _checkMealPlan();
+    if (dueStep != null) return; // the meal step has the sound for now
     _checkTarget();
     if (targetHit != null) return; // the target alert has the sound for now
     if (active?.test == true) return;
@@ -629,6 +645,77 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         _lastAutoNight = key;
         if (!alertOpen) openNight();
       }
+    }
+    notifyListeners();
+  }
+
+  // ---------- meal insulin plan ----------
+
+  void _saveMealPlan() {
+    try {
+      final p = mealPlan;
+      if (p == null || p.finished) {
+        _prefs?.remove('mealPlan');
+      } else {
+        _prefs?.setString('mealPlan', jsonEncode(p.toJson()));
+      }
+    } catch (_) {}
+  }
+
+  void startMealPlan(MealPlan p) {
+    mealPlan = p;
+    dueStep = null;
+    _saveMealPlan();
+    notifyListeners();
+  }
+
+  void cancelMealPlan() {
+    mealPlan = null;
+    if (dueStep != null) player.stop();
+    dueStep = null;
+    _saveMealPlan();
+    notifyListeners();
+  }
+
+  /// A step was given (sent to Loop or given by hand) or skipped.
+  void mealStepFinished(MealStep s, {bool skipped = false}) {
+    s.state = skipped ? StepState.skipped : StepState.done;
+    if (identical(dueStep, s)) {
+      dueStep = null;
+      player.stop();
+    }
+    if (mealPlan?.finished ?? false) mealPlan = null;
+    _saveMealPlan();
+    notifyListeners();
+  }
+
+  /// Ring again in [min] minutes.
+  void snoozeMealStep(MealStep s, int min) {
+    s.at = DateTime.now().add(Duration(minutes: min));
+    if (identical(dueStep, s)) {
+      dueStep = null;
+      player.stop();
+    }
+    _saveMealPlan();
+    notifyListeners();
+  }
+
+  void _checkMealPlan() {
+    final p = mealPlan;
+    if (p == null || dueStep != null) return;
+    final s = p.next;
+    if (s == null) return;
+    final l = latest;
+    final why = stepDueReason(s, now: DateTime.now(), planStarted: p.started, latestMg: l?.mg, latestTime: l?.t);
+    if (why == null) return;
+    dueStep = s;
+    dueReason = why;
+    final t = settings;
+    player.start(SoundCfg(sound: t.integer('tgtSound'), volMode: 0, v1: t.integer('tgtVolume'), v2: t.integer('tgtVolume'), secs: 60, vibrate: true));
+    final nav = navKey?.currentState;
+    if (nav != null && !_stepOpen) {
+      _stepOpen = true;
+      nav.push(MaterialPageRoute<void>(builder: (_) => MealStepScreen(step: s), fullscreenDialog: true)).then((_) => _stepOpen = false);
     }
     notifyListeners();
   }

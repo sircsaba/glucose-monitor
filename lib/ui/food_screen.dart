@@ -12,6 +12,7 @@ import '../state/app_state.dart';
 import 'bolus_calc_view.dart';
 import 'common.dart';
 import 'food_edit_screen.dart';
+import 'meal_plan_screen.dart';
 import 'remote_screen.dart';
 
 /// Foods from the shared food list: search, favorites, meal types, barcode
@@ -381,6 +382,7 @@ class _FoodScreenState extends State<FoodScreen> {
           final meal = app.meal;
           return Column(children: [
             if (_busy) const LinearProgressIndicator(),
+            if (app.mealPlan != null) const Padding(padding: EdgeInsets.fromLTRB(12, 8, 12, 0), child: MealPlanBanner()),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
               child: TextField(
@@ -541,19 +543,31 @@ class _FoodScreenState extends State<FoodScreen> {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: kRemote
-                  ? FilledButton.icon(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RemoteScreen(carbs: meal.carbs, mealNote: meal.describe()))),
-                      icon: const Icon(Icons.send),
-                      label: const Text('To Loop'),
-                    )
-                  : FilledButton.icon(
-                      onPressed: app.settings.flag('allowTreatments') ? _logMeal : null,
-                      icon: const Icon(Icons.save_outlined),
-                      label: const Text('Log meal'),
-                    ),
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => MealPlanScreen(carbs: meal.carbs, note: meal.describe(), foods: meal.toFoodsJson()))),
+                icon: const Icon(Icons.alarm),
+                label: const Text('Prebolus / timer'),
+              ),
             ),
           ]),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 46,
+            child: kRemote
+                ? FilledButton.icon(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RemoteScreen(carbs: meal.carbs, mealNote: meal.describe()))),
+                    icon: const Icon(Icons.send),
+                    label: const Text('Send carbs and bolus to Loop now'),
+                  )
+                : FilledButton.icon(
+                    onPressed: app.settings.flag('allowTreatments') ? _logMeal : null,
+                    icon: const Icon(Icons.save_outlined),
+                    label: const Text('Log the meal'),
+                  ),
+          ),
         ]),
       ),
     );

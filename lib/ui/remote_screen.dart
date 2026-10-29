@@ -64,7 +64,12 @@ class RemoteScreen extends StatefulWidget {
   /// Carbs to start with, and what was eaten (from a meal on the Food screen).
   final double? carbs;
   final String? mealNote;
-  const RemoteScreen({super.key, this.carbs, this.mealNote});
+  /// Insulin to give with the carbs, and a bolus on its own (from a meal plan).
+  final double? carbInsulin;
+  final double? bolus;
+  /// Called after carbs (true) or a bolus (false) were sent successfully.
+  final void Function(bool carbs)? onSent;
+  const RemoteScreen({super.key, this.carbs, this.mealNote, this.carbInsulin, this.bolus, this.onSent});
   @override
   State<RemoteScreen> createState() => _RemoteScreenState();
 }
@@ -77,10 +82,10 @@ class _RemoteScreenState extends State<RemoteScreen> {
   late double _carbs = widget.carbs?.roundToDouble() ?? 20;
   double _absorption = 3;
   int _carbsAgo = 0; // minutes
-  double _bolus = 0.5;
-  bool _bolusEdited = false; // false: the calculator's suggestion
-  double _carbInsulin = 0;
-  bool _carbInsulinEdited = false;
+  late double _bolus = widget.bolus ?? 0.5;
+  late bool _bolusEdited = widget.bolus != null; // false: the calculator's suggestion
+  late double _carbInsulin = widget.carbInsulin ?? 0;
+  late bool _carbInsulinEdited = widget.carbInsulin != null;
   bool _sending = false;
   Timer? _tick;
 
@@ -388,6 +393,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
       }
     }
     setState(() => _carbInsulinEdited = false);
+    widget.onSent?.call(true);
     await _sent(insulin > 0 ? 'Carbs and bolus sent' : 'Carbs sent', lines);
   }
 
@@ -406,6 +412,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
     if (otp == null) return;
     if (await _send({'eventType': 'Remote Bolus Entry', 'remoteBolus': bolus, 'otp': otp})) {
       setState(() => _bolusEdited = false);
+      widget.onSent?.call(false);
       await _sent('Bolus sent', ['${fmtU(bolus)} U bolus']);
     }
   }

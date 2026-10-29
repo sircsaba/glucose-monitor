@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glucose_monitor/logic/barcode.dart';
 import 'package:glucose_monitor/logic/food.dart';
+import 'package:glucose_monitor/logic/recipe_ai.dart';
 import 'package:image/image.dart' as img;
 import 'package:zxing_lib/zxing.dart';
 
@@ -141,6 +142,40 @@ void main() {
         }
       }
       expect(readBarcodeImage(im), '0036000291452');
+    });
+  });
+
+  group('recipe', () {
+    test('reads the AI answer into a food with its recipe', () {
+      final f = recipeFromJson({
+        'name': 'Banana muffins',
+        'servings': 12,
+        'servingText': '1 muffin',
+        'servingGrams': 60,
+        'ingredients': [
+          {'name': 'rice flour blend, gluten-free', 'amount': '2 cups', 'carbs': 160, 'gluten': 'free'},
+          {'name': 'baking powder', 'amount': '2 tsp', 'carbs': 2, 'gluten': 'unsure'},
+          {'name': 'bananas', 'amount': '3', 'carbs': 81, 'gluten': 'free'},
+        ],
+        'perServing': {'carbs': 25, 'energy': 180, 'protein': 3, 'fat': 7},
+        'steps': ['Heat the oven to 180 °C.', 'Mix.', 'Bake 20 minutes.'],
+        'gluten': 'unsure',
+        'glutenWhy': [],
+        'meals': ['breakfast', 'snack', 'dessert'],
+        'cookMinutes': 20,
+      });
+      expect(f.name, 'Banana muffins');
+      expect(f.source, 'recipe');
+      expect(f.portion, 60);
+      expect(f.unit, 'g');
+      expect(f.carbs, 25);
+      expect(f.per100.carbs, closeTo(41.67, 0.01));
+      expect(f.gluten, Gluten.unsure);
+      expect(f.glutenWhy.single, contains('baking powder'));
+      expect(f.meals, ['breakfast', 'snack']);
+      expect((f.recipe!['steps'] as List).length, 3);
+      expect(f.recipe!['servings'], 12);
+      expect(f.ingredients, contains('2 cups rice flour blend'));
     });
   });
 }
