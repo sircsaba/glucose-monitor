@@ -1,7 +1,7 @@
 name: Dev test (analyze and tests, output to the check-out branch)
 on:
   push:
-    branches: [food]
+    branches: [food, food2]
 permissions:
   contents: write
 jobs:
