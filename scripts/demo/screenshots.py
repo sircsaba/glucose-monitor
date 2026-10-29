@@ -111,9 +111,9 @@ PHONE_PLUS = [
 FOOD = [
     ('a-treat', 'app', ['Treat']),
     ('b-food', 'app', ['Treat', 'Food']),
-    ('c-lunch', 'app', ['Treat', 'Food', 'School lunch']),
-    ('d-lunch-pick', 'app', ['Treat', 'Food', 'School lunch', 'Ham sandwich (gluten-free bread)', '½', 'Apple']),
-    ('e-lunch-edit', 'app', ['Treat', 'Food', 'School lunch', 'Change the lunch box']),
+    ('c-lunch', 'app', ['Treat', 'Food', '4 foods in the box']),
+    ('d-lunch-pick', 'app', ['Treat', 'Food', '4 foods in the box', 'Ham sandwich (gluten-free bread)', '½', 'Apple']),
+    ('e-lunch-edit', 'app', ['Treat', 'Food', '4 foods in the box', 'Change the lunch box']),
     ('f-lookup', 'app', ['Treat', 'Food', 'New food', 'Look up by name', 'type:bbq chicken']),
     ('g-lookup-portion', 'app', ['Treat', 'Food', 'New food', 'Look up by name', 'type:bbq chicken', 'Chicken, broiler, breast, meat, roasted']),
     ('h-lookup-form', 'app', ['Treat', 'Food', 'New food', 'Look up by name', 'type:bbq chicken', 'Chicken, broiler, breast, meat, roasted', '1 breast']),

@@ -111,7 +111,12 @@ class Cnf {
       if (!q.contains('cooked') && !q.contains('cuit') && f._search.contains(' raw')) score += 0.05;
       scored.add((score, f));
     }
-    scored.sort((a, b) => b.$1.compareTo(a.$1));
+    // Same score: keep the file's order (sort is not stable on its own).
+    final order = {for (var k = 0; k < scored.length; k++) scored[k].$2.id: k};
+    scored.sort((a, b) {
+      final c = b.$1.compareTo(a.$1);
+      return c != 0 ? c : order[a.$2.id]!.compareTo(order[b.$2.id]!);
+    });
     return [for (final s in scored.take(limit)) s.$2];
   }
 
