@@ -104,7 +104,9 @@ Directions
     expect(find.textContaining('Grains, rice flour, white'), findsOneWidget);
     expect(find.textContaining('Banana, raw'), findsOneWidget);
     expect(find.text('12 servings'), findsOneWidget);
-    // The all-purpose flour makes the recipe contain gluten.
+    // The all-purpose flour is wheat: its line has the red Gluten badge.
+    await t.scrollUntilVisible(find.text('1 cup all-purpose flour'), 200, scrollable: find.byType(Scrollable).first);
+    await t.pump();
     expect(find.text('Gluten'), findsWidgets);
     await t.drag(find.byType(ListView).first, const Offset(0, -3000));
     await t.pump();
