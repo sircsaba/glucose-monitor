@@ -18,6 +18,7 @@ import 'food_lookup_screen.dart';
 import 'recipe_builder_screen.dart';
 import 'meal_plan_screen.dart';
 import 'remote_screen.dart';
+import 'school_lunch_screen.dart';
 
 /// Foods from the shared food list: search, favorites, meal types, barcode
 /// scanning (also in the store), and a meal put together from several foods.
@@ -42,6 +43,7 @@ class _FoodScreenState extends State<FoodScreen> {
     app.loadFoods().then((_) {
       if (mounted && first && app.foods.isNotEmpty && !app.foods.any((f) => f.favorite)) setState(() => _filter = 'all');
     });
+    app.loadLunches().catchError((_) {});
     final h = DateTime.now().hour;
     // Start on the meal of the time of day when there are no favorites yet.
     if (app.foodsLoaded && !app.foods.any((f) => f.favorite)) {
@@ -442,6 +444,7 @@ class _FoodScreenState extends State<FoodScreen> {
           return Column(children: [
             if (_busy) const LinearProgressIndicator(),
             if (app.mealPlan != null) const Padding(padding: EdgeInsets.fromLTRB(12, 8, 12, 0), child: MealPlanBanner()),
+            _lunchBanner(),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
               child: TextField(
@@ -470,6 +473,12 @@ class _FoodScreenState extends State<FoodScreen> {
                     ),
                   ),
                 FilterChip(label: const Text('Gluten-free only'), selected: _gfOnly, onSelected: (v) => setState(() => _gfOnly = v)),
+                const SizedBox(width: 6),
+                ActionChip(
+                  avatar: const Icon(Icons.lunch_dining, size: 18),
+                  label: const Text('School lunch'),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SchoolLunchScreen())),
+                ),
               ]),
             ),
             Expanded(
@@ -508,6 +517,41 @@ class _FoodScreenState extends State<FoodScreen> {
             if (!meal.isEmpty) _mealPanel(meal),
           ]);
         },
+      ),
+    );
+  }
+
+  /// Today's school lunch, when there is one with food left.
+  Widget _lunchBanner() {
+    final l = app.lunchToday;
+    if (l == null) return const SizedBox.shrink();
+    final left = l.waiting;
+    final carbs = left.fold(0.0, (a, i) => a + (i.leftNutrition.carbs ?? 0));
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Material(
+        color: kAccent.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SchoolLunchScreen())),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: kAccent)),
+            child: Row(children: [
+              const Icon(Icons.lunch_dining, color: kAccent, size: 30),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('School lunch', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  Text('${left.length} food${left.length > 1 ? 's' : ''} in the box · ${carbs.round()} g carbs',
+                      style: const TextStyle(color: kMuted, fontSize: 13)),
+                ]),
+              ),
+              const Icon(Icons.chevron_right),
+            ]),
+          ),
+        ),
       ),
     );
   }

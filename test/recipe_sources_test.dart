@@ -90,6 +90,8 @@ void main() {
       final pages = pdfPageTexts(bytes);
       expect(pages.length, 2);
       final text = pdfText(bytes);
+      // ignore: avoid_print
+      print('PDF TEXT >>>${text.replaceAll('\n', ' | ')}<<<');
       expect(pdfLooksScanned(text), isFalse);
       final lines = text.split('\n');
       expect(lines, contains('Crêpes sans gluten'));

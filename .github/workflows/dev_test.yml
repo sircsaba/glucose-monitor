@@ -33,6 +33,7 @@ jobs:
           RECIPE_PAGES: /tmp/pages
         run: |
           (flutter analyze --no-fatal-infos 2>&1 | grep -v "^ *info " | tail -40) > out.txt || true
+          (echo "----- pages"; for f in /tmp/pages/*.html; do echo "$f $(wc -c < $f) $(grep -o '<title>[^<]*' $f | head -1)"; done) >> out.txt
           echo "----- tests" >> out.txt
-          (flutter test --reporter expanded 2>&1 | grep -v "^[0-9:+ ]*loading" | tail -120) >> out.txt || true
+          (flutter test --reporter expanded 2>&1 | grep -v "^[0-9:+ ]*loading" | tail -400) >> out.txt || true
           mkdir o && cp out.txt o/ && cd o && git init -q -b check-out && git add . && git -c user.name=ci -c user.email=ci@x commit -qm out && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" check-out

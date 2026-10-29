@@ -611,6 +611,36 @@ class NightscoutClient {
     return f;
   }
 
+  /// Other documents kept in the food list (school lunches), by type.
+  Future<List<Map<String, dynamic>>> foodDocs(String type) async {
+    final j = await _get('/api/v1/food.json', {'count': '5000'});
+    if (j is! List) return [];
+    return [for (final e in j) if (e is Map && e['type'] == type) Map<String, dynamic>.from(e)];
+  }
+
+  /// Saves one of those documents; returns its id.
+  Future<String?> saveFoodDoc(Map<String, dynamic> doc) async {
+    final http.Response r;
+    try {
+      r = await (doc['_id'] == null
+              ? http.post(_uri('/api/v1/food', const {}), headers: {..._headers, 'Content-Type': 'application/json'}, body: jsonEncode(doc))
+              : http.put(_uri('/api/v1/food', const {}), headers: {..._headers, 'Content-Type': 'application/json'}, body: jsonEncode(doc)))
+          .timeout(const Duration(seconds: 25));
+    } catch (e) {
+      throw NsException('Cannot reach the site: $e');
+    }
+    if (r.statusCode == 401 || r.statusCode == 403) {
+      throw NsException('This token is not allowed to change the food list: use the API secret (or a Nightscout token with the admin role)');
+    }
+    if (r.statusCode != 200 && r.statusCode != 201) throw NsException('The site answered with error ${r.statusCode}');
+    try {
+      final j = jsonDecode(r.body);
+      final m = j is List && j.isNotEmpty ? j.first : j;
+      if (m is Map && m['_id'] != null) return m['_id'].toString();
+    } catch (_) {}
+    return doc['_id']?.toString();
+  }
+
   Future<void> deleteFood(String id) async {
     final http.Response r;
     try {
@@ -622,8 +652,6 @@ class NightscoutClient {
     if (r.statusCode != 200 && r.statusCode != 204) throw NsException('The site answered with error ${r.statusCode}');
   }
 
-  /// A product from Open Food Facts (free, world-wide, Canada and USA included);
-  /// null when the barcode is unknown there.
   /// The HTML of a recipe page, through this site (the web app: browsers
   /// cannot read other sites). Needs a Monitor Glucose server.
   Future<String> recipePageVia(String url) async {
@@ -682,6 +710,8 @@ class NightscoutClient {
     }
   }
 
+  /// A product from Open Food Facts (free, world-wide, Canada and USA included);
+  /// null when the barcode is unknown there.
   static Future<Food?> lookupBarcode(String barcode) async {
     final code = barcode.replaceAll(RegExp(r'[^0-9]'), '');
     if (code.length < 8) throw NsException('That barcode is too short');

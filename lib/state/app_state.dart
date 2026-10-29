@@ -9,6 +9,7 @@ import '../alarm/alarm_player.dart';
 import '../data/nightscout.dart';
 import '../logic/faults.dart';
 import '../logic/food.dart';
+import '../logic/school_lunch.dart';
 import '../logic/meal_plan.dart';
 import '../logic/profile.dart';
 import '../logic/glucose.dart';
@@ -761,4 +762,54 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void mealChanged() => notifyListeners();
+
+  // ---------- school lunch ----------
+
+  /// School lunches by day (YYYY-MM-DD), from the site's food list.
+  Map<String, SchoolLunch> lunches = {};
+  bool lunchesLoaded = false;
+
+  Future<void> loadLunches() async {
+    final docs = await client.foodDocs(SchoolLunch.type);
+    final m = <String, SchoolLunch>{};
+    for (final d in docs) {
+      final l = SchoolLunch.fromJson(d);
+      if (l == null) continue;
+      // Two for the same day (made at the same time on two phones): keep the fuller one.
+      final had = m[l.date];
+      if (had == null || l.items.length + l.eaten.length > had.items.length + had.eaten.length) m[l.date] = l;
+    }
+    lunches = m;
+    lunchesLoaded = true;
+    notifyListeners();
+  }
+
+  SchoolLunch? lunchFor(String day) => lunches[day];
+
+  /// Today's lunch with something still in the box.
+  SchoolLunch? get lunchToday {
+    final l = lunches[SchoolLunch.dayKey(DateTime.now())];
+    return l != null && l.waiting.isNotEmpty ? l : null;
+  }
+
+  /// Changes a lunch on the site: reads its latest copy first (another phone
+  /// may have changed it), applies [change], saves.
+  Future<SchoolLunch> changeLunch(String day, void Function(SchoolLunch l) change) async {
+    try {
+      await loadLunches();
+    } catch (_) {}
+    final l = lunches[day] ?? SchoolLunch(day);
+    change(l);
+    l.id = await client.saveFoodDoc(l.toJson());
+    lunches[day] = l;
+    notifyListeners();
+    return l;
+  }
+
+  Future<void> deleteLunch(String day) async {
+    final l = lunches[day];
+    if (l?.id != null) await client.deleteFood(l!.id!);
+    lunches.remove(day);
+    notifyListeners();
+  }
 }
