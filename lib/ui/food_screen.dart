@@ -267,7 +267,7 @@ class _FoodScreenState extends State<FoodScreen> {
       'carbs': m.carbs.round(),
       'notes': m.describe(),
       'foods': m.toFoodsJson(),
-      ...m.total.toJson()..remove('carbs'),
+      'nutrition': m.total.toJson(),
     };
     try {
       await app.postTreatment(t);

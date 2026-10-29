@@ -40,6 +40,9 @@ class Treatment {
   final double? targetHi;
   final double? scale; // Loop: insulin needs, 1 = 100 %
   final bool indefinite;
+  // A meal from the Food screen: its foods and their nutrition (for the Nutrition report).
+  final List<Map<String, dynamic>> foods;
+  final Nutrition nutrition;
   Treatment({
     required this.t,
     required this.type,
@@ -56,7 +59,11 @@ class Treatment {
     this.targetHi,
     this.scale,
     this.indefinite = false,
+    this.foods = const [],
+    this.nutrition = Nutrition.empty,
   });
+
+  bool get isMeal => foods.isNotEmpty;
 
   bool get isPreset => type == 'Temporary Override' || type == 'Temporary Target';
 }
@@ -291,6 +298,8 @@ class NightscoutClient {
       targetHi: _presetTarget(e, false),
       scale: _d(e['insulinNeedsScaleFactor']),
       indefinite: (e['durationType'] ?? '').toString() == 'indefinite',
+      foods: [for (final f in (e['foods'] is List ? e['foods'] as List : const [])) if (f is Map) Map<String, dynamic>.from(f)],
+      nutrition: e['nutrition'] is Map ? Nutrition.fromJson(Map<String, dynamic>.from(e['nutrition'] as Map)) : Nutrition.empty,
     );
   }
 

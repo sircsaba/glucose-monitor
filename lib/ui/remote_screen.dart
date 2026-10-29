@@ -376,7 +376,8 @@ class _RemoteScreenState extends State<RemoteScreen> {
           'enteredBy': 'Monitor Glucose Plus',
           'notes': 'Meal: ${widget.mealNote}',
           'foods': m.toFoodsJson(),
-          ...m.total.toJson(),
+          // Not top-level "carbs": Loop already records the carbs of this meal.
+          'nutrition': m.total.toJson(),
         });
       } catch (_) {}
       m.items.clear();

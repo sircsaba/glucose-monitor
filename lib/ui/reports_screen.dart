@@ -12,6 +12,7 @@ import '../state/app_state.dart';
 import '../state/settings.dart';
 import 'common.dart';
 import 'report_charts.dart';
+import 'nutrition_tab.dart';
 
 /// Reports like Nightscout's: a summary, day to day, daily stats and the
 /// distribution, for 1 to 90 days, each printable as a PDF.
@@ -22,7 +23,7 @@ class ReportsScreen extends StatefulWidget {
 }
 
 const _periods = [1, 7, 14, 30, 90];
-const reportTabs = ['Summary', 'Day to day', 'Daily stats', 'Distribution'];
+const reportTabs = ['Summary', 'Day to day', 'Daily stats', 'Distribution', 'Nutrition'];
 
 class _ReportsScreenState extends State<ReportsScreen> {
   int _days = 14;
@@ -60,7 +61,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Future<void> _print(bool all, ReportData data) async {
     setState(() => _printing = true);
     try {
-      await printReport(data, all ? const {0, 1, 2, 3} : {_tab});
+      await printReport(data, all ? const {0, 1, 2, 3, 4} : {_tab});
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not make the PDF: $e')));
     }
@@ -122,6 +123,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             1 => _dayToDay(data),
             2 => _dailyStats(data),
             3 => _distribution(data),
+            4 => nutritionTab(data.nutrition, _mmol),
             _ => _summary(data),
           };
         }

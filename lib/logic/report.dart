@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import '../data/nightscout.dart';
 import 'insulin.dart';
 import 'profile.dart';
+import 'nutrition_report.dart';
 
 /// Glucose summary of a set of readings (all mg/dL, fractions 0–1).
 class BgSummary {
@@ -104,6 +105,8 @@ class ReportData {
   late final double lbgi, hbgi, gvi, pgs, dailyChange;
   late final int lowEpisodes;
   late final double sensorUse;
+  /// Food: carbs, calories, protein, fat per day, and what each meal did to glucose.
+  late final NutritionReport nutrition = nutritionReport(from: from, to: to, treatments: treatments, entries: entries);
 
   ReportData({
     required this.from,

@@ -11,6 +11,7 @@ import '../logic/report.dart';
 import '../state/app_state.dart';
 import '../ui/report_charts.dart';
 import '../ui/reports_screen.dart';
+import '../ui/nutrition_tab.dart';
 
 /// Draws one of the report charts into a PNG (white background, print colours).
 Future<Uint8List> _png(CustomPainter p, double w, double h, {double scale = 2.5}) async {
@@ -233,6 +234,32 @@ Future<Uint8List> buildReportPdf(ReportData d, Set<int> which) async {
           ['Figure', 'Value'],
           for (final kv in variabilityRows(d, mmol)) [kv.$1, kv.$2],
         ], left: const {0, 1}, font: 9),
+      ],
+    ));
+  }
+
+  // ---------- nutrition
+  if (which.contains(4)) {
+    final r = d.nutrition;
+    doc.addPage(pw.MultiPage(
+      pageTheme: pw.PageTheme(pageFormat: PdfPageFormat.letter.landscape, margin: const pw.EdgeInsets.all(24)),
+      footer: footer,
+      build: (_) => [
+        header('Nutrition'),
+        pw.Text(_t('Carbs per day ${r.avgCarbs.round()} g (all carb entries). Calories, protein and fat from meals on the Food screen: '
+            '${r.daysWithMeals} of ${r.days.length} days.'), style: body),
+        pw.SizedBox(height: 8),
+        table(nutritionDayRows(r), font: 8),
+        pw.SizedBox(height: 12),
+        pw.Text('Meals that raised glucose the most (reading when eating to the highest in the next 3 hours; * other carbs within 2 hours)', style: bold),
+        pw.SizedBox(height: 4),
+        if (r.meals.isNotEmpty) table(mealRiseRows(r, mmol), left: const {0, 1}, font: 8) else pw.Text('No meals from the Food screen in this period.', style: small),
+        if (r.foods.isNotEmpty) ...[
+          pw.SizedBox(height: 12),
+          pw.Text('Foods by average rise', style: bold),
+          pw.SizedBox(height: 4),
+          table(foodRiseRows(r, mmol), font: 8),
+        ],
       ],
     ));
   }
