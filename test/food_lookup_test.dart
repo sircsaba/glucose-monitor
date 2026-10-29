@@ -36,8 +36,8 @@ void main() {
     final f = foodFromCnf(cnf.byId[842]!, const CnfPortion('1 breast', 172), category: 'Poultry Products');
     expect(f.carbs, 0);
     expect(f.n.protein, closeTo(31.02 * 1.72, 0.01));
-    expect(f.n.iron, isNotNull);
-    expect(f.n.calcium, isNotNull);
+    expect(f.n['iron'], isNotNull);
+    expect(f.n['calcium'], isNotNull);
     expect(f.portionText, '1 breast (172 g)');
     expect(f.gluten, Gluten.free);
     expect(f.per100.carbs, 0);
