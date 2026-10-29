@@ -6,23 +6,8 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: Check Nightscout and the Monitor Glucose server
-        shell: bash {0}
+      - name: List zxing2
         run: |
-          now=$(date +%s)
-          age() { [ -n "$1" ] && [ "$1" != null ] && echo "$(( (now - $1/1000) / 60 )) min" || echo "none"; }
-          iso() { [ -n "$1" ] && [ "$1" != null ] && date -d "$1" +%s000 2>/dev/null || echo null; }
-          for site in https://nsval.mooo.com https://bg.inforap.com; do
-            for p in /api/v1/status.json /api/v1/entries.json?count=1 /api/v1/devicestatus.json?count=1 /api/v1/health; do
-              tok=""; [ "$site" = https://bg.inforap.com ] && { [[ "$p" == *"?"* ]] && tok="&token=readable-val" || tok="?token=readable-val"; }
-              code=$(curl -s -m 20 -o r.json -w "%{http_code}" "$site$p$tok"); msg="$site$p HTTP $code"
-              case "$p" in
-                /api/v1/status.json) msg="$msg $(jq -r '"status=\(.status) version=\(.version) apiEnabled=\(.apiEnabled)"' r.json 2>/dev/null)";;
-                /api/v1/entries*) d=$(jq -r '.[0].date' r.json 2>/dev/null); msg="$msg newest reading: $(age $d) ago";;
-                /api/v1/devicestatus*) d=$(jq -r '.[0].loop.timestamp // .[0].created_at' r.json 2>/dev/null); f=$(jq -r '.[0].loop.failureReason // "none"' r.json 2>/dev/null | cut -c1-200); up=$(jq -r '.[0].created_at' r.json 2>/dev/null); msg="$msg last loop: $(age $(iso $d)) ago, last upload: $(age $(iso $up)) ago, failure: $f";;
-                /api/v1/health) msg="$msg $(jq -c '{feedProblem, libre:{ok:.libre.ok, fails:.libre.fails, error:.libre.error, lastRunAge:((now - (.libre.lastRun//0)/1000)/60|floor)}, cgmLastAge:((now-(.cgmLast//0)/1000)/60|floor), loopLastAge:((now-(.loopLast//0)/1000)/60|floor), loopCgmFromHere, main:{reachable:.main.reachable, error:.main.error}}' r.json 2>/dev/null | cut -c1-600)";;
-              esac
-              [ "$code" = 200 ] || msg="$msg $(head -c 200 r.json | tr '\n' ' ')"
-              echo "::notice::$msg" || true
-            done
-          done
+          mkdir p && cd p && printf 'name: p\nenvironment:\n  sdk: ">=3.0.0 <4.0.0"\ndependencies:\n  zxing2: ^0.2.3\n' > pubspec.yaml
+          docker run --rm -v $PWD:/p -w /p dart:stable sh -c 'dart pub get >/dev/null && d=$(ls -d /root/.pub-cache/hosted/pub.dev/zxing2-*) && echo $d && ls $d/lib $d/lib/src && grep -rn "^class \(MultiFormatReader\|EAN13Reader\|MultiFormatOneDReader\|UPCAReader\)\|^export" $d/lib | head -40' > out.txt 2>&1
+          while read -r l; do echo "::notice::$l"; done < out.txt
