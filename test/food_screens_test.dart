@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glucose_monitor/logic/food.dart';
 import 'package:glucose_monitor/ui/food_edit_screen.dart';
+import 'package:glucose_monitor/ui/recipe_builder_screen.dart';
 import 'package:glucose_monitor/ui/recipe_screen.dart';
 
 /// The food page and the recipe page draw on a phone and on a tablet without
@@ -70,4 +71,44 @@ void main() {
       expect(find.textContaining('All 13'), findsOneWidget);
     });
   }
+
+  testWidgets('recipe builder reads a recipe, matches the ingredients and draws the label', (t) async {
+    t.view.physicalSize = const Size(390, 844) * 3;
+    t.view.devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    const text = '''Banana muffins
+Makes 12
+
+Ingredients
+2 cups rice flour
+3 ripe bananas
+1/3 cup maple syrup
+2 large eggs
+1 tsp baking soda
+1 cup all-purpose flour
+
+Directions
+1. Heat the oven to 180 °C.
+2. Mix everything and bake 20 minutes.
+''';
+    await t.runAsync(() async {
+      await t.pumpWidget(MaterialApp(theme: ThemeData.dark(), home: const RecipeBuilderScreen(text: text)));
+      // The nutrient file loads in the background.
+      for (var i = 0; i < 50 && find.byType(CircularProgressIndicator).evaluate().isNotEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        await t.pump();
+      }
+    });
+    await t.pump();
+    expect(find.text('2 cups rice flour'), findsOneWidget);
+    expect(find.textContaining('Grains, rice flour, white'), findsOneWidget);
+    expect(find.textContaining('Banana, raw'), findsOneWidget);
+    expect(find.text('12 servings'), findsOneWidget);
+    // The all-purpose flour makes the recipe contain gluten.
+    expect(find.text('Gluten'), findsWidgets);
+    await t.drag(find.byType(ListView).first, const Offset(0, -3000));
+    await t.pump();
+    expect(find.text('Valeur nutritive'), findsOneWidget);
+    expect(find.text('Save the recipe'), findsOneWidget);
+  });
 }
