@@ -400,6 +400,7 @@ final class Server
             'main' => $this->mainStatus(),
             'foodWaiting' => $this->foodHealth(),
             'foodNightscout' => $this->foodCheck(),
+            'meals' => $this->syncMeals(true),
         ];
     }
 
@@ -682,6 +683,7 @@ final class Server
     {
         if ($method === 'GET') {
             $this->need(self::READ);
+            $this->syncMeals();
             $where = [];
             $args = [];
             $find = $_GET['find'] ?? [];
@@ -1092,6 +1094,155 @@ final class Server
             return;
         }
         throw new HttpError(405, 'Method not allowed');
+    }
+
+    // ------------------------------------------------------------ meals
+
+    /*
+     * Meals (treatments with a "foods" list: what was eaten, from the apps'
+     * Food screen) are copied both ways with the main Nightscout, so a meal
+     * sent from a phone connected to either site shows on both. Covers the
+     * last 3 days, at most once a minute (on treatment reads and health checks).
+     * Deleting a copied meal on one site deletes it on the other.
+     * 'meals_from_main' => false turns it off.
+     */
+    private function mealTable(): void
+    {
+        static $done = false;
+        if ($done) return;
+        $sqlite = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
+        $this->db->exec($sqlite
+            ? 'CREATE TABLE IF NOT EXISTS meal_link (local_id VARCHAR(64) PRIMARY KEY, main_id VARCHAR(64) NOT NULL, created_ms BIGINT NOT NULL)'
+            : 'CREATE TABLE IF NOT EXISTS meal_link (local_id VARCHAR(64) NOT NULL PRIMARY KEY, main_id VARCHAR(64) NOT NULL, '
+              . 'created_ms BIGINT NOT NULL, KEY idx_meal_main (main_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+        $done = true;
+    }
+
+    private const MEAL_MAX = 10000;
+
+    private static function isMeal($d): bool
+    {
+        return is_object($d) && isset($d->foods) && is_array($d->foods) && count($d->foods) > 0;
+    }
+
+    /** Copies meals both ways. Returns a short status for the health check (or null when off). */
+    private function syncMeals(bool $forHealth = false): ?string
+    {
+        if (($this->cfg['meals_from_main'] ?? true) === false || $this->foodMain() === null) return null;
+        $stateFile = __DIR__ . '/.meal-sync.json';
+        $st = is_file($stateFile) ? (json_decode((string)@file_get_contents($stateFile), true) ?: []) : [];
+        $now = time();
+        if ($now - (int)($st['at'] ?? 0) < 60) return $st['status'] ?? null;
+        @file_put_contents($stateFile, json_encode(['at' => $now, 'status' => $st['status'] ?? null]));
+        try {
+            $status = $this->syncMealsNow();
+        } catch (Throwable $e) {
+            $status = 'Error: ' . $e->getMessage();
+        }
+        @file_put_contents($stateFile, json_encode(['at' => $now, 'status' => $status]));
+        return $status;
+    }
+
+    private function syncMealsNow(): string
+    {
+        $this->mealTable();
+        $since = (int)round(microtime(true) * 1000) - 3 * 86400 * 1000;
+        [$code, $main] = $this->nsFood('GET', '/api/v1/treatments.json?count=' . self::MEAL_MAX . '&find[created_at][$gte]=' . rawurlencode(self::iso($since)));
+        if ($code === 0) return 'Nightscout not answering: meals will be copied when it is back';
+        if ($code !== 200 || !is_array($main)) return "Nightscout refused to give the treatments (HTTP $code)";
+
+        // A full page may have left meals out: then nothing is deleted this time.
+        $complete = count($main) < self::MEAL_MAX;
+        $mainMeals = [];
+        foreach ($main as $d) if (self::isMeal($d) && isset($d->_id)) $mainMeals[(string)$d->_id] = $d;
+        $local = [];
+        foreach ($this->fetchDocs('SELECT doc FROM treatments WHERE created_ms >= ?', [$since]) as $d) {
+            if (self::isMeal($d) && isset($d->_id)) $local[(string)$d->_id] = $d;
+        }
+        $links = [];   // local id => main id
+        $byMain = [];  // main id => local id
+        foreach ($this->db->query('SELECT local_id, main_id FROM meal_link')->fetchAll() as $r) {
+            $links[(string)$r['local_id']] = (string)$r['main_id'];
+            $byMain[(string)$r['main_id']] = (string)$r['local_id'];
+        }
+        $link = $this->db->prepare('INSERT INTO meal_link (local_id, main_id, created_ms) VALUES (?, ?, ?)');
+        $unlink = $this->db->prepare('DELETE FROM meal_link WHERE local_id = ?');
+        $delLocal = $this->db->prepare('DELETE FROM treatments WHERE id = ?');
+        $in = $out = $gone = 0;
+
+        // Same meal on both sides without a link yet (same time and type): just link them.
+        $key = fn($d) => (self::toMs($d->created_at ?? null) ?? 0) . '|' . ($d->eventType ?? '');
+        $localByKey = [];
+        foreach ($local as $id => $d) if (!isset($links[$id])) $localByKey[$key($d)] = $id;
+
+        // 1. From Nightscout to here.
+        foreach ($mainMeals as $mid => $d) {
+            if (isset($byMain[$mid])) continue;
+            $ms = self::toMs($d->created_at ?? null) ?? 0;
+            $lid = $localByKey[$key($d)] ?? null;
+            if ($lid === null) {
+                $copy = clone $d;
+                $copy->_id = isset($local[$mid]) || $this->exists('treatments', $mid) ? self::newId() : $mid;
+                $this->saveTreatment($copy, false);
+                $lid = $copy->_id;
+                $local[$lid] = $copy;
+                $in++;
+            }
+            $link->execute([$lid, $mid, $ms]);
+            $links[$lid] = $mid;
+            $byMain[$mid] = $lid;
+        }
+
+        // 2. Deleted on Nightscout (linked, recent, no longer there): delete here too.
+        foreach ($links as $lid => $mid) {
+            if (isset($mainMeals[$mid]) || !$complete) continue;
+            if (isset($local[$lid])) {
+                $delLocal->execute([$lid]);
+                unset($local[$lid]);
+                $gone++;
+            }
+            if (!$this->exists('treatments', $lid)) $unlink->execute([$lid]);
+        }
+
+        // 3. From here to Nightscout (needs the API secret).
+        $canWrite = trim((string)($this->cfg['main_nightscout_secret'] ?? '')) !== '';
+        foreach ($local as $lid => $d) {
+            if (isset($links[$lid]) || !$canWrite) continue;
+            $copy = clone $d;
+            unset($copy->_id);
+            [$c, $j] = $this->nsFood('POST', '/api/v1/treatments', $copy);
+            $mid = is_array($j) ? ($j[0]->_id ?? null) : ($j->_id ?? null);
+            if ($c < 200 || $c >= 300 || !is_string($mid)) break;
+            $link->execute([$lid, $mid, self::toMs($d->created_at ?? null) ?? 0]);
+            $out++;
+        }
+
+        // 4. Deleted here (linked meal gone from this server): delete on Nightscout too.
+        if ($canWrite) {
+            $rows = $this->db->prepare('SELECT local_id, main_id FROM meal_link WHERE created_ms >= ?');
+            $rows->execute([$since]);
+            foreach ($rows->fetchAll() as $r) {
+                if ($this->exists('treatments', (string)$r['local_id'])) continue;
+                if (isset($mainMeals[(string)$r['main_id']])) {
+                    [$c] = $this->nsFood('DELETE', '/api/v1/treatments/' . rawurlencode((string)$r['main_id']));
+                    if ($c === 0) break;
+                    $gone++;
+                }
+                $unlink->execute([(string)$r['local_id']]);
+            }
+        }
+        // Old links are not needed any more.
+        $this->db->prepare('DELETE FROM meal_link WHERE created_ms < ?')->execute([$since - 7 * 86400 * 1000]);
+
+        $n = $in + $out + $gone;
+        if ($n > 0) {
+            $parts = [];
+            if ($in) $parts[] = "$in from Nightscout";
+            if ($out) $parts[] = "$out to Nightscout";
+            if ($gone) $parts[] = "$gone deleted";
+            EventLog::add($this->db, 'job', 'Meals copied: ' . implode(', ', $parts));
+        }
+        return $canWrite ? 'OK' : 'Copying from Nightscout only: meals sent here need main_nightscout_secret to reach Nightscout';
     }
 
     // ------------------------------------------------------------ entry point

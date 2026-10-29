@@ -68,6 +68,9 @@ return [
     // once it is back. To add or change foods it needs that site's API secret.
     'main_nightscout_secret' => '',    // the main Nightscout's API_SECRET
     'food_from_main' => true,          // false: this server keeps its own food list
+    // Meals (what was eaten, from the Food screen) are copied both ways with the
+    // main Nightscout, last 3 days. Uses the same secret.
+    'meals_from_main' => true,         // false: no copying
 
     // Time zone for the times written in the event log (Settings › Logs).
     'timezone' => 'America/Toronto',
