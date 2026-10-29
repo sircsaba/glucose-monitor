@@ -131,8 +131,8 @@ def patch_ios():
     p['ITSAppUsesNonExemptEncryption'] = False
     p['UIApplicationSupportsIndirectInputEvents'] = True
     # Monitor Glucose Plus reads Loop's one-time password QR code from a photo.
-    p['NSCameraUsageDescription'] = "Take a photo of Loop's one-time password QR code (remote commands)."
-    p['NSPhotoLibraryUsageDescription'] = "Choose a screenshot of Loop's one-time password QR code (remote commands)."
+    p['NSCameraUsageDescription'] = "Take a photo of a food barcode or a recipe, or of Loop's one-time password QR code (remote commands)."
+    p['NSPhotoLibraryUsageDescription'] = "Choose a photo of a food barcode or a recipe, or a screenshot of Loop's one-time password QR code."
     # The phone's lock (Face ID or passcode) confirms commands sent to Loop.
     p['NSFaceIDUsageDescription'] = "Confirm commands sent to Loop (carbs, bolus, overrides) with Face ID or your passcode."
     with open(plist_path, 'wb') as f:

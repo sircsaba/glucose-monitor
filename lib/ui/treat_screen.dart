@@ -8,6 +8,7 @@ import '../state/app_state.dart';
 import '../state/settings.dart';
 import 'bolus_calc_view.dart';
 import 'common.dart';
+import 'food_screen.dart';
 import 'remote_screen.dart';
 
 class _EventType {
@@ -133,6 +134,16 @@ class _TreatScreenState extends State<TreatScreen> {
               ]),
               const SizedBox(height: 16),
             ],
+            SizedBox(
+              height: 52,
+              child: FilledButton.tonalIcon(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FoodScreen())),
+                icon: const Icon(Icons.restaurant_menu),
+                label: Text(app.meal.isEmpty ? 'Food: favorites, barcode, meals' : 'Food: meal of ${app.meal.carbs.round()} g carbs',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              ),
+            ),
+            const SizedBox(height: 10),
             OutlinedButton.icon(
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BolusCalcScreen())),
               icon: const Icon(Icons.calculate_outlined),

@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
+import '../logic/food.dart';
 import '../logic/profile.dart';
 
 class NsException implements Exception {
@@ -562,5 +564,77 @@ class NightscoutClient {
     if (r.statusCode != 200 && r.statusCode != 201) {
       throw NsException('The site answered with error ${r.statusCode}');
     }
+  }
+
+  // ---------------------------------------------------------------- food list
+
+  /// Foods from Nightscout's food list (Admin › Food editor, api/v1/food).
+  Future<List<Food>> foods() async {
+    final j = await _get('/api/v1/food.json', {'count': '5000'});
+    if (j is! List) return [];
+    return [
+      for (final e in j)
+        if (e is Map && (e['type'] ?? 'food') == 'food') Food.fromJson(Map<String, dynamic>.from(e))
+    ];
+  }
+
+  /// Creates or updates a food; returns it with its id.
+  Future<Food> saveFood(Food f) async {
+    final body = f.toJson();
+    final http.Response r;
+    try {
+      r = await (f.id == null
+              ? http.post(_uri('/api/v1/food', const {}), headers: {..._headers, 'Content-Type': 'application/json'}, body: jsonEncode(body))
+              : http.put(_uri('/api/v1/food', const {}), headers: {..._headers, 'Content-Type': 'application/json'}, body: jsonEncode(body)))
+          .timeout(const Duration(seconds: 25));
+    } catch (e) {
+      throw NsException('Cannot reach the site: $e');
+    }
+    if (r.statusCode == 401 || r.statusCode == 403) {
+      throw NsException('This token is not allowed to change the food list (it needs the careportal role or the API secret)');
+    }
+    if (r.statusCode != 200 && r.statusCode != 201) throw NsException('The site answered with error ${r.statusCode}');
+    try {
+      final j = jsonDecode(r.body);
+      final m = j is List && j.isNotEmpty ? j.first : j;
+      if (m is Map && m['_id'] != null) f.id = m['_id'].toString();
+    } catch (_) {}
+    return f;
+  }
+
+  Future<void> deleteFood(String id) async {
+    final http.Response r;
+    try {
+      r = await http.delete(_uri('/api/v1/food/$id', const {}), headers: _headers).timeout(const Duration(seconds: 25));
+    } catch (e) {
+      throw NsException('Cannot reach the site: $e');
+    }
+    if (r.statusCode == 401 || r.statusCode == 403) throw NsException('This token is not allowed to change the food list');
+    if (r.statusCode != 200 && r.statusCode != 204) throw NsException('The site answered with error ${r.statusCode}');
+  }
+
+  /// A product from Open Food Facts (free, world-wide, Canada and USA included);
+  /// null when the barcode is unknown there.
+  static Future<Food?> lookupBarcode(String barcode) async {
+    final code = barcode.replaceAll(RegExp(r'[^0-9]'), '');
+    if (code.length < 8) throw NsException('That barcode is too short');
+    final fields = 'product_name,product_name_en,product_name_fr,generic_name,brands,categories_tags,quantity,'
+        'serving_size,serving_quantity,serving_quantity_unit,nutriments,ingredients_text,ingredients_text_en,'
+        'ingredients_text_fr,allergens_tags,traces_tags,labels_tags';
+    for (final c in {code, if (code.length == 13 && code.startsWith('0')) code.substring(1)}) {
+      final http.Response r;
+      try {
+        r = await http.get(Uri.parse('https://world.openfoodfacts.org/api/v2/product/$c.json?fields=$fields'),
+            // Open Food Facts asks apps to name themselves (browsers send their own).
+            headers: kIsWeb ? const {} : const {'User-Agent': 'MonitorGlucose/1.0 (https://monitorglucose.ca)'}).timeout(const Duration(seconds: 20));
+      } catch (e) {
+        throw NsException('Cannot reach Open Food Facts: $e');
+      }
+      if (r.statusCode == 404) continue;
+      if (r.statusCode != 200) throw NsException('Open Food Facts answered with error ${r.statusCode}');
+      final f = foodFromOff(jsonDecode(r.body) as Map<String, dynamic>, code);
+      if (f != null) return f;
+    }
+    return null;
   }
 }

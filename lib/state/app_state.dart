@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../alarm/alarm_player.dart';
 import '../data/nightscout.dart';
 import '../logic/faults.dart';
+import '../logic/food.dart';
 import '../logic/profile.dart';
 import '../logic/glucose.dart';
 import '../ui/alert_screen.dart';
@@ -127,6 +128,13 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   String? error;
   /// Therapy profiles from the site, newest first.
   List<ProfileDoc> profiles = [];
+
+  // Food list (Nightscout's api/v1/food), loaded when the Food screen opens.
+  List<Food> foods = [];
+  bool foodsLoaded = false;
+  String? foodsError;
+  /// The meal being put together on the Food screen (kept while switching tabs).
+  final Meal meal = Meal();
   /// From your own server: why no readings are coming in (shown in a bar).
   String? feedProblem;
   /// Your own server's health report (null on a plain Nightscout).
@@ -624,4 +632,46 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     }
     notifyListeners();
   }
+
+  // ---------- food ----------
+
+  Future<void> loadFoods() async {
+    try {
+      foods = await client.foods();
+      foods.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      foodsLoaded = true;
+      foodsError = null;
+    } catch (e) {
+      foodsError = e.toString();
+    }
+    notifyListeners();
+  }
+
+  Future<Food> saveFood(Food f) async {
+    final saved = await client.saveFood(f);
+    foods.removeWhere((x) => x.id != null && x.id == saved.id);
+    foods.add(saved);
+    foods.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    notifyListeners();
+    return saved;
+  }
+
+  Future<void> deleteFood(Food f) async {
+    if (f.id != null) await client.deleteFood(f.id!);
+    foods.remove(f);
+    meal.items.removeWhere((i) => identical(i.food, f));
+    notifyListeners();
+  }
+
+  /// The food already saved with this barcode, if any.
+  Food? foodByBarcode(String code) {
+    final c = code.replaceAll(RegExp(r'[^0-9]'), '');
+    for (final f in foods) {
+      final b = f.barcode.replaceAll(RegExp(r'[^0-9]'), '');
+      if (b.isNotEmpty && (b == c || b.padLeft(13, '0') == c.padLeft(13, '0'))) return f;
+    }
+    return null;
+  }
+
+  void mealChanged() => notifyListeners();
 }

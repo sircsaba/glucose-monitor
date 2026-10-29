@@ -58,13 +58,15 @@ class BolusSummary extends StatelessWidget {
 /// Bolus calculator: carbs and glucose in, the suggested bolus out, with
 /// every step shown. Nothing is sent from here.
 class BolusCalcScreen extends StatefulWidget {
-  const BolusCalcScreen({super.key});
+  /// Carbs to start with (from a meal on the Food screen).
+  final double carbs;
+  const BolusCalcScreen({super.key, this.carbs = 0});
   @override
   State<BolusCalcScreen> createState() => _BolusCalcScreenState();
 }
 
 class _BolusCalcScreenState extends State<BolusCalcScreen> {
-  double _carbs = 0;
+  late double _carbs = widget.carbs.roundToDouble();
   double? _bg; // mg/dL, null = latest reading
   bool _corr = true;
   bool _iob = true;

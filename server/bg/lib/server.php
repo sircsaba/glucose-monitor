@@ -278,6 +278,9 @@ final class Server
             case 'profiles':
                 $this->profile($method, $res === 'profiles' ? 'list' : $sub);
                 return;
+            case 'food':
+                $this->food($method, $sub);
+                return;
         }
         throw new HttpError(404, 'Not found');
     }
@@ -793,6 +796,65 @@ final class Server
             $this->need(self::ADMIN);
             $this->db->prepare('DELETE FROM profile WHERE id = ?')->execute([$sub]);
             self::out(['n' => 1, 'ok' => 1]);
+            return;
+        }
+        throw new HttpError(405, 'Method not allowed');
+    }
+
+    // ------------------------------------------------------------ food
+
+    /** Food list, like Nightscout's api/v1/food (the apps' Food screen). */
+    private function foodTable(): void
+    {
+        static $done = false;
+        if ($done) return;
+        $sqlite = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
+        $this->db->exec($sqlite
+            ? 'CREATE TABLE IF NOT EXISTS food (id VARCHAR(64) PRIMARY KEY, name VARCHAR(255) NOT NULL DEFAULT \'\', updated_ms BIGINT NOT NULL, doc TEXT NOT NULL)'
+            : 'CREATE TABLE IF NOT EXISTS food (id VARCHAR(64) NOT NULL PRIMARY KEY, name VARCHAR(255) NOT NULL DEFAULT \'\', '
+              . 'updated_ms BIGINT NOT NULL, doc LONGTEXT NOT NULL, KEY idx_food_name (name)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+        $done = true;
+    }
+
+    private function saveFood(object $doc): object
+    {
+        $id = isset($doc->_id) && is_string($doc->_id) && preg_match('/^[A-Za-z0-9_-]{1,64}$/', $doc->_id) ? $doc->_id : self::newId();
+        $doc->_id = $id;
+        if (empty($doc->type)) $doc->type = 'food';
+        $now = (int)round(microtime(true) * 1000);
+        if (empty($doc->created_at)) $doc->created_at = self::iso($now);
+        $this->save('food', $id, ['name' => substr((string)($doc->name ?? ''), 0, 250), 'updated_ms' => $now, 'doc' => self::enc($doc)]);
+        return $doc;
+    }
+
+    private function food(string $method, string $sub): void
+    {
+        $this->foodTable();
+        if ($method === 'GET') {
+            $this->need(self::READ);
+            if ($sub !== '' && $sub !== 'quickpicks' && $sub !== 'regular') {
+                $docs = $this->fetchDocs('SELECT doc FROM food WHERE id = ?', [$sub]);
+                if (!$docs) throw new HttpError(404, 'Not found');
+                self::out($docs[0]);
+                return;
+            }
+            $docs = $this->fetchDocs('SELECT doc FROM food ORDER BY name LIMIT ' . $this->count(5000, 20000), []);
+            if ($sub === 'quickpicks') $docs = array_values(array_filter($docs, fn($d) => ($d->type ?? '') === 'quickpick'));
+            if ($sub === 'regular') $docs = array_values(array_filter($docs, fn($d) => ($d->type ?? 'food') === 'food'));
+            self::out($docs);
+            return;
+        }
+        if ($method === 'POST' || $method === 'PUT') {
+            $this->need(self::CARE);
+            $saved = array_map(fn($d) => $this->saveFood($d), self::body());
+            self::out($method === 'PUT' && count($saved) === 1 ? $saved[0] : $saved);
+            return;
+        }
+        if ($method === 'DELETE' && $sub !== '') {
+            $this->need(self::CARE);
+            $st = $this->db->prepare('DELETE FROM food WHERE id = ?');
+            $st->execute([$sub]);
+            self::out(['n' => $st->rowCount(), 'ok' => 1]);
             return;
         }
         throw new HttpError(405, 'Method not allowed');

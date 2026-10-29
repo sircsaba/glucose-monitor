@@ -61,7 +61,10 @@ String _presetLabel(ProfileDoc? loop, String name) {
 }
 
 class RemoteScreen extends StatefulWidget {
-  const RemoteScreen({super.key});
+  /// Carbs to start with, and what was eaten (from a meal on the Food screen).
+  final double? carbs;
+  final String? mealNote;
+  const RemoteScreen({super.key, this.carbs, this.mealNote});
   @override
   State<RemoteScreen> createState() => _RemoteScreenState();
 }
@@ -71,7 +74,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
   String? _savedSecret; // API secret remembered on this phone
   String? _cmdUrl; // another site for commands ('' = the connected site)
   String? _cmdSecret;
-  double _carbs = 20;
+  late double _carbs = widget.carbs?.roundToDouble() ?? 20;
   double _absorption = 3;
   int _carbsAgo = 0; // minutes
   double _bolus = 0.5;
@@ -358,6 +361,22 @@ class _RemoteScreenState extends State<RemoteScreen> {
     }, secret: secret);
     if (!carbsOk) return;
     final lines = ['${_carbs.round()} g carbs (absorption ${fmtU(_absorption)} h, eaten $when)'];
+    if (widget.mealNote != null && !app.meal.isEmpty) {
+      // What was eaten, kept on the site for later analysis (Loop records only the carbs).
+      final m = app.meal;
+      try {
+        await app.postTreatment({
+          'eventType': 'Note',
+          'created_at': DateTime.now().subtract(Duration(minutes: _carbsAgo)).toUtc().toIso8601String(),
+          'enteredBy': 'Monitor Glucose Plus',
+          'notes': 'Meal: ${widget.mealNote}',
+          'foods': m.toFoodsJson(),
+          ...m.total.toJson(),
+        });
+      } catch (_) {}
+      m.items.clear();
+      app.mealChanged();
+    }
     if (insulin > 0) {
       final otp2 = await _nextOtp(otp);
       if (otp2 == null) {
