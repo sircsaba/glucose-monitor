@@ -2,6 +2,8 @@ name: Server check
 on:
   push:
     branches: [server-check]
+permissions:
+  contents: write
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -9,5 +11,5 @@ jobs:
       - name: List zxing2
         run: |
           mkdir p && cd p && printf 'name: p\nenvironment:\n  sdk: ">=3.0.0 <4.0.0"\ndependencies:\n  zxing2: ^0.2.3\n' > pubspec.yaml
-          docker run --rm -v $PWD:/p -w /p dart:stable sh -c 'dart pub get >/dev/null && d=$(ls -d /root/.pub-cache/hosted/pub.dev/zxing2-*) && echo $d && ls $d/lib $d/lib/src && grep -rn "^class \(MultiFormatReader\|EAN13Reader\|MultiFormatOneDReader\|UPCAReader\)\|^export" $d/lib | head -40' > out.txt 2>&1
-          while read -r l; do echo "::notice::$l"; done < out.txt
+          docker run --rm -q -v $PWD:/p -w /p dart:stable sh -c 'dart pub get >/dev/null && d=$(ls -d /root/.pub-cache/hosted/pub.dev/zxing2-*) && echo $d && find $d/lib -name "*.dart" | sed "s#$d/##" && grep -rn "^class \|^export\|^library\|Future<Result>\|Result decode" $d/lib | sed "s#$d/##" | grep -i "reader\|export\|library\|decode" | head -80' > out.txt 2>&1 || true
+          mkdir ../o && cp out.txt ../o/ && cd ../o && git init -q -b check-out && git add . && git -c user.name=ci -c user.email=ci@x commit -qm out && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" check-out
