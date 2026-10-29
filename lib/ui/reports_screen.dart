@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -30,6 +31,25 @@ class _ReportsScreenState extends State<ReportsScreen> {
   int _loadedDays = 0;
   DateTime _loadedAt = DateTime(2000);
   bool _printing = false;
+  Timer? _tick;
+
+  // A screen left open (tablet, browser) is not redrawn by itself: check every
+  // minute, so "Today" starts again at midnight and the data stays under 10 min old.
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted && _stale(DateTime.now()) && TickerMode.of(context)) setState(_load);
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  bool _stale(DateTime now) => now.day != _loadedAt.day || now.difference(_loadedAt) > const Duration(minutes: 10);
 
   void _load() {
     _loadedDays = _days;
@@ -52,7 +72,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     // Reload when the period changed, the date changed since the last load
     // (Today must start at this midnight), or the data is over 10 minutes old.
     final now = DateTime.now();
-    final stale = now.day != _loadedAt.day || now.difference(_loadedAt) > const Duration(minutes: 10);
+    final stale = _stale(now);
     // TickerMode is off while another tab is shown, and changes (rebuilding this
     // screen) when the Reports tab comes back into view.
     final visible = TickerMode.of(context);
