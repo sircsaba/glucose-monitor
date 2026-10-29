@@ -5,6 +5,7 @@ import '../logic/glucose.dart';
 import '../logic/meal_plan.dart';
 import '../plus.dart';
 import '../state/app_state.dart';
+import '../state/settings.dart';
 import 'common.dart';
 import 'remote_screen.dart';
 

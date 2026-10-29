@@ -2,7 +2,7 @@
 /// prebolus a set time before the meal, or waiting until glucose rises above a
 /// level. Each step rings when it is due; a person confirms it (Face ID in
 /// Monitor Glucose Plus) before anything is sent. Nothing is given by itself.
-enum StepState { pending, done, skipped }
+enum MealStepState { pending, done, skipped }
 
 class MealStep {
   final String label; // "Prebolus", "Rest of the bolus", "Bolus"
@@ -11,7 +11,7 @@ class MealStep {
   DateTime? at; // due at this time (null: no time)
   final double? aboveMg; // due when a reading is at or above this
   final DateTime? giveUpAt; // with aboveMg: ring anyway at this time
-  StepState state;
+  MealStepState state;
 
   MealStep({
     required this.label,
@@ -20,7 +20,7 @@ class MealStep {
     this.at,
     this.aboveMg,
     this.giveUpAt,
-    this.state = StepState.pending,
+    this.state = MealStepState.pending,
   });
 
   bool get isNow => at == null && aboveMg == null;
@@ -42,13 +42,13 @@ class MealStep {
         at: j['at'] == null ? null : DateTime.tryParse(j['at'].toString()),
         aboveMg: (j['aboveMg'] as num?)?.toDouble(),
         giveUpAt: j['giveUpAt'] == null ? null : DateTime.tryParse(j['giveUpAt'].toString()),
-        state: StepState.values.firstWhere((s) => s.name == j['state'], orElse: () => StepState.pending),
+        state: MealStepState.values.firstWhere((s) => s.name == j['state'], orElse: () => MealStepState.pending),
       );
 }
 
 /// Why a step is due now, or null if it isn't.
 String? stepDueReason(MealStep s, {required DateTime now, required DateTime planStarted, double? latestMg, DateTime? latestTime}) {
-  if (s.state != StepState.pending || s.isNow) return null;
+  if (s.state != MealStepState.pending || s.isNow) return null;
   if (s.at != null && !now.isBefore(s.at!)) return 'It is time';
   if (s.aboveMg != null && latestMg != null && latestTime != null && latestTime.isAfter(planStarted) && latestMg >= s.aboveMg! - 0.01) {
     return 'Glucose is above the level you set';
@@ -68,7 +68,7 @@ class MealPlan {
 
   MealStep? get next {
     for (final s in steps) {
-      if (s.state == StepState.pending) return s;
+      if (s.state == MealStepState.pending) return s;
     }
     return null;
   }

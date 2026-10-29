@@ -49,13 +49,13 @@ void main() {
     final s = planSplit(4.0, 2.0, 15, now)[1];
     expect(stepDueReason(s, now: now.add(const Duration(minutes: 14)), planStarted: now), isNull);
     expect(stepDueReason(s, now: now.add(const Duration(minutes: 15)), planStarted: now), isNotNull);
-    s.state = StepState.done;
+    s.state = MealStepState.done;
     expect(stepDueReason(s, now: now.add(const Duration(minutes: 20)), planStarted: now), isNull);
   });
 
   test('plan survives saving and loading; next skips finished steps', () {
     final p = MealPlan(started: now, carbs: 45, note: 'Eggs, bacon', steps: planSplit(4.0, 2.0, 15, now));
-    p.steps.first.state = StepState.done;
+    p.steps.first.state = MealStepState.done;
     final q = MealPlan.fromJson(p.toJson());
     expect(q.carbs, 45);
     expect(q.note, 'Eggs, bacon');

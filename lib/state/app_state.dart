@@ -679,7 +679,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
   /// A step was given (sent to Loop or given by hand) or skipped.
   void mealStepFinished(MealStep s, {bool skipped = false}) {
-    s.state = skipped ? StepState.skipped : StepState.done;
+    s.state = skipped ? MealStepState.skipped : MealStepState.done;
     if (identical(dueStep, s)) {
       dueStep = null;
       player.stop();
