@@ -109,14 +109,18 @@ PHONE_PLUS = [
     ('4-night', 'plus', ['Night view']),
 ]
 FOOD = [
-    ('7-food', 'app', ['Treat', 'Food: favorites, barcode, meals']),
-    ('8-amount', 'app', ['Treat', 'Food: favorites, barcode, meals', 'Scrambled eggs']),
-    ('9-meal', 'app', ['Treat', 'Food: favorites, barcode, meals', 'Scrambled eggs', 'Add to the meal',
-                       'Bacon', 'Add to the meal', 'Dragon fruit', 'Add to the meal']),
-    ('10-plan', 'app', ['Treat', 'Food: favorites, barcode, meals', 'Scrambled eggs', 'Add to the meal',
-                        'Dragon fruit', 'Add to the meal', 'Prebolus / timer', 'When glucose rises above']),
-    ('11-product', 'app', ['Treat', 'Food: favorites, barcode, meals', 'All', 'Granola bar']),
-    ('12-recipe', 'app', ['Treat', 'Food: favorites, barcode, meals', 'Banana muffins', 'Add to the meal']),
+    ('a-treat', 'app', ['Treat']),
+    ('b-food', 'app', ['Treat', 'Food']),
+    ('c-lunch', 'app', ['Treat', 'Food', 'School lunch']),
+    ('d-lunch-pick', 'app', ['Treat', 'Food', 'School lunch', 'Ham sandwich (gluten-free bread)', '½', 'Apple']),
+    ('e-lunch-edit', 'app', ['Treat', 'Food', 'School lunch', 'Change the lunch box']),
+    ('f-lookup', 'app', ['Treat', 'Food', 'New food', 'Look up by name', 'type:bbq chicken']),
+    ('g-lookup-portion', 'app', ['Treat', 'Food', 'New food', 'Look up by name', 'type:bbq chicken', 'Chicken, broiler, breast, meat, roasted']),
+    ('h-lookup-form', 'app', ['Treat', 'Food', 'New food', 'Look up by name', 'type:bbq chicken', 'Chicken, broiler, breast, meat, roasted', '1 breast']),
+    ('i-recipe-menu', 'app', ['Treat', 'Food', 'Recipes']),
+    ('j-remote', 'plus', ['Treat', 'Remote control']),
+    ('k-remote-carbs', 'plus', ['Treat', 'Remote control', 'Carbs']),
+    ('l-remote-bolus', 'plus', ['Treat', 'Remote control', 'Bolus']),
 ]
 TABLET = [
     ('1-live', 'app', []),
@@ -136,12 +140,14 @@ async def main():
         # The demo site gets a neutral name instead of 127.0.0.1 on screen.
         browser = await p.chromium.launch(args=['--host-resolver-rules=MAP my-site.example 127.0.0.1'])
         only_food = os.environ.get('ONLY_FOOD') == '1'
-        jobs = [('iphone', 'gm', FOOD), ('iphone', 'plus', FOOD)] if only_food else [('iphone', 'gm', PHONE_GM), ('android', 'gm', PHONE_GM), ('tablet', 'gm', TABLET),
+        jobs = [('iphone', 'gm', FOOD), ('iphone', 'plus', FOOD), ('android', 'plus', FOOD)] if only_food else [('iphone', 'gm', PHONE_GM), ('android', 'gm', PHONE_GM), ('tablet', 'gm', TABLET),
                 ('iphone', 'plus', PHONE_PLUS), ('android', 'plus', PHONE_PLUS), ('web', 'web', WEB)]
-        if only_food:
-            jobs = jobs[:2]
         for dev, group, shots in jobs:
             for name, which, steps in shots:
+                if shots is FOOD:
+                    if group == 'gm' and which == 'plus':
+                        continue
+                    which = 'plus' if group == 'plus' else 'app'
                 ctx = await browser.new_context(timezone_id='America/Toronto', locale='en-CA', **DEVICES[dev])
                 # shared_preferences on the web keeps each value JSON-encoded in
                 # localStorage under "flutter.<key>"; the settings are one JSON string.
@@ -150,6 +156,10 @@ async def main():
                     "try { localStorage.setItem('flutter.settings', " + json.dumps(stored) + "); } catch (e) {}")
                 page = await open_app(ctx, APP if which == 'app' else PLUS)
                 for s in steps:
+                    if s.startswith('type:'):
+                        await page.keyboard.type(s[5:], delay=60)
+                        await page.wait_for_timeout(2500)
+                        continue
                     await tap(page, s, touch=dev != 'web')
                 await page.wait_for_timeout(1500)  # tooltips and transitions gone
                 await shot(page, f'{group}-{dev}' if group != 'web' else 'web', name)

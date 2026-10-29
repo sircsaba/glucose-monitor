@@ -178,8 +178,31 @@ class H(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self._send({'ok': True})
 
+    def _body(self):
+        n = int(self.headers.get('Content-Length') or 0)
+        try:
+            return json.loads(self.rfile.read(n) or b'null')
+        except Exception:
+            return None
+
     def do_POST(self):
+        path = urlparse(self.path).path.replace('.json', '')
+        d = self._body()
+        if path == '/api/v1/food' and isinstance(d, dict):
+            d['_id'] = 'n%d' % (len(FOODS) + 1)
+            FOODS.append(d)
+            return self._send([d])
         self._send([])
+
+    def do_PUT(self):
+        path = urlparse(self.path).path.replace('.json', '')
+        d = self._body()
+        if path == '/api/v1/food' and isinstance(d, dict):
+            for k, f in enumerate(FOODS):
+                if f.get('_id') == d.get('_id'):
+                    FOODS[k] = d
+            return self._send(d)
+        self._send({})
 
     def do_GET(self):
         u = urlparse(self.path)
@@ -247,6 +270,29 @@ FOODS = [
     {'_id': 'f8', 'type': 'food', 'name': 'Rice, cooked', 'category': 'Grains', 'portion': 150, 'unit': 'g', 'carbs': 42,
      'energy': 195, 'gluten': 'free', 'meals': ['lunch', 'supper'], 'favorite': False, 'source': 'manual'},
 ]
+
+
+# Today's school lunch (demo).
+def _lunch():
+    try:
+        from zoneinfo import ZoneInfo
+        day = datetime.now(ZoneInfo('America/Toronto')).strftime('%Y-%m-%d')
+    except Exception:
+        day = datetime.now().strftime('%Y-%m-%d')
+    by = {f['_id']: f for f in FOODS}
+    def item(key, fid, amount):
+        return {'key': key, 'food': by[fid], 'amount': amount, 'eaten': 0}
+    sandwich = {'_id': 'f9', 'type': 'food', 'name': 'Ham sandwich (gluten-free bread)', 'category': 'Lunch', 'portion': 1,
+                'unit': 'piece', 'carbs': 34, 'energy': 310, 'protein': 16, 'fat': 11, 'gluten': 'free', 'meals': ['lunch']}
+    apple = {'_id': 'f10', 'type': 'food', 'name': 'Apple', 'category': 'Fruit', 'portion': 1, 'unit': 'piece', 'carbs': 25,
+             'energy': 95, 'gluten': 'free', 'meals': ['lunch', 'snack']}
+    FOODS.extend([sandwich, apple])
+    by = {f['_id']: f for f in FOODS}
+    FOODS.append({'_id': 'l1', 'type': 'schoollunch', 'name': 'School lunch ' + day, 'date': day,
+                  'items': [item('i1', 'f9', 1), item('i2', 'f10', 1), item('i3', 'f4', 28), item('i4', 'f7', 60)], 'eaten': []})
+
+
+_lunch()
 
 
 if __name__ == '__main__':

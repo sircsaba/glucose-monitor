@@ -6,6 +6,8 @@ name: Make Monitor Glucose screenshots (demo data)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [food2]
 
 permissions:
   contents: write
