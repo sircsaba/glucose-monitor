@@ -1,0 +1,39 @@
+name: Loop compile check (no signing)
+
+on:
+  push:
+    branches: [loop-check]
+
+jobs:
+  compile:
+    runs-on: macos-latest
+    timeout-minutes: 150
+    steps:
+      - name: Newest Xcode
+        run: |
+          X=$(ls -d /Applications/Xcode_*.app | grep -v beta | sort -V | tail -1)
+          echo "::notice::$X"
+          sudo xcode-select --switch "$X/Contents/Developer"
+      - uses: actions/checkout@v5
+        with:
+          repository: sircsaba/LoopWorkspace
+          ref: shared-foods-check
+          submodules: recursive
+      - name: Patches, as in the real build
+        run: |
+          git apply --directory=Loop -v --whitespace=fix ./custom_patches/loop_heartbeat.patch
+          git apply --directory=Loop -v --whitespace=fix ./custom_patches/loop_shared_foods.patch
+          git apply --directory=NightscoutRemoteCGM -v --whitespace=fix ./custom_patches/nightscout_cgm_backup_source.patch
+          export PATCH_REPO=https://github.com/loopandlearn/customization.git PATCH_BRANCH=main
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/sircsaba/lnl-scripts/dev/CustomizationSelect.sh)" profiles watch_title negative_insulin
+      - name: Build Loop (iPhone, no signing)
+        run: |
+          set +e
+          xcodebuild -workspace LoopWorkspace.xcworkspace -scheme LoopWorkspace \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build > build.log 2>&1
+          rc=$?
+          grep -E "error:" build.log | sort -u | head -15 | while read -r l; do echo "::error::${l:0:900}"; done
+          grep -E "warning: .*(CarbEntryView|CarbEntryViewModel)" build.log | sort -u | head -10 | while read -r l; do echo "::warning::${l:0:600}"; done
+          tail -3 build.log | while read -r l; do echo "::notice::tail: ${l:0:500}"; done
+          exit $rc
