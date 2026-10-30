@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../data/nightscout.dart';
@@ -249,9 +249,9 @@ class _FoodScreenState extends State<FoodScreen> {
   Future<void> _recipeFromPdf() async {
     Uint8List? bytes;
     try {
-      final pick = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: const ['pdf'], withData: true);
-      final f = pick?.files.firstOrNull;
-      bytes = f == null ? null : (f.bytes ?? await f.xFile.readAsBytes());
+      const pdf = XTypeGroup(label: 'PDF', extensions: ['pdf'], mimeTypes: ['application/pdf'], uniformTypeIdentifiers: ['com.adobe.pdf']);
+      final f = await openFile(acceptedTypeGroups: const [pdf]);
+      bytes = f == null ? null : await f.readAsBytes();
     } catch (e) {
       if (mounted) toast(context, 'Could not open the file: $e');
       return;
