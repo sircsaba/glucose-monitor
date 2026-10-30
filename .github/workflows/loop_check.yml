@@ -21,11 +21,14 @@ jobs:
           submodules: recursive
       - name: Patches, as in the real build
         run: |
-          git apply --directory=Loop -v --whitespace=fix ./custom_patches/loop_heartbeat.patch
-          git apply --directory=Loop -v --whitespace=fix ./custom_patches/loop_shared_foods.patch
-          git apply --directory=NightscoutRemoteCGM -v --whitespace=fix ./custom_patches/nightscout_cgm_backup_source.patch
+          run() { if ! out=$("$@" 2>&1); then echo "$out" | tail -8 | while IFS= read -r l; do echo "::error::$1 ... ${l:0:400}"; done; exit 1; fi; }
+          run git apply --directory=Loop -v --whitespace=fix ./custom_patches/loop_heartbeat.patch
+          run git apply --directory=Loop -v --whitespace=fix ./custom_patches/loop_shared_foods.patch
+          run git apply --directory=NightscoutRemoteCGM -v --whitespace=fix ./custom_patches/nightscout_cgm_backup_source.patch
           export PATCH_REPO=https://github.com/loopandlearn/customization.git PATCH_BRANCH=main
-          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/sircsaba/lnl-scripts/dev/CustomizationSelect.sh)" profiles watch_title negative_insulin
+          curl -fsSL https://raw.githubusercontent.com/sircsaba/lnl-scripts/dev/CustomizationSelect.sh -o /tmp/cs.sh
+          run /bin/bash /tmp/cs.sh profiles watch_title negative_insulin
+          echo "::notice::patches applied"
       - name: Build Loop (iPhone, no signing)
         run: |
           set +e
