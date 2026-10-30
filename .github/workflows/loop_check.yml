@@ -6,12 +6,12 @@ on:
 
 jobs:
   compile:
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 150
     steps:
       - name: Newest Xcode
         run: |
-          X=$(ls -d /Applications/Xcode_*.app | grep -v beta | sort -V | tail -1)
+          X=/Applications/Xcode_27.0.app
           echo "::notice::$X"
           sudo xcode-select --switch "$X/Contents/Developer"
       - uses: actions/checkout@v5
@@ -26,8 +26,6 @@ jobs:
           run git apply --directory=Loop -v --whitespace=fix ./custom_patches/loop_shared_foods.patch
           run git apply --directory=NightscoutRemoteCGM -v --whitespace=fix ./custom_patches/nightscout_cgm_backup_source.patch
           echo "::notice::patches applied"
-      - name: watchOS platform (Loop has a watch app)
-        run: xcodebuild -downloadPlatform watchOS || xcodebuild -downloadAllPlatforms
       - name: Build Loop (iPhone, no signing)
         run: |
           set +e
