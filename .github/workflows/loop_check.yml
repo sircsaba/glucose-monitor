@@ -26,6 +26,8 @@ jobs:
           run git apply --directory=Loop -v --whitespace=fix ./custom_patches/loop_shared_foods.patch
           run git apply --directory=NightscoutRemoteCGM -v --whitespace=fix ./custom_patches/nightscout_cgm_backup_source.patch
           echo "::notice::patches applied"
+      - name: watchOS platform (Loop has a watch app)
+        run: xcodebuild -downloadPlatform watchOS || xcodebuild -downloadAllPlatforms
       - name: Build Loop (iPhone, no signing)
         run: |
           set +e
