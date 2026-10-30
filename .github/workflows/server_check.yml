@@ -8,8 +8,21 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: List zxing2
+      - name: Look
         run: |
-          mkdir p && cd p && printf 'name: p\nenvironment:\n  sdk: ">=3.0.0 <4.0.0"\ndependencies:\n  zxing2: ^0.2.3\n' > pubspec.yaml
-          docker run --rm -q -v $PWD:/p -w /p dart:stable sh -c 'dart pub get >/dev/null && d=$(ls -d /root/.pub-cache/hosted/pub.dev/zxing2-*) && echo $d && find $d/lib -name "*.dart" | sed "s#$d/##" && grep -rn "^class \|^export\|^library\|Future<Result>\|Result decode" $d/lib | sed "s#$d/##" | grep -i "reader\|export\|library\|decode" | head -80' > out.txt 2>&1 || true
-          mkdir ../o && cp out.txt ../o/ && cd ../o && git init -q -b check-out && git add . && git -c user.name=ci -c user.email=ci@x commit -qm out && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" check-out
+          mkdir o && cd o
+          curl -s -m 30 "https://nsval.mooo.com/api/v1/food.json?count=5000" > foods.json
+          python3 - > out.txt <<'PY'
+          import json
+          for d in json.load(open('foods.json')):
+              t = (str(d.get('name','')) + ' ' + str(d.get('brand',''))).lower()
+              if 'crisp' in t or 'sour cream' in t:
+                  print(json.dumps({k: d.get(k) for k in ('name','brand','barcode','gluten','glutenWhy','ingredients','allergens')}, ensure_ascii=False))
+          PY
+          for c in $(python3 -c "import json;[print(json.loads(l).get('barcode') or '') for l in open('out.txt') if l.startswith('{')]"); do
+            echo "== OFF $c" >> out.txt
+            curl -s -m 30 -A "MonitorGlucose/1.0 (https://monitorglucose.ca)" "https://world.openfoodfacts.org/api/v2/product/$c.json?fields=product_name,brands,ingredients_text,ingredients_text_en,ingredients_text_fr,labels_tags,allergens_tags,traces_tags,ingredients_analysis_tags" >> out.txt
+            echo >> out.txt
+          done
+          rm foods.json
+          git init -q -b check-out && git add . && git -c user.name=ci -c user.email=ci@x commit -qm out && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" check-out
