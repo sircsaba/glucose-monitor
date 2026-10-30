@@ -1,0 +1,40 @@
+BackLook up a food
+Back
+Generic foods
+Store products
+Chicken, broiler, meat only, roasted
+Poulet à griller, viande seulement, rôti
+Per 100 g: 0 g carbs · 190 kcal
+Chicken, broiler, light meat, roasted
+Poulet à griller, viande blanche, rôtie
+Per 100 g: 0 g carbs · 173 kcal
+Chicken, broiler, dark meat, roasted
+Poulet à griller, viande brune, rôtie
+Per 100 g: 0 g carbs · 205 kcal
+Chicken, broiler, leg, meat, roasted
+Poulet à griller, cuisse, viande, rôti
+Per 100 g: 0 g carbs · 174 kcal
+Chicken, broiler, wing, meat, roasted
+Poulet à griller, aile, viande, rôti
+Per 100 g: 0 g carbs · 203 kcal
+Chicken, roasting, meat only, roasted
+Poulet à rôtir, viande seulement, rôtie
+Per 100 g: 0 g carbs · 167 kcal
+Chicken, roasting, light meat, roasted
+Poulet à rôtir, viande blanche, rôti
+Per 100 g: 0 g carbs · 153 kcal
+Chicken, broiler, skin only, roasted
+Poulet à griller, peau seulement, rôti
+Per 100 g: 0 g carbs · 454 kcal
+Chicken, broiler, back, meat, roasted
+Poulet à griller, dos, viande, rôti
+Per 100 g: 0 g carbs · 239 kcal
+Chicken, broiler, breast, meat, roasted
+Poulet à griller, poitrine, viande, rôti
+Per 100 g: 0 g carbs · 165 kcal
+Chicken, broiler, drumstick, meat, roasted
+Poulet à griller, pilon, viande, rôti
+Per 100 g: 0 g carbs · 155 kcal
+Chicken, capon, meat and skin, roasted
+Poulet, chapon, viande et peau, rôties
+Per 100 g: 0 g carbs · 229 kcal

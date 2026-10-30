@@ -1,0 +1,6 @@
+Popup menu
+Recipe from a PDF file
+Recipe from a web address
+Type or paste a recipe
+Canadian nutrition label
+US nutrition label

@@ -1,0 +1,32 @@
+BackFoodScan a barcodeNew foodRecipes
+Back
+Scan a barcode
+New food
+Recipes
+School lunch
+4 foods in the box · 102 g carbs
+Favorites
+All
+Breakfast
+Lunch
+Supper
+Snack
+Gluten-free only
+Remove from favoritesDetails
+Bacon
+GF
+0.4 g carbs / 30 g · 160 kcal · Breakfast, Lunch, Snack
+Remove from favorites
+Details
+Banana muffins
+GF
+25 g carbs / 60 g · 180 kcal · Breakfast, Snack
+Corn tortilla chips
+GF
+Sample Foods · 18 g carbs / 28 g · 140 kcal · Snack
+Dragon fruit
+GF
+13 g carbs / 100 g · 60 kcal · Breakfast, Snack
+Scrambled eggs
+GF
+1 g carbs / 2 pieces · 180 kcal · Breakfast
