@@ -30,7 +30,7 @@ jobs:
         run: |
           set +e
           xcodebuild -workspace LoopWorkspace.xcworkspace -scheme LoopWorkspace \
-            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -configuration Release -destination 'generic/platform=iOS' \
             -derivedDataPath build CODE_SIGNING_ALLOWED=NO build > build.log 2>&1
           rc=$?
           grep -E "error:" build.log | sort -u | head -15 | while read -r l; do echo "::error::${l:0:900}"; done
