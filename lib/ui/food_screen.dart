@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -245,14 +247,15 @@ class _FoodScreenState extends State<FoodScreen> {
 
   /// A PDF of a recipe: its text read directly; a scanned PDF read like photos (phone).
   Future<void> _recipeFromPdf() async {
-    FilePickerResult? pick;
+    Uint8List? bytes;
     try {
-      pick = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: const ['pdf'], withData: true);
+      final pick = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: const ['pdf'], withData: true);
+      final f = pick?.files.firstOrNull;
+      bytes = f == null ? null : (f.bytes ?? await f.xFile.readAsBytes());
     } catch (e) {
       if (mounted) toast(context, 'Could not open the file: $e');
       return;
     }
-    final bytes = pick?.files.firstOrNull?.bytes;
     if (bytes == null || !mounted) return;
     setState(() => _busy = true);
     var text = '';
