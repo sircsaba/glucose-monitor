@@ -2,6 +2,8 @@ name: Build Monitor Glucose Plus (Android)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [food2]
 
 jobs:
   android:

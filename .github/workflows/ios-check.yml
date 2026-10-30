@@ -4,6 +4,8 @@ name: Check Monitor Glucose (iPhone build, no signing)
 # that everything compiles. Nothing is sent to TestFlight.
 on:
   workflow_dispatch:
+  push:
+    branches: [food2]
 
 jobs:
   ios-check:
