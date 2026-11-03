@@ -339,6 +339,7 @@ final class Server
             'ip' => substr(trim(explode(',', $ip)[0]), 0, 64),
             'agent' => substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 200),
             'auth' => isset($_SERVER['HTTP_API_SECRET']) ? 'api-secret' : (isset($_GET['token']) ? 'token' : 'other'),
+            'phone' => substr((string)($_SERVER['HTTP_X_LOOP_PHONE'] ?? ''), 0, 60),
             'query' => substr((string)($_SERVER['QUERY_STRING'] ?? ''), 0, 300),
         ]);
         @file_put_contents($rf, json_encode(array_slice($list, 0, 200)), LOCK_EX);
@@ -348,8 +349,40 @@ final class Server
         if (time() - $last < 30) return;
         @file_put_contents($file, json_encode(['at' => time()]), LOCK_EX);
         if (time() - $last > 900) {
-            EventLog::add($this->db, 'job', 'Loop is reading its glucose from this server (backup CGM source)');
+            $phone = trim((string)($_SERVER['HTTP_X_LOOP_PHONE'] ?? ''));
+            EventLog::add($this->db, 'job', 'Loop' . ($phone !== '' ? " ($phone)" : '') . ' is reading its glucose from this server (backup CGM source)');
         }
+    }
+
+    /**
+     * Is the Loop that is looping reading its glucose from here (backup)?
+     * Counts only reads from that phone (named in Loop with the Phone name
+     * setting, sent with each read and each status upload), and needs reads
+     * at least 3 minutes apart in the last 12 minutes: a one-off test of the
+     * address in Loop's settings, or a spare phone, does not count.
+     */
+    private function loopOnBackup(): array
+    {
+        $rf = __DIR__ . '/.cgm-readers.json';
+        $list = is_file($rf) ? (json_decode((string)file_get_contents($rf), true) ?: []) : [];
+        $looping = '';
+        $ds = $this->fetchDocs('SELECT doc FROM devicestatus ORDER BY created_ms DESC LIMIT 1', [])[0] ?? null;
+        if (is_object($ds) && isset($ds->device) && is_string($ds->device)) {
+            $looping = preg_replace('#^loop://#', '', $ds->device);
+        }
+        $named = $looping !== '' && strcasecmp($looping, 'iPhone') !== 0 && strcasecmp($looping, 'iPad') !== 0;
+        $times = [];
+        foreach ($list as $r) {
+            $t = strtotime((string)($r['at'] ?? ''));
+            if (!$t || time() - $t > 720) continue;
+            $phone = (string)($r['phone'] ?? '');
+            // With phone names: only the looping phone; without (older Loop): any Loop.
+            if ($named && $phone !== '' && strcasecmp($phone, $looping) !== 0) continue;
+            if ($named && $phone === '' && array_filter($list, fn($x) => ($x['phone'] ?? '') !== '')) continue;
+            $times[] = $t;
+        }
+        $on = $times && (max($times) - min($times)) >= 180;
+        return [$on, $times ? max($times) : 0, $named ? $looping : null];
     }
 
     /** GET a small JSON from the main Nightscout; null when it does not answer. */
@@ -413,8 +446,7 @@ final class Server
         }
         $cgm = $this->db->query("SELECT MAX(date_ms) FROM entries WHERE type = 'sgv'")->fetchColumn();
         $loop = $this->db->query('SELECT MAX(created_ms) FROM devicestatus')->fetchColumn();
-        $lf = __DIR__ . '/.loop-cgm.json';
-        $fetch = is_file($lf) ? (int)(json_decode((string)file_get_contents($lf), true)['at'] ?? 0) : 0;
+        [$onBackup, $fetch, $loopPhone] = $this->loopOnBackup();
         return [
             'serverTime' => (int)round(microtime(true) * 1000),
             'feedProblem' => $this->feedProblem(),
@@ -422,7 +454,8 @@ final class Server
             'cgmLast' => $cgm !== false && $cgm !== null ? (int)$cgm : null,
             'loopLast' => $loop !== false && $loop !== null ? (int)$loop : null,
             // Loop asked this server for glucose in the last 10 minutes.
-            'loopCgmFromHere' => $fetch > 0 && time() - $fetch < 600,
+            'loopCgmFromHere' => $onBackup,
+            'loopPhone' => $loopPhone,
             'loopCgmFetch' => $fetch > 0 ? $fetch * 1000 : null,
             'main' => $this->mainStatus(),
             'foodWaiting' => $this->foodHealth(),
@@ -1166,8 +1199,42 @@ final class Server
         } catch (Throwable $e) {
             $status = 'Error: ' . $e->getMessage();
         }
+        try {
+            $this->syncProfileNow();
+        } catch (Throwable $e) {
+            // the meals status says enough; the profile is tried again next time
+        }
         @file_put_contents($stateFile, json_encode(['at' => $now, 'status' => $status]));
         return $status;
+    }
+
+    /**
+     * Loop's settings (the profile: override presets, carb ratio, sensitivity,
+     * targets) kept the same on both sites: the newest one (by its start date)
+     * is copied to the site that does not have it. Loop sends its settings only
+     * when they change, so a site that missed that upload gets them this way.
+     */
+    private function syncProfileNow(): void
+    {
+        if (($this->cfg['profile_from_main'] ?? true) === false) return;
+        [$code, $main] = $this->nsFood('GET', '/api/v1/profile.json?count=1');
+        if ($code !== 200 || !is_array($main)) return;
+        $theirs = $main[0] ?? null;
+        $mine = $this->fetchDocs('SELECT doc FROM profile ORDER BY start_ms DESC, created_ms DESC LIMIT 1', [])[0] ?? null;
+        $start = fn($d) => is_object($d) ? (self::toMs($d->startDate ?? null) ?? self::toMs($d->created_at ?? null) ?? 0) : 0;
+        $t = $start($theirs);
+        $m = $start($mine);
+        if ($theirs !== null && $t > $m + 60000) {
+            $copy = clone $theirs;
+            unset($copy->_id);
+            $this->saveProfile($copy);
+            EventLog::add($this->db, 'job', 'Loop settings (profile) copied from Nightscout');
+        } elseif ($mine !== null && $m > $t + 60000 && trim((string)($this->cfg['main_nightscout_secret'] ?? '')) !== '') {
+            $copy = clone $mine;
+            unset($copy->_id);
+            [$c2] = $this->nsFood('POST', '/api/v1/profile', $copy);
+            if ($c2 >= 200 && $c2 < 300) EventLog::add($this->db, 'job', 'Loop settings (profile) copied to Nightscout');
+        }
     }
 
     private function syncMealsNow(): string

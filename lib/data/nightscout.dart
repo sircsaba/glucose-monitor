@@ -581,10 +581,45 @@ class NightscoutClient {
   Future<List<Food>> foods() async {
     final j = await _get('/api/v1/food.json', {'count': '5000'});
     if (j is! List) return [];
+    // Older Nightscout versions can keep two copies of a food with the same
+    // _id (the first one, and one made when it was changed): show the newest.
+    final byId = <String, Map>{};
+    final noId = <Map>[];
+    for (final e in j) {
+      if (e is! Map) continue;
+      final id = e['_id']?.toString();
+      if (id == null) {
+        noId.add(e);
+        continue;
+      }
+      final had = byId[id];
+      if (had == null || (e['created_at'] ?? '').toString().compareTo((had['created_at'] ?? '').toString()) > 0) byId[id] = e;
+    }
     return [
-      for (final e in j)
-        if (e is Map && (e['type'] ?? 'food') == 'food') Food.fromJson(Map<String, dynamic>.from(e))
+      for (final e in [...byId.values, ...noId])
+        if ((e['type'] ?? 'food') == 'food') Food.fromJson(Map<String, dynamic>.from(e))
     ];
+  }
+
+  /// How many copies of this _id the food list has (older Nightscout: up to 2).
+  Future<int> _foodCopies(String id) async {
+    try {
+      final j = await _get('/api/v1/food.json', {'count': '5000'});
+      if (j is! List) return 0;
+      return j.where((e) => e is Map && e['_id']?.toString() == id).length;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// After a change: older Nightscout versions add a second copy instead of
+  /// changing the first; the first (old) one is removed so it cannot come back.
+  Future<void> _dropOldCopy(String id) async {
+    if (await _foodCopies(id) > 1) {
+      try {
+        await http.delete(_uri('/api/v1/food/$id', const {}), headers: _headers).timeout(const Duration(seconds: 25));
+      } catch (_) {}
+    }
   }
 
   /// Creates or updates a food; returns it with its id.
@@ -603,11 +638,13 @@ class NightscoutClient {
       throw NsException('This token is not allowed to change the food list: use the API secret (or a Nightscout token with the admin role)');
     }
     if (r.statusCode != 200 && r.statusCode != 201) throw NsException('The site answered with error ${r.statusCode}');
+    final wasPut = f.id != null;
     try {
       final j = jsonDecode(r.body);
       final m = j is List && j.isNotEmpty ? j.first : j;
       if (m is Map && m['_id'] != null) f.id = m['_id'].toString();
     } catch (_) {}
+    if (wasPut && f.id != null) await _dropOldCopy(f.id!);
     return f;
   }
 
@@ -633,12 +670,14 @@ class NightscoutClient {
       throw NsException('This token is not allowed to change the food list: use the API secret (or a Nightscout token with the admin role)');
     }
     if (r.statusCode != 200 && r.statusCode != 201) throw NsException('The site answered with error ${r.statusCode}');
+    String? id = doc['_id']?.toString();
     try {
       final j = jsonDecode(r.body);
       final m = j is List && j.isNotEmpty ? j.first : j;
-      if (m is Map && m['_id'] != null) return m['_id'].toString();
+      if (m is Map && m['_id'] != null) id = m['_id'].toString();
     } catch (_) {}
-    return doc['_id']?.toString();
+    if (doc['_id'] != null && id != null) await _dropOldCopy(id);
+    return id;
   }
 
   Future<void> deleteFood(String id) async {
@@ -650,6 +689,17 @@ class NightscoutClient {
     }
     if (r.statusCode == 401 || r.statusCode == 403) throw NsException('This token is not allowed to change the food list');
     if (r.statusCode != 200 && r.statusCode != 204) throw NsException('The site answered with error ${r.statusCode}');
+    // Older Nightscout versions cannot delete the second copy of a changed food
+    // (it comes back later): mark that copy as deleted, it is then never shown.
+    if (await _foodCopies(id) > 0) {
+      try {
+        await http
+            .put(_uri('/api/v1/food', const {}),
+                headers: {..._headers, 'Content-Type': 'application/json'},
+                body: jsonEncode({'_id': id, 'type': 'deleted', 'name': '(deleted)', 'created_at': DateTime.now().toUtc().toIso8601String()}))
+            .timeout(const Duration(seconds: 25));
+      } catch (_) {}
+    }
   }
 
   /// The HTML of a recipe page, through this site (the web app: browsers

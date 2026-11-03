@@ -302,6 +302,16 @@ try {
     if (!empty($backfill)) jobLog('cgm', "LibreLinkUp: filled in $backfill older reading(s)");
     saveStatus(null, $added);
     echo date('Y-m-d H:i:s ') . "LibreLinkUp: $added new reading(s)\n";
+    // Readings the main Nightscout is missing (Loop on the backup source does not upload them).
+    if (is_file(__DIR__ . '/maincopy.php')) {
+        try {
+            require_once __DIR__ . '/maincopy.php';
+            $msg = MainCopy::run($cfg, $db);
+            if ($msg !== null) jobLog('job', $msg);
+        } catch (Throwable $e) {
+            fwrite(STDERR, date('Y-m-d H:i:s ') . 'Readings to Nightscout: ' . $e->getMessage() . "\n");
+        }
+    }
 } catch (Throwable $e) {
     fwrite(STDERR, date('Y-m-d H:i:s ') . $e->getMessage() . "\n");
     saveStatus($e instanceof LibreError ? $e->getMessage() : 'Error: ' . $e->getMessage());
