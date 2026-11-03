@@ -1,0 +1,42 @@
+name: Loop compile check (no signing)
+
+on:
+  push:
+    branches: [loop-check]
+
+jobs:
+  compile:
+    runs-on: xcode-27
+    timeout-minutes: 150
+    steps:
+      - name: Xcode
+        run: sudo xcode-select --switch /Applications/Xcode_27.0.app/Contents/Developer
+      - uses: actions/checkout@v5
+        with:
+          repository: sircsaba/LoopWorkspace
+          ref: loop-wish-check
+          submodules: recursive
+      - name: Patches, as in the real build
+        run: |
+          python3 - <<'PY'
+          import sys, yaml
+          wf = yaml.safe_load(open('.github/workflows/build_loop.yml'))
+          for job in wf['jobs'].values():
+              for step in job.get('steps', []):
+                  if step.get('name') == 'Customize Loop':
+                      open('/tmp/customize.sh', 'w').write(step['run'])
+                      sys.exit(0)
+          sys.exit('no Customize Loop step')
+          PY
+          if ! bash -e /tmp/customize.sh > /tmp/c.log 2>&1; then grep -E "rror|does not apply" /tmp/c.log | head -8 | while IFS= read -r l; do echo "::error::${l:0:400}"; done; exit 1; fi
+          echo "::notice::patches applied (same Customize Loop step as the build)"
+      - name: Build Loop (iPhone, no signing)
+        run: |
+          set +e
+          xcodebuild -workspace LoopWorkspace.xcworkspace -scheme LoopWorkspace \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build > build.log 2>&1
+          rc=$?
+          grep -E "error: " build.log | grep -v "var error" | sort -u | head -15 | while read -r l; do echo "::error::${l:0:900}"; done
+          tail -3 build.log | while read -r l; do echo "::notice::tail: ${l:0:500}"; done
+          exit $rc
