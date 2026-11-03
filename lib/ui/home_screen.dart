@@ -431,7 +431,6 @@ class _DayViewState extends State<DayView> {
           final net = switch (d?.network) {
             'Wi-Fi' => Icons.wifi,
             'cellular' => Icons.signal_cellular_alt,
-            'offline' => Icons.signal_wifi_off,
             _ => null,
           };
           if (c.box) return pair('Phone', pct, icon: net);
