@@ -18,17 +18,9 @@ jobs:
           submodules: recursive
       - name: Patches, as in the real build
         run: |
-          python3 - <<'PY'
-          import sys, yaml
-          wf = yaml.safe_load(open('.github/workflows/build_loop.yml'))
-          for job in wf['jobs'].values():
-              for step in job.get('steps', []):
-                  if step.get('name') == 'Customize Loop':
-                      open('/tmp/customize.sh', 'w').write(step['run'])
-                      sys.exit(0)
-          sys.exit('no Customize Loop step')
-          PY
-          if ! bash -e /tmp/customize.sh > /tmp/c.log 2>&1; then grep -E "rror|does not apply" /tmp/c.log | head -8 | while IFS= read -r l; do echo "::error::${l:0:400}"; done; exit 1; fi
+          ruby -ryaml -e 'wf = YAML.load_file(".github/workflows/build_loop.yml"); wf["jobs"].each_value { |j| (j["steps"] || []).each { |st| File.write("/tmp/customize.sh", st["run"]) if st["name"] == "Customize Loop" } }'
+          test -s /tmp/customize.sh || { echo "::error::no Customize Loop step"; exit 1; }
+          if ! bash -e /tmp/customize.sh > /tmp/c.log 2>&1; then tail -12 /tmp/c.log | while IFS= read -r l; do echo "::error::${l:0:400}"; done; exit 1; fi
           echo "::notice::patches applied (same Customize Loop step as the build)"
       - name: Build Loop (iPhone, no signing)
         run: |
