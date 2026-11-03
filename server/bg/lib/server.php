@@ -1349,6 +1349,12 @@ final class Server
         header('Access-Control-Allow-Headers: Content-Type, Accept, api-secret, Authorization');
         $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
         $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+        // /p/<phone name>/api/...: Loop names its phone in the backup address
+        // (Phone name setting), so this server knows which phone reads from it.
+        if (preg_match('#^/p/([^/]{1,60})(/api(?:/.*)?)$#', $path, $pm)) {
+            $_SERVER['HTTP_X_LOOP_PHONE'] = rawurldecode($pm[1]);
+            $path = $pm[2];
+        }
         // Everything outside /api is the web app (same as the phone app), so this
         // address shows it. No database needed for that.
         $isApi = $path === '/api' || strncmp($path, '/api/', 5) === 0;
