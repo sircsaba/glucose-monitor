@@ -281,6 +281,11 @@ final class Server
             case 'food':
                 $this->food($method, $sub);
                 return;
+            case 'cgmreaders':
+                $this->need(self::READ);
+                $rf = __DIR__ . '/.cgm-readers.json';
+                self::out(is_file($rf) ? (json_decode((string)file_get_contents($rf), true) ?: []) : []);
+                return;
             case 'recipepage':
                 // The web app's "recipe from a web address": browsers cannot read
                 // other sites, so this server fetches the page. Only for the web
@@ -324,6 +329,20 @@ final class Server
 
     private function noteLoopCgmFetch(): void
     {
+        // Who is reading (kept to find out what reads glucose from here):
+        // the last 200 requests, newest first, at /api/v1/cgmreaders.
+        $rf = __DIR__ . '/.cgm-readers.json';
+        $list = is_file($rf) ? (json_decode((string)file_get_contents($rf), true) ?: []) : [];
+        $ip = (string)($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '');
+        array_unshift($list, [
+            'at' => gmdate('Y-m-d\TH:i:s\Z'),
+            'ip' => substr(trim(explode(',', $ip)[0]), 0, 64),
+            'agent' => substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 200),
+            'auth' => isset($_SERVER['HTTP_API_SECRET']) ? 'api-secret' : (isset($_GET['token']) ? 'token' : 'other'),
+            'query' => substr((string)($_SERVER['QUERY_STRING'] ?? ''), 0, 300),
+        ]);
+        @file_put_contents($rf, json_encode(array_slice($list, 0, 200)), LOCK_EX);
+
         $file = __DIR__ . '/.loop-cgm.json';
         $last = is_file($file) ? (int)(json_decode((string)file_get_contents($file), true)['at'] ?? 0) : 0;
         if (time() - $last < 30) return;
