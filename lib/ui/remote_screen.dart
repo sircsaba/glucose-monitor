@@ -586,6 +586,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
                   onMinus: () => change((x) => x.set('remoteMaxCarbs', (x.number('remoteMaxCarbs') - 10).clamp(10.0, 250.0))),
                   onPlus: () => change((x) => x.set('remoteMaxCarbs', (x.number('remoteMaxCarbs') + 10).clamp(10.0, 250.0))),
                   onTyped: (v) => change((x) => x.set('remoteMaxCarbs', v.roundToDouble().clamp(10.0, 250.0))),
+                ),
                 const SizedBox(height: 14),
                 const Text('Insulin safety', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                 StepRow(
@@ -637,7 +638,6 @@ class _RemoteScreenState extends State<RemoteScreen> {
                   ),
                 ],
                 const SizedBox(height: 8),
-                ),
                 TextField(
                   controller: nameCtl,
                   decoration: const InputDecoration(labelText: 'Your name (shown in Loop)', hintText: kAppName),
