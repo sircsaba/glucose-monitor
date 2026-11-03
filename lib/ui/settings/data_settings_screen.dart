@@ -29,6 +29,28 @@ class DataSettingsScreen extends StatelessWidget {
               app.restartTimers();
             },
           ),
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: TextFormField(
+              initialValue: s.str('statusUrl'),
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(
+                labelText: 'Your Monitor Glucose server (optional)',
+                hintText: 'https://bg.example.com',
+                helperText: 'When this app shows a Nightscout site: the backup CGM and job status come from your server',
+                helperMaxLines: 2,
+              ),
+              onChanged: (v) => app.change((x) => x.set('statusUrl', v.trim())),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 4),
+            child: TextFormField(
+              initialValue: s.str('statusToken'),
+              decoration: const InputDecoration(labelText: 'Its read token', hintText: 'readable-…'),
+              onChanged: (v) => app.change((x) => x.set('statusToken', v.trim())),
+            ),
+          ),
           setSwitch('Allow logging treatments', 'allowTreatments'),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),

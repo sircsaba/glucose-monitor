@@ -339,7 +339,13 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
           feedProblem = await c.feedProblem();
         } catch (_) {}
       }
-      health = Health.fromJson(await c.health());
+      var h = await c.health();
+      final su = settings.str('statusUrl');
+      if (h == null && su.isNotEmpty && NightscoutClient.normalize(su) != NightscoutClient.normalize(settings.str('nsUrl'))) {
+        // A plain Nightscout has no health report: ask your own server.
+        h = await NightscoutClient(su, settings.str('statusToken'), false).health();
+      }
+      health = Health.fromJson(h);
       error = null;
       internetUp = null;
       lastFetch = now;

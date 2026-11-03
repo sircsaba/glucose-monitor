@@ -506,6 +506,34 @@ class _BgPainter extends CustomPainter {
       }
     }
 
+    // Sensor, pump site / pod and insulin changes: a dotted line and a label.
+    {
+      const kinds = {
+        'Sensor Start': ('Sensor', Color(0xFF9B8CFF)),
+        'Sensor Change': ('Sensor', Color(0xFF9B8CFF)),
+        'Site Change': ('Pump', Color(0xFF4FC3F7)),
+        'Pod Change': ('Pod', Color(0xFF4FC3F7)),
+        'Insulin Change': ('Insulin', Color(0xFF81C784)),
+        'Pump Battery Change': ('Battery', Color(0xFFFFB74D)),
+      };
+      var lane = 0;
+      DateTime? lastAt;
+      for (final t in [...treatments]..sort((a, b) => a.t.compareTo(b.t))) {
+        final kd = kinds[t.type];
+        if (kd == null || t.t.isBefore(tStart) || t.t.isAfter(tEnd)) continue;
+        final cx = x(t.t);
+        final pen = Paint()
+          ..color = kd.$2.withValues(alpha: 0.8)
+          ..strokeWidth = 1.4;
+        _dotted(canvas, Offset(cx, top), Offset(cx, plotBottom), pen, on: 3, off: 3);
+        // Changes close together (pod and insulin at once): labels one under the other.
+        lane = lastAt != null && t.t.difference(lastAt).inMinutes.abs() < 40 ? lane + 1 : 0;
+        lastAt = t.t;
+        _text(canvas, kd.$1, Offset(cx + 3, top + 10 + lane * 12.0), color: kd.$2);
+        hits.add(_Hit(Offset(cx, top + 10 + lane * 12.0), '${t.type}${t.notes.isNotEmpty ? ': ${t.notes}' : ''}', t.t));
+      }
+    }
+
     // Now line.
     final nx = x(now);
     final dash = Paint()

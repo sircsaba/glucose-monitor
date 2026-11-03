@@ -246,6 +246,10 @@ class Settings {
   static const Map<String, dynamic> defaults = {
     // Data
     'nsUrl': '',
+    // Your Monitor Glucose server, read for its health report (backup CGM,
+    // jobs) when the app shows a plain Nightscout site.
+    'statusUrl': '',
+    'statusToken': '',
     'nsToken': '',
     'apiSecret': false,
     'mmol': true,
