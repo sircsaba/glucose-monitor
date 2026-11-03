@@ -281,7 +281,7 @@ class _DayViewState extends State<DayView> {
       final align = _align(c.align);
 
       // "Label value" on one line, or the label above the value (stack).
-      Widget pair(String label, String value, {Color? labelColor, String? sub}) {
+      Widget pair(String label, String value, {Color? labelColor, String? sub, IconData? icon}) {
         final valueStyle = kMono.copyWith(color: col, fontSize: size, fontWeight: weight);
         if (c.stack) {
           final cross = c.align == 'left'
@@ -290,7 +290,16 @@ class _DayViewState extends State<DayView> {
           return Column(crossAxisAlignment: cross, mainAxisSize: MainAxisSize.min, children: [
             Text(label, maxLines: 1, style: TextStyle(color: labelColor ?? kMuted, fontSize: size < 18 ? 12 : size * 0.66)),
             const SizedBox(height: 2),
-            FittedBox(fit: BoxFit.scaleDown, alignment: align, child: Text(value, maxLines: 1, style: valueStyle)),
+            FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: align,
+                child: icon == null
+                    ? Text(value, maxLines: 1, style: valueStyle)
+                    : Row(mainAxisSize: MainAxisSize.min, children: [
+                        Text(value, maxLines: 1, style: valueStyle),
+                        const SizedBox(width: 4),
+                        Icon(icon, size: size * 0.9, color: col),
+                      ])),
             if (sub != null)
               FittedBox(
                 fit: BoxFit.scaleDown,
@@ -306,6 +315,10 @@ class _DayViewState extends State<DayView> {
             TextSpan(children: [
               TextSpan(text: '$label ', style: TextStyle(color: labelColor ?? kMuted, fontSize: size * 0.85)),
               TextSpan(text: value, style: valueStyle),
+              if (icon != null) ...[
+                const TextSpan(text: ' '),
+                WidgetSpan(alignment: PlaceholderAlignment.middle, child: Icon(icon, size: size * 0.9, color: col)),
+              ],
             ]),
             maxLines: 1,
           ),
@@ -414,8 +427,15 @@ class _DayViewState extends State<DayView> {
         case 'phone':
           if (d?.phoneBattery == null && !c.box) return const SizedBox.shrink();
           final pct = d?.phoneBattery == null ? '–' : '${d!.phoneBattery}%';
-          if (c.box) return pair('Phone', pct);
-          return pair(c.stack ? 'Looping phone' : 'Looping phone battery', pct);
+          // Wi-Fi or mobile data, when Loop sends it (Monitor Glucose Loop build).
+          final net = switch (d?.network) {
+            'Wi-Fi' => Icons.wifi,
+            'cellular' => Icons.signal_cellular_alt,
+            'offline' => Icons.signal_wifi_off,
+            _ => null,
+          };
+          if (c.box) return pair('Phone', pct, icon: net);
+          return pair(c.stack ? 'Looping phone' : 'Looping phone battery', pct, icon: net);
         case 'ttir':
           // Time in range today since midnight (local time), or over the last
           // 24 h, as set; and in tight range when TTIR is on.

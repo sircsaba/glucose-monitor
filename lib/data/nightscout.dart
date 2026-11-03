@@ -91,6 +91,9 @@ class DeviceInfo {
   int? pumpBattery;
   double? pumpVolts; // some pumps send volts instead of percent
   int? phoneBattery;
+  /// From Loop's uploader name "Valérie (Wi-Fi)" (Monitor Glucose Loop build).
+  String? phoneName;
+  String? network; // Wi-Fi, cellular, offline, other
   DateTime? pumpTime;
 
   /// Loop's override as of its last upload (devicestatus "override").
@@ -467,6 +470,13 @@ class NightscoutClient {
           info.phoneBattery = ub.round();
         } else if (up is Map) {
           info.phoneBattery = _d(up['battery'])?.round();
+        }
+        if (up is Map && up['name'] is String) {
+          final m = RegExp(r'^(.*) \((Wi-Fi|cellular|offline|other)\)$').firstMatch(up['name'] as String);
+          if (m != null) {
+            info.phoneName = m.group(1);
+            info.network = m.group(2);
+          }
         }
       }
     }
