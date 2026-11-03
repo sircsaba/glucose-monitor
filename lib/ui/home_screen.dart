@@ -433,8 +433,10 @@ class _DayViewState extends State<DayView> {
             'cellular' => Icons.signal_cellular_alt,
             _ => null,
           };
-          if (c.box) return pair('Phone', pct, icon: net);
-          return pair(c.stack ? 'Looping phone' : 'Looping phone battery', pct, icon: net);
+          // The phone name set in Loop (Services › Monitor Glucose), when it sends one.
+          final who = d?.phoneName;
+          if (c.box) return pair(who ?? 'Phone', pct, icon: net);
+          return pair(who != null ? (c.stack ? 'Looping: $who' : 'Looping on $who') : (c.stack ? 'Looping phone' : 'Looping phone battery'), pct, icon: net);
         case 'ttir':
           // Time in range today since midnight (local time), or over the last
           // 24 h, as set; and in tight range when TTIR is on.
