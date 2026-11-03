@@ -98,7 +98,7 @@ class SchoolLunch {
       final take = a > i.left ? i.left : a;
       if (take <= 0) return;
       i.eaten += take;
-      eaten.add(LunchEaten(key, i.food.name, take, i.food.unit, i.food.forAmount(take).carbs ?? 0, when, how));
+      eaten.add(LunchEaten(key, i.food.name, take, i.food.unit, i.food.forAmount(take).counted ?? 0, when, how));
     });
   }
 

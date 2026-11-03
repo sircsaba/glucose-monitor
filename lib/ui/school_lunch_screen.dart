@@ -97,7 +97,7 @@ class _SchoolLunchScreenState extends State<SchoolLunchScreen> {
     return showDialog<double>(
       context: context,
       builder: (d) => StatefulBuilder(builder: (d, set) {
-        final carbs = f.forAmount(a).carbs ?? 0;
+        final carbs = f.forAmount(a).counted ?? 0;
         return AlertDialog(
           title: Text(f.name),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -495,7 +495,7 @@ class _SchoolLunchScreenState extends State<SchoolLunchScreen> {
 
   Widget _boxCard(SchoolLunch l, List<LunchItem> waiting, bool h24) {
     final shown = _edit ? l.items.where((i) => !i.done).toList() : waiting;
-    final leftCarbs = waiting.fold(0.0, (a, i) => a + (i.leftNutrition.carbs ?? 0));
+    final leftCarbs = waiting.fold(0.0, (a, i) => a + (i.leftNutrition.counted ?? 0));
     return _card(
       'In the lunch box',
       [
@@ -528,7 +528,7 @@ class _SchoolLunchScreenState extends State<SchoolLunchScreen> {
   }
 
   Widget _packRow(LunchItem i) {
-    final c = i.food.forAmount(i.amount).carbs ?? 0;
+    final c = i.food.forAmount(i.amount).counted ?? 0;
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: GlutenBadge(i.food.gluten),
@@ -557,7 +557,7 @@ class _SchoolLunchScreenState extends State<SchoolLunchScreen> {
     final part = _pick[i.key];
     final on = part != null;
     final eatNow = i.left * (part ?? 1);
-    final c = i.food.forAmount(eatNow).carbs ?? 0;
+    final c = i.food.forAmount(eatNow).counted ?? 0;
     final past = _lunch.isPast;
     return Container(
       margin: const EdgeInsets.only(top: 6),

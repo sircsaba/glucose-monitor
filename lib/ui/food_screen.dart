@@ -466,7 +466,9 @@ class _FoodScreenState extends State<FoodScreen> {
   }
 
   static String _nutLine(Nutrition n) => [
-        '${fmtAmount(((n.carbs ?? 0) * 10).round() / 10)} g carbs',
+        n.fibreSubtracted
+            ? '${fmtAmount(((n.counted ?? 0) * 10).round() / 10)} g net carbs (${fmtAmount(((n.carbs ?? 0) * 10).round() / 10)} − fibre ${fmtAmount(((n.fiber ?? 0) * 10).round() / 10)})'
+            : '${fmtAmount(((n.carbs ?? 0) * 10).round() / 10)} g carbs',
         if (n.energy != null) '${n.energy!.round()} kcal',
         if (n.protein != null) 'protein ${fmtAmount((n.protein! * 10).round() / 10)} g',
         if (n.fat != null) 'fat ${fmtAmount((n.fat! * 10).round() / 10)} g',
@@ -492,6 +494,7 @@ class _FoodScreenState extends State<FoodScreen> {
               if (v == 'web') _recipeFromWeb();
               if (v == 'text') Navigator.push(context, MaterialPageRoute(builder: (_) => const RecipeBuilderScreen()));
               if (v == 'ca' || v == 'us') app.change((x) => x.set('labelFormat', v == 'us' ? 1 : 0));
+              if (v == 'net') app.change((x) => x.set('netCarbs', !x.flag('netCarbs')));
             },
             itemBuilder: (_) => [
               if (ocrAvailable)
@@ -499,6 +502,8 @@ class _FoodScreenState extends State<FoodScreen> {
               const PopupMenuItem(value: 'pdf', child: ListTile(leading: Icon(Icons.picture_as_pdf_outlined), title: Text('Recipe from a PDF file'))),
               const PopupMenuItem(value: 'web', child: ListTile(leading: Icon(Icons.link), title: Text('Recipe from a web address'))),
               const PopupMenuItem(value: 'text', child: ListTile(leading: Icon(Icons.edit_note), title: Text('Type or paste a recipe'))),
+              const PopupMenuDivider(),
+              CheckedPopupMenuItem(value: 'net', checked: app.settings.flag('netCarbs'), child: const Text('Count net carbs (carbs − fibre)')),
               const PopupMenuDivider(),
               CheckedPopupMenuItem(value: 'ca', checked: app.settings.integer('labelFormat') != 1, child: const Text('Canadian nutrition label')),
               CheckedPopupMenuItem(value: 'us', checked: app.settings.integer('labelFormat') == 1, child: const Text('US nutrition label')),
@@ -596,7 +601,7 @@ class _FoodScreenState extends State<FoodScreen> {
     final l = app.lunchToday;
     if (l == null) return const SizedBox.shrink();
     final left = l.waiting;
-    final carbs = left.fold(0.0, (a, i) => a + (i.leftNutrition.carbs ?? 0));
+    final carbs = left.fold(0.0, (a, i) => a + (i.leftNutrition.counted ?? 0));
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       child: Material(
@@ -656,7 +661,7 @@ class _FoodScreenState extends State<FoodScreen> {
         subtitle: Text(
           [
             if (f.brand.isNotEmpty) f.brand,
-            '${fmtAmount(f.carbs)} g carbs / ${fmtAmount(f.portion)} ${unitFor(f.portion, f.unit)}',
+            '${fmtAmount(f.carbs)} g ${f.n.fibreSubtracted ? 'net ' : ''}carbs / ${fmtAmount(f.portion)} ${unitFor(f.portion, f.unit)}',
             if (f.n.energy != null) '${f.n.energy!.round()} kcal',
             if (f.meals.isNotEmpty) f.meals.map((m) => mealLabels[m]).join(', '),
           ].join(' · '),
@@ -685,7 +690,7 @@ class _FoodScreenState extends State<FoodScreen> {
             const SizedBox(width: 8),
             GlutenBadge(meal.gluten),
             const Spacer(),
-            Text('${(t.carbs ?? 0).round()} g carbs', style: kMono.copyWith(fontSize: 18, fontWeight: FontWeight.w700, color: kAccent)),
+            Text('${(t.counted ?? 0).round()} g ${t.fibreSubtracted ? 'net ' : ''}carbs', style: kMono.copyWith(fontSize: 18, fontWeight: FontWeight.w700, color: kAccent)),
             IconButton(
               icon: const Icon(Icons.close),
               tooltip: 'Clear the meal',
@@ -701,7 +706,7 @@ class _FoodScreenState extends State<FoodScreen> {
               for (final i in meal.items)
                 Row(children: [
                   Expanded(child: Text('${i.food.name}  ${fmtAmount(i.amount)} ${unitFor(i.amount, i.food.unit)}', overflow: TextOverflow.ellipsis)),
-                  Text('${fmtAmount(((i.n.carbs ?? 0) * 10).round() / 10)} g', style: kMono.copyWith(color: kMuted)),
+                  Text('${fmtAmount(((i.n.counted ?? 0) * 10).round() / 10)} g', style: kMono.copyWith(color: kMuted)),
                   IconButton(
                     visualDensity: VisualDensity.compact,
                     icon: const Icon(Icons.remove_circle_outline, size: 20),

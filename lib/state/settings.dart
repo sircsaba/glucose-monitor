@@ -265,6 +265,8 @@ class Settings {
     // Monitor Glucose Plus: Loop remote control limits and name.
     'remoteMaxBolus': 2.0,
     'remoteMaxCarbs': 50.0,
+    // Carbs counted for insulin from foods: net carbs (carbs − fibre).
+    'netCarbs': true,
     // Insulin safety (Remote control): no insulin below the low limit; a
     // warning to confirm below the caution level, when falling fast, or when
     // Loop predicts a low.

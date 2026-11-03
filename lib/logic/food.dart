@@ -43,6 +43,21 @@ class Nutrition {
 
   double? operator [](String k) => v[k];
   double? get carbs => v['carbs'];
+
+  /// Count net carbs (carbs − fibre) for insulin; set from the app's settings.
+  static bool netCarbs = true;
+
+  /// The carbs that count for insulin: net carbs (carbs − fibre) when that
+  /// setting is on (the default), else the carbs as on the label.
+  double? get counted {
+    final c = v['carbs'];
+    if (c == null || !netCarbs) return c;
+    final f = v['fiber'] ?? 0;
+    return f >= c ? 0 : c - f;
+  }
+
+  /// True when fibre makes the counted carbs differ from the label's.
+  bool get fibreSubtracted => netCarbs && (v['fiber'] ?? 0) > 0 && (v['carbs'] ?? 0) > 0;
   double? get energy => v['energy'];
   double? get protein => v['protein'];
   double? get fat => v['fat'];
@@ -144,7 +159,8 @@ class Food {
         meals = meals ?? [],
         _other = other ?? {};
 
-  double get carbs => n.carbs ?? 0;
+  /// Carbs of one portion, as counted for insulin (net carbs by default).
+  double get carbs => n.counted ?? 0;
 
   /// Nutrition for [amount] in [unit] (portion size scaled).
   Nutrition forAmount(double amount) => portion <= 0 ? n : n.times(amount / portion);
@@ -398,7 +414,8 @@ class MealItem {
 class Meal {
   final List<MealItem> items = [];
   Nutrition get total => items.fold(Nutrition.empty, (a, i) => a + i.n);
-  double get carbs => total.carbs ?? 0;
+  /// Carbs of the meal, as counted for insulin (net carbs by default).
+  double get carbs => total.counted ?? 0;
   bool get isEmpty => items.isEmpty;
 
   /// Worst gluten verdict in the meal.
@@ -416,7 +433,7 @@ class Meal {
     final c = carbs;
     var base = medium;
     if (c > 0) {
-      base = items.fold(0.0, (a, i) => a + i.food.absorptionHours(fast: fast, medium: medium, slow: slow) * (i.n.carbs ?? 0) / c);
+      base = items.fold(0.0, (a, i) => a + i.food.absorptionHours(fast: fast, medium: medium, slow: slow) * (i.n.counted ?? 0) / c);
     }
     final fp = (total.fat ?? 0) + (total.protein ?? 0);
     final extra = fp > 15 ? (((fp - 15) / 20).ceil() * 0.5).clamp(0.0, 2.0) : 0.0;

@@ -176,6 +176,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     navKey = key;
     _prefs = await SharedPreferences.getInstance();
     settings = Settings.decode(_prefs!.getString('settings'));
+    Nutrition.netCarbs = settings.flag('netCarbs');
     try {
       final mp = _prefs!.getString('mealPlan');
       if (mp != null) mealPlan = MealPlan.fromJson(jsonDecode(mp) as Map<String, dynamic>);
@@ -222,6 +223,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
   void change(void Function(Settings s) f) {
     f(settings);
+    Nutrition.netCarbs = settings.flag('netCarbs');
     save();
   }
 
