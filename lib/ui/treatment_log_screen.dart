@@ -11,6 +11,7 @@ import '../data/nightscout.dart';
 import '../logic/glucose.dart';
 import '../state/app_state.dart';
 import 'common.dart';
+import 'food_screen.dart';
 
 /// Every treatment over a period (carbs, boluses, automatic boluses / SMB,
 /// temp basals, overrides, site changes…), filtered by kind, with the columns
@@ -220,6 +221,27 @@ class _TreatmentLogScreenState extends State<TreatmentLogScreen> {
     if (mounted) setState(() => _busy = false);
   }
 
+  Future<void> _addFoods(Treatment t) async {
+    final go = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (c) => SafeArea(
+        child: ListTile(
+          leading: const Icon(Icons.restaurant_menu),
+          title: Text('Add the foods eaten (${(t.carbs ?? 0).round()} g at ${fmtClock(t.t, app.settings.flag('time24'))})'),
+          subtitle: const Text('Pick them in Food, then "Add to the entry"'),
+          onTap: () => Navigator.pop(c, true),
+        ),
+      ),
+    );
+    if (go != true || !mounted) return;
+    if (!app.meal.isEmpty) {
+      app.meal.items.clear();
+      app.mealChanged();
+    }
+    final done = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => FoodScreen(attachTo: t)));
+    if (done == true && mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final mmol = app.mmol;
@@ -341,7 +363,13 @@ class _TreatmentLogScreenState extends State<TreatmentLogScreen> {
                           ),
                       ],
                       rows: [
-                        for (final t in rows.take(1000)) DataRow(cells: [for (final c in cols) DataCell(Text(tlCell(t, c, mmol)))]),
+                        for (final t in rows.take(1000))
+                          DataRow(cells: [
+                            for (final c in cols)
+                              DataCell(Text(tlCell(t, c, mmol)),
+                                  // A carb entry: tap to add the foods that were eaten.
+                                  onTap: (t.carbs ?? 0) > 0 && t.foods.isEmpty ? () => _addFoods(t) : null),
+                          ]),
                       ],
                     ),
                   ),

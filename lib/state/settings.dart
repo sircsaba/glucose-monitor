@@ -261,6 +261,17 @@ class Settings {
     // Monitor Glucose Plus: Loop remote control limits and name.
     'remoteMaxBolus': 2.0,
     'remoteMaxCarbs': 50.0,
+    // Insulin safety (Remote control): no insulin below the low limit; a
+    // warning to confirm below the caution level, when falling fast, or when
+    // Loop predicts a low.
+    'safeLowMg': 72.0, // 4.0 mmol/L
+    'safeCautionMg': 90.0, // 5.0 mmol/L
+    // Reminder to give insulin: glucose at or above the level for a while, and
+    // no bolus lately. Rings; the insulin is never sent by itself.
+    'bolusRemindOn': false,
+    'bolusRemindMg': 180.0, // 10.0 mmol/L
+    'bolusRemindMin': 30,
+    'bolusRemindQuietH': 2,
     'remoteName': '',
     'patientName': '',
     'tirPeriod': 0, // main-screen TIR card: 0 today since midnight, 1 last 24 h

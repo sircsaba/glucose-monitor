@@ -20,7 +20,7 @@ import '../ui/night_screen.dart';
 import '../ui/target_screen.dart';
 import 'settings.dart';
 
-enum AlarmKind { redLow, yellowLow, predictedLow, yellowHigh, redHigh, noData, loop, reservoir, pumpBattery }
+enum AlarmKind { redLow, yellowLow, predictedLow, yellowHigh, redHigh, noData, loop, reservoir, pumpBattery, bolusReminder }
 
 String alarmTitle(AlarmKind k) {
   switch (k) {
@@ -42,6 +42,8 @@ String alarmTitle(AlarmKind k) {
       return 'Insulin running low';
     case AlarmKind.pumpBattery:
       return 'Pump battery low';
+    case AlarmKind.bolusReminder:
+      return 'High for a while: insulin?';
   }
 }
 
@@ -54,6 +56,7 @@ int soundGroup(AlarmKind k) {
     case AlarmKind.predictedLow:
       return 1;
     case AlarmKind.yellowHigh:
+    case AlarmKind.bolusReminder:
       return 2;
     case AlarmKind.redHigh:
       return 3;
@@ -511,6 +514,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
           cands.add(AlarmKind.predictedLow);
         }
       }
+      if (l != null && s.flag('bolusRemindOn') && s.sounds[2].enabled && _bolusReminderDue(now)) {
+        cands.add(AlarmKind.bolusReminder);
+      }
       final d = device;
       if (d != null && s.sounds[4].enabled) {
         if (s.flag('loopOn') && d.loopTime != null && now.difference(d.loopTime!).inMinutes >= s.integer('loopMin')) {
@@ -541,6 +547,23 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     }
     if (active?.kind == pick) return;
     _startAlarm(pick, now);
+  }
+
+  /// Reminder to give insulin: glucose at or above the level for the whole
+  /// time set (readings every few minutes), and no bolus in the quiet time.
+  bool _bolusReminderDue(DateTime now) {
+    final s = settings;
+    final level = s.number('bolusRemindMg');
+    final mins = s.integer('bolusRemindMin');
+    final l = latest;
+    if (l == null || l.mg < level || now.difference(l.t).inMinutes > 15) return false;
+    final since = now.subtract(Duration(minutes: mins));
+    final window = entries.where((e) => !e.t.isBefore(since)).toList();
+    if (window.length < 2 || window.first.t.difference(since).inMinutes > 10) return false;
+    if (window.any((e) => e.mg < level)) return false;
+    final quiet = now.subtract(Duration(hours: s.integer('bolusRemindQuietH')));
+    if (treatments.any((t) => (t.insulin ?? 0) > 0 && !t.isSmb && t.t.isAfter(quiet))) return false;
+    return true;
   }
 
   void _startAlarm(AlarmKind kind, DateTime now, {bool test = false}) {
@@ -784,11 +807,23 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  SchoolLunch? lunchFor(String day) => lunches[day];
+  /// The lunch of a day: its own, or on a school day (Monday to Friday) a copy
+  /// of the default lunch box (made real when it is changed or eaten from).
+  SchoolLunch? lunchFor(String day) {
+    final own = lunches[day];
+    if (own != null || day == SchoolLunch.defaultKey) return own;
+    final d = SchoolLunch.dayOf(day);
+    final def = lunches[SchoolLunch.defaultKey];
+    if (d == null || def == null || def.isEmpty || d.weekday > 5) return null;
+    return def.copyFor(day);
+  }
+
+  /// True when this day uses the default lunch box (no changes made for it).
+  bool lunchIsDefault(String day) => day != SchoolLunch.defaultKey && lunches[day] == null && lunchFor(day) != null;
 
   /// Today's lunch with something still in the box.
   SchoolLunch? get lunchToday {
-    final l = lunches[SchoolLunch.dayKey(DateTime.now())];
+    final l = lunchFor(SchoolLunch.dayKey(DateTime.now()));
     return l != null && l.waiting.isNotEmpty ? l : null;
   }
 
@@ -798,7 +833,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     try {
       await loadLunches();
     } catch (_) {}
-    final l = lunches[day] ?? SchoolLunch(day);
+    final l = lunches[day] ?? lunchFor(day) ?? SchoolLunch(day);
     change(l);
     l.id = await client.saveFoodDoc(l.toJson());
     lunches[day] = l;

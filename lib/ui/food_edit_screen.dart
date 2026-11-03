@@ -108,6 +108,52 @@ class _FoodEditScreenState extends State<FoodEditScreen> {
     for (final k in nutrientKeys) k: TextEditingController(text: _v(f.n[k])),
   };
   bool _busy = false;
+  bool _glutenByHand = false;
+  late final bool _labelledFree = f.glutenWhy.any((w) => w.toLowerCase().contains('labelled gluten-free')) || f.gluten == Gluten.free;
+
+  /// Ingredients changed: check the gluten again (unless set by hand).
+  void _recheckGluten() {
+    if (_glutenByHand) return;
+    final ing = _ingredients.text.trim();
+    if (ing.isEmpty) return;
+    final allergens = _allergens.text.toLowerCase();
+    final r = glutenVerdict(
+      labels: _labelledFree ? const ['en:gluten-free'] : const [],
+      allergens: RegExp(r'gluten|wheat|blé|barley|orge|rye|seigle').hasMatch(allergens) ? const ['en:gluten'] : const [],
+      traces: const [],
+      ingredients: ing,
+    );
+    if (r.verdict != f.gluten || r.why.join() != f.glutenWhy.join()) {
+      setState(() {
+        f.gluten = r.verdict;
+        f.glutenWhy = r.why;
+      });
+    }
+  }
+
+  static const _absorptionChoices = [(null, 'From the food (GI)'), (2.0, 'Fast 2 h'), (3.0, 'Medium 3 h'), (4.0, 'Slow 4 h')];
+
+  Future<void> _otherAbsorption() async {
+    final c = TextEditingController(text: f.absorption == null ? '' : fmtAmount(f.absorption!));
+    final v = await showDialog<double>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: const Text('Absorption time'),
+        content: TextField(
+          controller: c,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(suffixText: 'hours', helperText: 'Between 0.5 and 8 hours'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(d, num_(c.text)?.toDouble()), child: const Text('OK')),
+        ],
+      ),
+    );
+    c.dispose();
+    if (v != null) setState(() => f.absorption = (v.clamp(0.5, 8.0) * 4).round() / 4);
+  }
 
   // Carbs first: that is the number used for insulin.
   static const _order = ['carbs', 'energy', 'fiber', 'sugars', 'protein', 'fat', 'satFat', 'transFat', 'cholesterol', 'sodium',
@@ -302,9 +348,27 @@ class _FoodEditScreenState extends State<FoodEditScreen> {
               onSelected: (_) => setState(() {
                 if (f.gluten != g) f.glutenWhy = ['Set by hand'];
                 f.gluten = g;
+                _glutenByHand = true;
               }),
             ),
         ]),
+        const SizedBox(height: 18),
+        const Text('Carb absorption time', style: TextStyle(color: kMuted, fontSize: 13)),
+        const SizedBox(height: 6),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          for (final a in _absorptionChoices)
+            ChoiceChip(label: Text(a.$2), selected: f.absorption == a.$1, onSelected: (_) => setState(() => f.absorption = a.$1)),
+          ChoiceChip(
+            label: Text(f.absorption != null && !_absorptionChoices.any((a) => a.$1 == f.absorption) ? '${fmtAmount(f.absorption!)} h' : 'Other…'),
+            selected: f.absorption != null && !_absorptionChoices.any((a) => a.$1 == f.absorption),
+            onSelected: (_) => _otherAbsorption(),
+          ),
+        ]),
+        if (f.absorption == null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text('Now: ${fmtAmount(f.absorptionHours())} h${f.gi == 1 ? ' (low GI)' : (f.gi == 3 ? ' (high GI)' : '')}', style: const TextStyle(color: kMuted, fontSize: 12)),
+          ),
         const SizedBox(height: 18),
         const Text('Eaten at', style: TextStyle(color: kMuted, fontSize: 13)),
         const SizedBox(height: 6),
@@ -323,8 +387,8 @@ class _FoodEditScreenState extends State<FoodEditScreen> {
           onChanged: (v) => setState(() => f.favorite = v),
         ),
         const SizedBox(height: 6),
-        _field(_ingredients, 'Ingredients', lines: 8),
-        _field(_allergens, 'Allergens'),
+        _field(_ingredients, 'Ingredients', lines: 8, onChanged: (_) => _recheckGluten()),
+        _field(_allergens, 'Allergens', onChanged: (_) => _recheckGluten()),
         _field(_barcode, 'Barcode', type: TextInputType.number),
         _field(_notes, 'Notes', lines: 4),
         const SizedBox(height: 10),

@@ -154,6 +154,9 @@ class StepRow extends StatelessWidget {
   final VoidCallback onMinus;
   final VoidCallback onPlus;
   final bool last;
+  /// When set, tapping the value lets you type it (the number shown is
+  /// filled in). Called with the number typed.
+  final ValueChanged<double>? onTyped;
   const StepRow({
     super.key,
     required this.label,
@@ -162,9 +165,46 @@ class StepRow extends StatelessWidget {
     required this.onMinus,
     required this.onPlus,
     this.last = false,
+    this.onTyped,
   });
+
+  Future<void> _type(BuildContext context) async {
+    final m = RegExp(r'-?\d+(?:[.,]\d+)?').firstMatch(value);
+    final start = m?.group(0) ?? (value.trim() == 'now' ? '0' : '');
+    var unit = m == null ? '' : value.replaceFirst(m.group(0)!, '').trim();
+    if (value.trim() == 'now') unit = 'min ago';
+    final c = TextEditingController(text: start);
+    c.selection = TextSelection(baseOffset: 0, extentOffset: start.length);
+    final v = await showDialog<double>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: Text(label),
+        content: TextField(
+          controller: c,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(suffixText: unit),
+          onSubmitted: (t) => Navigator.pop(d, double.tryParse(t.replaceAll(',', '.'))),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(d, double.tryParse(c.text.replaceAll(',', '.'))), child: const Text('OK')),
+        ],
+      ),
+    );
+    c.dispose();
+    if (v != null) onTyped!(v);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final text = Text(value,
+        textAlign: TextAlign.center,
+        style: kMono.copyWith(
+            fontSize: 15,
+            decoration: onTyped != null ? TextDecoration.underline : null,
+            decorationStyle: TextDecorationStyle.dotted,
+            decorationColor: kMuted));
     return RowBox(
       last: last,
       child: Row(children: [
@@ -172,7 +212,13 @@ class StepRow extends StatelessWidget {
         RoundButton('−', onMinus, semantic: 'Decrease $label'),
         SizedBox(
           width: 78,
-          child: Text(value, textAlign: TextAlign.center, style: kMono.copyWith(fontSize: 15)),
+          child: onTyped == null
+              ? text
+              : Semantics(
+                  button: true,
+                  label: 'Type $label',
+                  child: InkWell(borderRadius: BorderRadius.circular(8), onTap: () => _type(context), child: Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: text)),
+                ),
         ),
         RoundButton('+', onPlus, semantic: 'Increase $label'),
       ]),

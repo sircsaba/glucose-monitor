@@ -88,6 +88,7 @@ class _BolusCalcScreenState extends State<BolusCalcScreen> {
                 value: '${_carbs.round()} g',
                 onMinus: () => setState(() => _carbs = (_carbs - 5).clamp(0, 300)),
                 onPlus: () => setState(() => _carbs = (_carbs + 5).clamp(0, 300)),
+                onTyped: (v) => setState(() => _carbs = v.clamp(0, 300).toDouble()),
               ),
               StepRow(
                 label: 'Glucose',
@@ -95,6 +96,7 @@ class _BolusCalcScreenState extends State<BolusCalcScreen> {
                 value: bg == null ? '—' : fmtBg(bg, mmol),
                 onMinus: () => setState(() => _bg = ((bg ?? 100) - (mmol ? mgPerMmol / 10 : 1)).clamp(40.0, 400.0)),
                 onPlus: () => setState(() => _bg = ((bg ?? 100) + (mmol ? mgPerMmol / 10 : 1)).clamp(40.0, 400.0)),
+                onTyped: (v) => setState(() => _bg = (mmol ? v * mgPerMmol : v).clamp(40.0, 400.0)),
               ),
               SwitchRow(label: 'Correct to the target', value: _corr, onChanged: (v) => setState(() => _corr = v)),
               SwitchRow(label: 'Subtract insulin on board', value: _iob, onChanged: (v) => setState(() => _iob = v)),

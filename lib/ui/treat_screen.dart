@@ -172,6 +172,7 @@ class _TreatScreenState extends State<TreatScreen> {
                   value: '$_carbs g',
                   onMinus: () => setState(() => _carbs = (_carbs - 5).clamp(0, 300)),
                   onPlus: () => setState(() => _carbs = (_carbs + 5).clamp(0, 300)),
+                  onTyped: (v) => setState(() => _carbs = v.round().clamp(0, 300)),
                 ),
               if (t.insulin) ...[
                 StepRow(
@@ -179,6 +180,7 @@ class _TreatScreenState extends State<TreatScreen> {
                   value: '${fmtU(_insulin)} U',
                   onMinus: () => setState(() => _insulin = (_insulin - 0.05).clamp(0.0, 30.0)),
                   onPlus: () => setState(() => _insulin = (_insulin + 0.05).clamp(0.0, 30.0)),
+                  onTyped: (v) => setState(() => _insulin = ((v.clamp(0.0, 30.0)) * 20).round() / 20),
                 ),
                 Builder(builder: (_) {
                   final c = BolusCalc.now(carbs: t.carbs ? _carbs.toDouble() : 0);
@@ -198,12 +200,14 @@ class _TreatScreenState extends State<TreatScreen> {
                   value: fmtBg(_target, mmol),
                   onMinus: () => setState(() => _target = (_target - (mmol ? mgPerMmol / 2 : 5)).clamp(72.0, 270.0)),
                   onPlus: () => setState(() => _target = (_target + (mmol ? mgPerMmol / 2 : 5)).clamp(72.0, 270.0)),
+                  onTyped: (v) => setState(() => _target = (mmol ? v * mgPerMmol : v).clamp(72.0, 270.0)),
                 ),
                 StepRow(
                   label: 'Duration',
                   value: '$_duration min',
                   onMinus: () => setState(() => _duration = (_duration - 15).clamp(15, 720)),
                   onPlus: () => setState(() => _duration = (_duration + 15).clamp(15, 720)),
+                  onTyped: (v) => setState(() => _duration = v.round().clamp(15, 720)),
                 ),
               ],
               if (t.bg)
@@ -212,12 +216,14 @@ class _TreatScreenState extends State<TreatScreen> {
                   value: fmtBg(_bg, mmol),
                   onMinus: () => setState(() => _bg = (_bg - (mmol ? mgPerMmol / 10 : 1)).clamp(20.0, 600.0)),
                   onPlus: () => setState(() => _bg = (_bg + (mmol ? mgPerMmol / 10 : 1)).clamp(20.0, 600.0)),
+                  onTyped: (v) => setState(() => _bg = (mmol ? v * mgPerMmol : v).clamp(20.0, 600.0)),
                 ),
               StepRow(
                 label: 'When',
                 value: _minutesAgo == 0 ? 'Now' : '$_minutesAgo min ago',
                 onMinus: () => setState(() => _minutesAgo = (_minutesAgo - 5).clamp(0, 720)),
                 onPlus: () => setState(() => _minutesAgo = (_minutesAgo + 5).clamp(0, 720)),
+                onTyped: (v) => setState(() => _minutesAgo = v.round().clamp(0, 720)),
                 last: true,
               ),
             ]),

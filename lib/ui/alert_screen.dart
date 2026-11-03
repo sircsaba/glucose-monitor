@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 
 import '../logic/glucose.dart';
 import '../state/app_state.dart';
+import '../plus.dart';
 import 'common.dart';
+import 'remote_screen.dart';
 
 class AlertScreen extends StatefulWidget {
   const AlertScreen({super.key});
@@ -164,6 +166,26 @@ class _AlertScreenState extends State<AlertScreen> {
                       child: const Text("I'm treating it", style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
                     ),
                   ),
+                  if (a.kind == AlarmKind.bolusReminder && kRemote) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white)),
+                        icon: const Icon(Icons.water_drop_outlined),
+                        // Opens the bolus; nothing is sent until you confirm there.
+                        onPressed: () {
+                          app.snooze(60);
+                          // After this alert screen has closed.
+                          Future.delayed(const Duration(milliseconds: 500), () {
+                            app.navKey?.currentState?.push(MaterialPageRoute(builder: (_) => const RemoteScreen(section: 'bolus')));
+                          });
+                        },
+                        label: const Text('Open the bolus', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                  ],
                 ]),
               ),
             ),

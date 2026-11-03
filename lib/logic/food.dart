@@ -112,6 +112,9 @@ class Food {
   String notes;
   Map<String, dynamic>? recipe; // stage 2: servings, ingredients, steps
   int? gi;
+  /// Carb absorption time in hours, set for this food (null: from its GI,
+  /// else the meal's default). Loop's carb entry uses it.
+  double? absorption;
   Map<String, dynamic> _other; // fields we don't use, kept when saving
 
   Food({
@@ -135,6 +138,7 @@ class Food {
     this.notes = '',
     this.recipe,
     this.gi,
+    this.absorption,
     Map<String, dynamic>? other,
   })  : glutenWhy = glutenWhy ?? [],
         meals = meals ?? [],
@@ -159,7 +163,7 @@ class Food {
 
   static const _known = {
     '_id', 'type', 'name', 'brand', 'category', 'portion', 'unit', 'portionText', ...nutrientKeys, 'per100', 'barcode', 'gluten', 'glutenWhy', 'ingredients',
-    'allergens', 'meals', 'favorite', 'source', 'notes', 'recipe', 'gi',
+    'allergens', 'meals', 'favorite', 'source', 'notes', 'recipe', 'gi', 'absorption',
   };
 
   factory Food.fromJson(Map<String, dynamic> j) {
@@ -188,6 +192,7 @@ class Food {
       notes: (j['notes'] ?? '').toString(),
       recipe: j['recipe'] is Map ? Map<String, dynamic>.from(j['recipe']) : null,
       gi: (num_(j['gi']))?.round(),
+      absorption: num_(j['absorption'])?.toDouble(),
       other: other,
     );
   }
@@ -217,7 +222,13 @@ class Food {
         if (notes.isNotEmpty) 'notes': notes,
         if (recipe != null) 'recipe': recipe,
         if (gi != null) 'gi': gi,
+        if (absorption != null) 'absorption': absorption,
       };
+
+  /// Hours used for this food: its own, else from its GI (Nightscout: 1 low =
+  /// slow, 3 high = fast), else the medium time.
+  double absorptionHours({double fast = 2, double medium = 3, double slow = 4}) =>
+      absorption ?? switch (gi) { 1 => slow, 3 => fast, _ => medium };
 
   Food copy() => Food.fromJson(jsonDecode(jsonEncode(toJson())) as Map<String, dynamic>);
 
@@ -398,6 +409,22 @@ class Meal {
   }
 
   /// "Scrambled eggs 2 pieces, Bacon 30 g, Dragon fruit 100 g"
+  /// Absorption time of the whole meal (hours): each food's time weighted by
+  /// its carbs, plus half an hour per 20 g of fat and protein above 15 g (at
+  /// most 2 hours more): fat and protein slow the meal down.
+  (double, String) absorption({double fast = 2, double medium = 3, double slow = 4}) {
+    final c = carbs;
+    var base = medium;
+    if (c > 0) {
+      base = items.fold(0.0, (a, i) => a + i.food.absorptionHours(fast: fast, medium: medium, slow: slow) * (i.n.carbs ?? 0) / c);
+    }
+    final fp = (total.fat ?? 0) + (total.protein ?? 0);
+    final extra = fp > 15 ? (((fp - 15) / 20).ceil() * 0.5).clamp(0.0, 2.0) : 0.0;
+    final h = ((base + extra) * 4).round() / 4;
+    final why = '${fmtAmount((base * 10).round() / 10)} h from the foods${extra > 0 ? ' + ${fmtAmount(extra)} h for ${fp.round()} g of fat and protein' : ''}';
+    return (h.clamp(0.5, 8.0), why);
+  }
+
   String describe() => items.map((i) => '${i.food.name} ${fmtAmount(i.amount)} ${unitFor(i.amount, i.food.unit)}').join(', ');
 
   /// Kept on the treatment so meals can be analysed later.

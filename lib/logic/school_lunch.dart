@@ -70,7 +70,7 @@ class SchoolLunch {
   bool get isEmpty => items.isEmpty;
 
   /// Past day: what is still in the box came back home.
-  bool get isPast => date.compareTo(dayKey(DateTime.now())) < 0;
+  bool get isPast => !isDefault && date.compareTo(dayKey(DateTime.now())) < 0;
 
   String newKey() {
     var n = items.length + 1;
@@ -106,15 +106,22 @@ class SchoolLunch {
         ..._other,
         if (id != null) '_id': id,
         'type': type,
-        'name': 'School lunch $date',
+        'name': isDefault ? 'School lunch (default)' : 'School lunch $date',
         'date': date,
         'items': [for (final i in items) i.toJson()],
         'eaten': [for (final e in eaten) e.toJson()],
       };
 
+  /// The default lunch box: every school day starts from it.
+  static const defaultKey = 'default';
+  bool get isDefault => date == defaultKey;
+
+  /// A school day without its own lunch: a fresh copy of the default box.
+  SchoolLunch copyFor(String day) => SchoolLunch(day, items: [for (final i in items) LunchItem(i.key, i.food.copy(), i.amount)]);
+
   static SchoolLunch? fromJson(Map<String, dynamic> j) {
     final date = (j['date'] ?? '').toString();
-    if (dayOf(date) == null) return null;
+    if (date != defaultKey && dayOf(date) == null) return null;
     final other = Map<String, dynamic>.from(j)..removeWhere((k, _) => const {'_id', 'type', 'name', 'date', 'items', 'eaten'}.contains(k));
     return SchoolLunch(
       date,

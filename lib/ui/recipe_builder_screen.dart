@@ -374,6 +374,7 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
             value: '${fmtAmount(_servings)} servings',
             onMinus: () => setState(() => _servings = (_servings - (_servings > 2 ? 1 : 0.5)).clamp(0.5, 200)),
             onPlus: () => setState(() => _servings = _servings + (_servings >= 2 ? 1 : 0.5)),
+            onTyped: (v) => setState(() => _servings = v.clamp(0.5, 200).toDouble()),
             last: true,
           ),
         ]),

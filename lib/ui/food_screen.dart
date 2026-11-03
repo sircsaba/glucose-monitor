@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../data/nightscout.dart';
 import '../logic/barcode.dart';
 import '../logic/food.dart';
+import '../logic/glucose.dart';
 import '../logic/ocr.dart';
 import '../logic/pdf_text.dart';
 import '../logic/recipe_web.dart';
@@ -25,7 +26,10 @@ import 'school_lunch_screen.dart';
 /// Foods from the shared food list: search, favorites, meal types, barcode
 /// scanning (also in the store), and a meal put together from several foods.
 class FoodScreen extends StatefulWidget {
-  const FoodScreen({super.key});
+  /// A carb entry made earlier: the meal put together here is attached to it
+  /// (what was eaten, for the nutrition report). Its carbs are not changed.
+  final Treatment? attachTo;
+  const FoodScreen({super.key, this.attachTo});
   @override
   State<FoodScreen> createState() => _FoodScreenState();
 }
@@ -356,12 +360,14 @@ class _FoodScreenState extends State<FoodScreen> {
                   value: '${fmtAmount(amount)} ${unitFor(amount, f.unit)}',
                   onMinus: () => set(() => amount = (amount - step).clamp(step, 5000.0)),
                   onPlus: () => set(() => amount = amount + step),
+                  onTyped: (v) => set(() => amount = v.clamp(step, 5000.0).toDouble()),
                 ),
                 StepRow(
                   label: 'Portions',
                   value: f.portion > 0 ? fmtAmount((amount / f.portion * 10).round() / 10) : '–',
                   onMinus: () => set(() => amount = (amount - f.portion / 2).clamp(f.portion / 2, 5000.0)),
                   onPlus: () => set(() => amount = amount + f.portion / 2),
+                  onTyped: (v) => set(() => amount = (v * f.portion).clamp(f.portion / 2, 5000.0).toDouble()),
                   last: true,
                 ),
               ]),
@@ -374,6 +380,67 @@ class _FoodScreenState extends State<FoodScreen> {
       }),
     );
     if (ok == true) _addToMeal(f, amount);
+  }
+
+  /// Attaches the meal to a carb entry made earlier (same time, as a note).
+  Future<void> _attach() async {
+    final t = widget.attachTo!;
+    final m = app.meal;
+    final had = t.carbs ?? 0;
+    if ((m.carbs - had).abs() >= 2) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (d) => AlertDialog(
+          title: const Text('The carbs are not the same'),
+          content: Text('These foods have ${m.carbs.round()} g of carbs; the entry has ${had.round()} g.\n\n'
+              'The foods are added to it as they are. The carbs of the entry stay ${had.round()} g: change them in Loop if needed.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Add the foods')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+    try {
+      await app.postTreatment({
+        'eventType': 'Note',
+        'created_at': t.t.toUtc().toIso8601String(),
+        'enteredBy': app.settings.str('enteredBy').isEmpty ? kAppName : app.settings.str('enteredBy'),
+        'notes': 'Meal: ${m.describe()}',
+        'foods': m.toFoodsJson(),
+        // Not "carbs": the entry already has them.
+        'nutrition': m.total.toJson(),
+      });
+      if (!mounted) return;
+      m.items.clear();
+      app.mealChanged();
+      toast(context, 'Foods added to the ${fmtClock(t.t, app.settings.flag('time24'))} entry');
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) toast(context, e.toString());
+    }
+  }
+
+  /// A meal without carbs: only the foods and nutrition are saved (as a note).
+  Future<void> _saveMealOnly() async {
+    final m = app.meal;
+    try {
+      await app.postTreatment({
+        'eventType': 'Note',
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+        'enteredBy': app.settings.str('enteredBy').isEmpty ? kAppName : app.settings.str('enteredBy'),
+        'notes': 'Meal: ${m.describe()}',
+        'foods': m.toFoodsJson(),
+        'nutrition': m.total.toJson(),
+      });
+      if (!mounted) return;
+      toast(context, 'Meal saved (0 g carbs: nothing sent to Loop)');
+      m.items.clear();
+      app.mealChanged();
+    } catch (e) {
+      if (mounted) toast(context, e.toString());
+    }
   }
 
   Future<void> _logMeal() async {
@@ -670,11 +737,30 @@ class _FoodScreenState extends State<FoodScreen> {
             ),
           ]),
           const SizedBox(height: 6),
+          Text('Absorption ${fmtAmount(meal.absorption().$1)} h (${meal.absorption().$2})', style: const TextStyle(color: kMuted, fontSize: 12)),
+          const SizedBox(height: 6),
+          if (widget.attachTo != null)
+            SizedBox(
+              height: 46,
+              child: FilledButton.icon(
+                onPressed: _attach,
+                icon: const Icon(Icons.link),
+                label: Text('Add to the ${fmtClock(widget.attachTo!.t, app.settings.flag('time24'))} entry (${(widget.attachTo!.carbs ?? 0).round()} g)'),
+              ),
+            )
+          else
           SizedBox(
             height: 46,
-            child: kRemote
+            child: meal.carbs < 0.5
                 ? FilledButton.icon(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RemoteScreen(carbs: meal.carbs, mealNote: meal.describe()))),
+                    // No carbs (meat, eggs...): nothing for Loop; the meal is kept for the nutrition report.
+                    onPressed: _saveMealOnly,
+                    icon: const Icon(Icons.save_outlined),
+                    label: const Text('Save the meal (0 g carbs)'),
+                  )
+                : kRemote
+                ? FilledButton.icon(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RemoteScreen(carbs: meal.carbs, mealNote: meal.describe(), absorption: meal.absorption().$1))),
                     icon: const Icon(Icons.send),
                     label: const Text('Send carbs and bolus to Loop now'),
                   )

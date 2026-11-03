@@ -155,6 +155,7 @@ class _TargetScreenState extends State<TargetScreen> {
           value: '${fmtBg(_mg, mmol)} ${mmol ? 'mmol' : 'mg'}',
           onMinus: () => _edit(() => _mg = (_mg - step).clamp(40.0, 400.0)),
           onPlus: () => _edit(() => _mg = (_mg + step).clamp(40.0, 400.0)),
+          onTyped: (v) => _edit(() => _mg = (mmol ? v * mgPerMmol : v).clamp(40.0, 400.0)),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -195,6 +196,7 @@ class _TargetScreenState extends State<TargetScreen> {
           value: _timer == 0 ? 'Off' : '$_timer min',
           onMinus: () => _edit(() => _timer = (_timer - 5).clamp(0, 240)),
           onPlus: () => _edit(() => _timer = (_timer + 5).clamp(0, 240)),
+          onTyped: (v) => _edit(() => _timer = v.round().clamp(0, 240)),
         ),
         if (_timer > 0)
           Padding(

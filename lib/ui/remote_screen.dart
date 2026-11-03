@@ -10,6 +10,7 @@ import '../data/nightscout.dart';
 import '../logic/bolus_calc.dart';
 import '../logic/device_lock.dart';
 import '../logic/glucose.dart';
+import '../logic/insulin_safety.dart';
 import '../logic/otp.dart';
 import '../logic/profile.dart';
 import '../logic/qr.dart';
@@ -64,12 +65,16 @@ class RemoteScreen extends StatefulWidget {
   /// Carbs to start with, and what was eaten (from a meal on the Food screen).
   final double? carbs;
   final String? mealNote;
+  /// Absorption time of the meal (hours), from its foods.
+  final double? absorption;
   /// Insulin to give with the carbs, and a bolus on its own (from a meal plan).
   final double? carbInsulin;
   final double? bolus;
   /// Called after carbs (true) or a bolus (false) were sent successfully.
   final void Function(bool carbs)? onSent;
-  const RemoteScreen({super.key, this.carbs, this.mealNote, this.carbInsulin, this.bolus, this.onSent});
+  /// The card to open first: override, carbs, bolus or settings.
+  final String? section;
+  const RemoteScreen({super.key, this.carbs, this.mealNote, this.absorption, this.carbInsulin, this.bolus, this.onSent, this.section});
   @override
   State<RemoteScreen> createState() => _RemoteScreenState();
 }
@@ -80,7 +85,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
   String? _cmdUrl; // another site for commands ('' = the connected site)
   String? _cmdSecret;
   late double _carbs = widget.carbs?.roundToDouble() ?? 20;
-  double _absorption = 3;
+  late double _absorption = widget.absorption ?? 3;
   int _carbsAgo = 0; // minutes
   late double _bolus = widget.bolus ?? 0.5;
   late bool _bolusEdited = widget.bolus != null; // false: the calculator's suggestion
@@ -89,7 +94,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
   bool _sending = false;
   Timer? _tick;
   // The section shown under the cards: override, carbs, bolus or settings.
-  late String? _section = widget.carbs != null ? 'carbs' : (widget.bolus != null && widget.carbs == null ? 'bolus' : null);
+  late String? _section = widget.section ?? (widget.carbs != null ? 'carbs' : (widget.bolus != null && widget.carbs == null ? 'bolus' : null));
 
   @override
   void initState() {
@@ -261,6 +266,55 @@ class _RemoteScreenState extends State<RemoteScreen> {
     return ok;
   }
 
+  /// Insulin safety: refused below the low limit; warnings to confirm.
+  Future<bool> _safetyOk(double insulin) async {
+    if (insulin <= 0) return true;
+    final r = insulinSafety(
+      latest: app.latest,
+      device: app.device,
+      lowMg: s.number('safeLowMg'),
+      cautionMg: s.number('safeCautionMg'),
+      mmol: app.mmol,
+    );
+    if (!mounted) return false;
+    if (r.block != null) {
+      await showDialog<void>(
+        context: context,
+        builder: (c) => AlertDialog(
+          icon: const Icon(Icons.block, color: kRed, size: 36),
+          title: const Text('No insulin now'),
+          content: Text('${r.block!}\n\nThe limit is in Remote control › Settings › Insulin safety.'),
+          actions: [FilledButton(onPressed: () => Navigator.pop(c), child: const Text('OK'))],
+        ),
+      );
+      return false;
+    }
+    if (r.warnings.isEmpty) return true;
+    var armed = false;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => StatefulBuilder(builder: (c, set) {
+        if (!armed) {
+          Future.delayed(const Duration(seconds: 3), () {
+            if (c.mounted) set(() => armed = true);
+          });
+        }
+        return AlertDialog(
+          icon: const Icon(Icons.warning_amber_rounded, color: kAmber, size: 36),
+          title: Text('Check before giving ${fmtU(insulin)} U'),
+          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            for (final w in r.warnings) Padding(padding: const EdgeInsets.only(bottom: 6), child: Text('• $w')),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+            FilledButton(onPressed: armed ? () => Navigator.pop(c, true) : null, child: const Text('Send anyway')),
+          ],
+        );
+      }),
+    );
+    return ok == true;
+  }
+
   /// The phone's lock (PIN / Face ID / fingerprint) before anything goes to Loop.
   Future<bool> _unlock(String what) async {
     final err = await confirmDeviceLock('Send to Loop: $what');
@@ -346,6 +400,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
     if (_carbs > _maxCarbs) return _snack('More than your limit of ${_maxCarbs.round()} g (gear button)');
     final limit = _bolusLimit;
     if (insulin > limit + 0.0001) return _snack('More than the bolus limit of ${fmtU(limit)} U');
+    if (!await _safetyOk(insulin)) return;
     final when = _carbsAgo == 0 ? 'now' : '$_carbsAgo min ago';
     final what = '${_carbs.round()} g${insulin > 0 ? ' + ${fmtU(insulin)} U' : ''}';
     if (!await _confirm(insulin > 0 ? 'Send carbs and bolus to Loop?' : 'Send carbs to Loop?',
@@ -359,45 +414,72 @@ class _RemoteScreenState extends State<RemoteScreen> {
     if (secret == null) return;
     final otp = await _otp();
     if (otp == null) return;
+    final carbsTime = DateTime.now().subtract(Duration(minutes: _carbsAgo));
+    final before = _seen();
+    final sentAt = DateTime.now();
     final carbsOk = await _send({
       'eventType': 'Remote Carbs Entry',
       'remoteCarbs': _carbs.round(),
       'remoteAbsorption': _absorption,
       'otp': otp,
-      'created_at': DateTime.now().subtract(Duration(minutes: _carbsAgo)).toUtc().toIso8601String(),
+      'created_at': carbsTime.toUtc().toIso8601String(),
     }, secret: secret);
     if (!carbsOk) return;
-    final lines = ['${_carbs.round()} g carbs (absorption ${fmtU(_absorption)} h, eaten $when)'];
-    if (widget.mealNote != null && !app.meal.isEmpty) {
-      // What was eaten, kept on the site for later analysis (Loop records only the carbs).
-      final m = app.meal;
-      try {
-        await app.postTreatment({
-          'eventType': 'Note',
-          'created_at': DateTime.now().subtract(Duration(minutes: _carbsAgo)).toUtc().toIso8601String(),
-          'enteredBy': 'Monitor Glucose Plus',
-          'notes': 'Meal: ${widget.mealNote}',
-          'foods': m.toFoodsJson(),
-          // Not top-level "carbs": Loop already records the carbs of this meal.
-          'nutrition': m.total.toJson(),
-        });
-      } catch (_) {}
-      m.items.clear();
-      app.mealChanged();
-    }
+    double? bolusSent;
+    String? bolusProblem;
     if (insulin > 0) {
       final otp2 = await _nextOtp(otp);
       if (otp2 == null) {
-        lines.add('Bolus NOT sent (no one-time code)');
+        bolusProblem = 'Bolus NOT sent (no one-time code)';
       } else if (await _send({'eventType': 'Remote Bolus Entry', 'remoteBolus': insulin, 'otp': otp2}, secret: secret)) {
-        lines.add('${fmtU(insulin)} U bolus');
+        bolusSent = insulin;
       } else {
-        lines.add('Bolus NOT sent (see the message)');
+        bolusProblem = 'Bolus NOT sent (see the message)';
       }
     }
     setState(() => _carbInsulinEdited = false);
-    widget.onSent?.call(true);
-    await _sent(insulin > 0 ? 'Carbs and bolus sent' : 'Carbs sent', lines);
+    // Wait for Loop's answer: its carb entry (and bolus) on the site, or its error.
+    final r = await _watchLoop(sentAt: sentAt, before: before, carbs: _carbs.round().toDouble(), carbsTime: carbsTime, bolus: bolusSent, extra: bolusProblem);
+    if (r == _LoopAnswer.received || r == _LoopAnswer.anyway) {
+      if (widget.mealNote != null && !app.meal.isEmpty) {
+        // What was eaten, kept on the site for later analysis (Loop records only the carbs).
+        final m = app.meal;
+        try {
+          await app.postTreatment({
+            'eventType': 'Note',
+            'created_at': carbsTime.toUtc().toIso8601String(),
+            'enteredBy': 'Monitor Glucose Plus',
+            'notes': 'Meal: ${widget.mealNote}',
+            'foods': m.toFoodsJson(),
+            // Not top-level "carbs": Loop already records the carbs of this meal.
+            'nutrition': m.total.toJson(),
+          });
+        } catch (_) {}
+        m.items.clear();
+        app.mealChanged();
+      }
+      widget.onSent?.call(true);
+    }
+  }
+
+  /// Treatments already on the site (so an older identical entry is not taken for Loop's answer).
+  Set<String> _seen() => {for (final t in app.treatments) '${t.t.millisecondsSinceEpoch}|${t.type}|${t.carbs}|${t.insulin}|${t.notes.hashCode}'};
+
+  Future<_LoopAnswer> _watchLoop({
+    required DateTime sentAt,
+    required Set<String> before,
+    double? carbs,
+    DateTime? carbsTime,
+    double? bolus,
+    String? extra,
+  }) async {
+    if (!mounted) return _LoopAnswer.unknown;
+    final r = await showDialog<_LoopAnswer>(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => _LoopWatchDialog(sentAt: sentAt, before: before, carbs: carbs, carbsTime: carbsTime, bolus: bolus, extra: extra),
+    );
+    return r ?? _LoopAnswer.unknown;
   }
 
   double get _bolusLimit {
@@ -409,14 +491,17 @@ class _RemoteScreenState extends State<RemoteScreen> {
     final limit = _bolusLimit;
     if (bolus <= 0) return _snack('Nothing to send: the bolus is 0 U');
     if (bolus > limit + 0.0001) return _snack('More than the limit of ${fmtU(limit)} U');
+    if (!await _safetyOk(bolus)) return;
     if (!await _confirm('Send a bolus to Loop?', '${fmtU(bolus)} U\n\nLoop checks it against its own limits before giving it.', danger: true)) return;
     if (!await _unlock('${fmtU(bolus)} U bolus')) return;
     final otp = await _otp();
     if (otp == null) return;
+    final before = _seen();
+    final sentAt = DateTime.now();
     if (await _send({'eventType': 'Remote Bolus Entry', 'remoteBolus': bolus, 'otp': otp})) {
       setState(() => _bolusEdited = false);
-      widget.onSent?.call(false);
-      await _sent('Bolus sent', ['${fmtU(bolus)} U bolus']);
+      final r = await _watchLoop(sentAt: sentAt, before: before, bolus: bolus);
+      if (r == _LoopAnswer.received || r == _LoopAnswer.anyway) widget.onSent?.call(false);
     }
   }
 
@@ -493,12 +578,65 @@ class _RemoteScreenState extends State<RemoteScreen> {
                   value: '${fmtU(s.number('remoteMaxBolus'))} U',
                   onMinus: () => change((x) => x.set('remoteMaxBolus', ((x.number('remoteMaxBolus') - 0.5).clamp(0.5, 30.0) * 100).round() / 100)),
                   onPlus: () => change((x) => x.set('remoteMaxBolus', ((x.number('remoteMaxBolus') + 0.5).clamp(0.5, 30.0) * 100).round() / 100)),
+                  onTyped: (v) => change((x) => x.set('remoteMaxBolus', (v.clamp(0.5, 30.0) * 20).round() / 20)),
                 ),
                 StepRow(
                   label: 'Most carbs allowed',
                   value: '${s.number('remoteMaxCarbs').round()} g',
                   onMinus: () => change((x) => x.set('remoteMaxCarbs', (x.number('remoteMaxCarbs') - 10).clamp(10.0, 250.0))),
                   onPlus: () => change((x) => x.set('remoteMaxCarbs', (x.number('remoteMaxCarbs') + 10).clamp(10.0, 250.0))),
+                  onTyped: (v) => change((x) => x.set('remoteMaxCarbs', v.roundToDouble().clamp(10.0, 250.0))),
+                const SizedBox(height: 14),
+                const Text('Insulin safety', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                StepRow(
+                  label: 'No insulin below',
+                  hint: 'Sending insulin is refused under this glucose',
+                  value: fmtBg(s.number('safeLowMg'), app.mmol),
+                  onMinus: () => change((x) => x.set('safeLowMg', (x.number('safeLowMg') - (app.mmol ? mgPerMmol / 10 : 1)).clamp(54.0, 126.0))),
+                  onPlus: () => change((x) => x.set('safeLowMg', (x.number('safeLowMg') + (app.mmol ? mgPerMmol / 10 : 1)).clamp(54.0, 126.0))),
+                  onTyped: (v) => change((x) => x.set('safeLowMg', (app.mmol ? v * mgPerMmol : v).clamp(54.0, 126.0))),
+                ),
+                StepRow(
+                  label: 'Warn below',
+                  hint: 'Also when falling fast or when Loop predicts a low',
+                  value: fmtBg(s.number('safeCautionMg'), app.mmol),
+                  onMinus: () => change((x) => x.set('safeCautionMg', (x.number('safeCautionMg') - (app.mmol ? mgPerMmol / 10 : 1)).clamp(54.0, 180.0))),
+                  onPlus: () => change((x) => x.set('safeCautionMg', (x.number('safeCautionMg') + (app.mmol ? mgPerMmol / 10 : 1)).clamp(54.0, 180.0))),
+                  onTyped: (v) => change((x) => x.set('safeCautionMg', (app.mmol ? v * mgPerMmol : v).clamp(54.0, 180.0))),
+                ),
+                const SizedBox(height: 14),
+                const Text('Reminder to give insulin', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                SwitchRow(
+                  label: 'Ring when glucose stays high',
+                  hint: 'You still send the insulin yourself',
+                  value: s.flag('bolusRemindOn'),
+                  onChanged: (v) => change((x) => x.set('bolusRemindOn', v)),
+                ),
+                if (s.flag('bolusRemindOn')) ...[
+                  StepRow(
+                    label: 'At or above',
+                    value: fmtBg(s.number('bolusRemindMg'), app.mmol),
+                    onMinus: () => change((x) => x.set('bolusRemindMg', (x.number('bolusRemindMg') - (app.mmol ? mgPerMmol / 2 : 10)).clamp(110.0, 400.0))),
+                    onPlus: () => change((x) => x.set('bolusRemindMg', (x.number('bolusRemindMg') + (app.mmol ? mgPerMmol / 2 : 10)).clamp(110.0, 400.0))),
+                    onTyped: (v) => change((x) => x.set('bolusRemindMg', (app.mmol ? v * mgPerMmol : v).clamp(110.0, 400.0))),
+                  ),
+                  StepRow(
+                    label: 'For at least',
+                    value: '${s.integer('bolusRemindMin')} min',
+                    onMinus: () => change((x) => x.set('bolusRemindMin', (x.integer('bolusRemindMin') - 5).clamp(5, 180))),
+                    onPlus: () => change((x) => x.set('bolusRemindMin', (x.integer('bolusRemindMin') + 5).clamp(5, 180))),
+                    onTyped: (v) => change((x) => x.set('bolusRemindMin', v.round().clamp(5, 180))),
+                  ),
+                  StepRow(
+                    label: 'Not if a bolus in the last',
+                    value: '${s.integer('bolusRemindQuietH')} h',
+                    onMinus: () => change((x) => x.set('bolusRemindQuietH', (x.integer('bolusRemindQuietH') - 1).clamp(0, 6))),
+                    onPlus: () => change((x) => x.set('bolusRemindQuietH', (x.integer('bolusRemindQuietH') + 1).clamp(0, 6))),
+                    onTyped: (v) => change((x) => x.set('bolusRemindQuietH', v.round().clamp(0, 6))),
+                    last: true,
+                  ),
+                ],
+                const SizedBox(height: 8),
                 ),
                 TextField(
                   controller: nameCtl,
@@ -717,18 +855,21 @@ class _RemoteScreenState extends State<RemoteScreen> {
                     value: '${_carbs.round()} g',
                     onMinus: () => setState(() => _carbs = (_carbs - 5).clamp(1.0, _maxCarbs)),
                     onPlus: () => setState(() => _carbs = (_carbs + 5).clamp(1.0, _maxCarbs)),
+                    onTyped: (v) => setState(() => _carbs = v.roundToDouble().clamp(1.0, _maxCarbs)),
                   ),
                   StepRow(
                     label: 'Absorption time',
                     value: '${fmtU(_absorption)} h',
                     onMinus: () => setState(() => _absorption = (_absorption - 0.5).clamp(0.5, 8.0)),
                     onPlus: () => setState(() => _absorption = (_absorption + 0.5).clamp(0.5, 8.0)),
+                    onTyped: (v) => setState(() => _absorption = ((v * 4).round() / 4).clamp(0.5, 8.0)),
                   ),
                   StepRow(
                     label: 'Eaten',
                     value: _carbsAgo == 0 ? 'now' : '$_carbsAgo min ago',
                     onMinus: () => setState(() => _carbsAgo = (_carbsAgo - 15).clamp(0, 120)),
                     onPlus: () => setState(() => _carbsAgo = (_carbsAgo + 15).clamp(0, 120)),
+                    onTyped: (v) => setState(() => _carbsAgo = v.round().clamp(0, 120)),
                   ),
                   StepRow(
                     label: 'Insulin with the carbs',
@@ -742,6 +883,10 @@ class _RemoteScreenState extends State<RemoteScreen> {
                     }),
                     onPlus: () => setState(() {
                       _carbInsulin = ((carbInsulin + 0.05).clamp(0.0, bolusLimit) * 100).round() / 100;
+                      _carbInsulinEdited = true;
+                    }),
+                    onTyped: (v) => setState(() {
+                      _carbInsulin = ((v.clamp(0.0, bolusLimit)) * 20).round() / 20;
                       _carbInsulinEdited = true;
                     }),
                     last: true,
@@ -773,15 +918,26 @@ class _RemoteScreenState extends State<RemoteScreen> {
                       _bolus = ((bolus + 0.05).clamp(0.0, bolusLimit) * 100).round() / 100;
                       _bolusEdited = true;
                     }),
+                    onTyped: (v) => setState(() {
+                      _bolus = ((v.clamp(0.0, bolusLimit)) * 20).round() / 20;
+                      _bolusEdited = true;
+                    }),
                     last: true,
                   ),
                   Wrap(spacing: 6, children: [
+                    ActionChip(
+                        label: const Text('0 U'),
+                        onPressed: () => setState(() {
+                              _bolus = 0;
+                              _bolusEdited = true;
+                            })),
+                    // Each tap adds (1 + 0.5 = 1.5 U), up to the limit.
                     for (final v in [0.25, 0.5, 1.0, 2.0])
                       if (v <= bolusLimit)
                         ActionChip(
-                            label: Text('${fmtU(v)} U'),
+                            label: Text('+${fmtU(v)} U'),
                             onPressed: () => setState(() {
-                                  _bolus = v;
+                                  _bolus = ((bolus + v).clamp(0.0, bolusLimit) * 20).round() / 20;
                                   _bolusEdited = true;
                                 })),
                     if (_bolusEdited) ActionChip(label: Text('Suggested ${fmtU(lim(calcBolus.total))} U'), onPressed: () => setState(() => _bolusEdited = false)),
@@ -817,6 +973,127 @@ class _RemoteScreenState extends State<RemoteScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+
+enum _LoopAnswer { received, refused, unknown, anyway }
+
+/// Waits (up to 4 minutes) for Loop to answer a command: its carb entry or
+/// bolus showing on the site, or the error Loop writes there (for example
+/// "Password is incorrect": the one-time code did not match).
+class _LoopWatchDialog extends StatefulWidget {
+  final DateTime sentAt;
+  final Set<String> before;
+  final double? carbs;
+  final DateTime? carbsTime;
+  final double? bolus;
+  final String? extra;
+  const _LoopWatchDialog({required this.sentAt, required this.before, this.carbs, this.carbsTime, this.bolus, this.extra});
+  @override
+  State<_LoopWatchDialog> createState() => _LoopWatchDialogState();
+}
+
+class _LoopWatchDialogState extends State<_LoopWatchDialog> {
+  Timer? _timer;
+  bool? _carbsOk; // null waiting, true received, false refused
+  bool? _bolusOk;
+  String? _why;
+  bool _timedOut = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.carbs == null) _carbsOk = true;
+    if (widget.bolus == null) _bolusOk = true;
+    _timer = Timer.periodic(const Duration(seconds: 10), (_) => _check());
+    Future.delayed(const Duration(seconds: 4), _check);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _check() async {
+    if (!mounted) return;
+    try {
+      await app.refresh(full: true);
+    } catch (_) {}
+    if (!mounted) return;
+    String key(Treatment t) => '${t.t.millisecondsSinceEpoch}|${t.type}|${t.carbs}|${t.insulin}|${t.notes.hashCode}';
+    final fresh = app.treatments.where((t) => !widget.before.contains(key(t))).toList();
+    final from = widget.sentAt.subtract(const Duration(minutes: 1));
+    setState(() {
+      if (_carbsOk == null) {
+        final ct = widget.carbsTime ?? widget.sentAt;
+        if (fresh.any((t) => (t.carbs ?? 0) > 0 && ((t.carbs ?? 0) - widget.carbs!).abs() < 0.6 && t.t.difference(ct).inMinutes.abs() <= 10)) _carbsOk = true;
+      }
+      if (_bolusOk == null) {
+        if (fresh.any((t) => (t.insulin ?? 0) > 0 && ((t.insulin ?? 0) - widget.bolus!).abs() < 0.051 && !t.t.isBefore(from))) _bolusOk = true;
+      }
+      for (final t in fresh) {
+        final n = t.notes;
+        if (t.t.isBefore(from) || !(n.contains('Password is incorrect') || n.startsWith('Error'))) continue;
+        _why = n.contains('Password is incorrect')
+            ? 'Loop refused it: the one-time code did not match. Check that the QR code in Remote control › Settings is the one of the Loop phone, and that the phone clocks are set automatically.'
+            : n.split('\n').first;
+        if (n.contains('Bolus')) {
+          _bolusOk ??= false;
+        } else {
+          _carbsOk ??= false;
+        }
+      }
+      if (DateTime.now().difference(widget.sentAt).inMinutes >= 4) _timedOut = true;
+    });
+    if ((_carbsOk != null && _bolusOk != null) || _timedOut) _timer?.cancel();
+  }
+
+  Widget _line(String text, bool? ok) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(children: [
+          ok == null
+              ? (_timedOut ? const Icon(Icons.help_outline, color: kAmber) : const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5)))
+              : Icon(ok ? Icons.check_circle : Icons.cancel, color: ok ? kGreen : kRed),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 15))),
+        ]),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final done = _carbsOk != null && _bolusOk != null;
+    final allOk = _carbsOk == true && _bolusOk == true;
+    final refused = _carbsOk == false || _bolusOk == false;
+    return AlertDialog(
+      title: Text(done ? (allOk ? 'Received by Loop' : 'Refused by Loop') : (_timedOut ? 'No answer from Loop yet' : 'Sent: waiting for Loop…')),
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (widget.carbs != null) _line('${widget.carbs!.round()} g carbs', _carbsOk),
+        if (widget.bolus != null) _line('${fmtU(widget.bolus!)} U bolus', _bolusOk),
+        if (widget.extra != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text(widget.extra!, style: const TextStyle(color: kAmber))),
+        if (_why != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_why!, style: const TextStyle(color: kRed, fontSize: 13))),
+        if (_timedOut && !done)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text('Loop has not shown it on the site yet (its phone may have no internet). Look at the Loop phone before sending again.',
+                style: TextStyle(color: kMuted, fontSize: 13)),
+          ),
+        if (!done && !_timedOut)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text('Usually within a minute. You can close this: nothing is sent again.', style: TextStyle(color: kMuted, fontSize: 12)),
+          ),
+      ]),
+      actions: [
+        if (!done && _timedOut && widget.carbs != null)
+          TextButton(onPressed: () => Navigator.pop(context, _LoopAnswer.anyway), child: const Text('Count it as received')),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, done ? (refused ? _LoopAnswer.refused : _LoopAnswer.received) : _LoopAnswer.unknown),
+          child: Text(done ? 'OK' : 'Close'),
+        ),
+      ],
     );
   }
 }

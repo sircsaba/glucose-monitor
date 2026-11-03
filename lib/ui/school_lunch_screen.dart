@@ -58,6 +58,7 @@ class _SchoolLunchScreenState extends State<SchoolLunchScreen> {
   bool get _today => _day == SchoolLunch.dayKey(DateTime.now());
 
   String _dayLabel(String key) {
+    if (key == SchoolLunch.defaultKey) return 'Default lunch box';
     final d = SchoolLunch.dayOf(key)!;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -105,6 +106,7 @@ class _SchoolLunchScreenState extends State<SchoolLunchScreen> {
               value: '${fmtAmount(a)} ${unitFor(a, f.unit)}',
               onMinus: () => set(() => a = (a - step).clamp(step, 5000)),
               onPlus: () => set(() => a = a + step),
+              onTyped: (v) => set(() => a = v.clamp(step, 5000).toDouble()),
               last: true,
             ),
             Text('${fmtAmount((carbs * 10).round() / 10)} g carbs', style: kMono.copyWith(color: kAccent, fontSize: 16)),
@@ -247,12 +249,14 @@ class _SchoolLunchScreenState extends State<SchoolLunchScreen> {
     final note = 'School lunch: ${m.describe()}';
     var sent = false;
     var how = 'loop';
-    if (kRemote) {
+    final noCarbs = m.carbs < 0.5;
+    if (noCarbs) how = 'logged';
+    if (kRemote && !noCarbs) {
       if (!mounted) return;
       await Navigator.push(
-          context, MaterialPageRoute(builder: (_) => RemoteScreen(carbs: m.carbs, mealNote: note, onSent: (carbs) => sent = sent || carbs)));
+          context, MaterialPageRoute(builder: (_) => RemoteScreen(carbs: m.carbs, mealNote: note, absorption: m.absorption().$1, onSent: (carbs) => sent = sent || carbs)));
     } else {
-      if (!app.settings.flag('allowTreatments')) {
+      if (!noCarbs && !app.settings.flag('allowTreatments')) {
         if (mounted) toast(context, 'Logging treatments is turned off in Settings');
         return;
       }
@@ -260,10 +264,11 @@ class _SchoolLunchScreenState extends State<SchoolLunchScreen> {
       setState(() => _busy = true);
       try {
         await app.postTreatment({
-          'eventType': 'Meal Bolus',
+          // No carbs: only a note with the foods (nothing for Loop).
+          'eventType': noCarbs ? 'Note' : 'Meal Bolus',
           'created_at': DateTime.now().toUtc().toIso8601String(),
           'enteredBy': app.settings.str('enteredBy').isEmpty ? 'Monitor Glucose app' : app.settings.str('enteredBy'),
-          'carbs': m.carbs.round(),
+          if (!noCarbs) 'carbs': m.carbs.round(),
           'notes': note,
           'foods': m.toFoodsJson(),
           'nutrition': m.total.toJson(),
@@ -336,6 +341,14 @@ class _SchoolLunchScreenState extends State<SchoolLunchScreen> {
               PopupMenuButton<String>(
                 onSelected: (v) async {
                   if (v == 'copy') _copyFrom();
+                  if (v == 'default') {
+                    try {
+                      await app.deleteLunch(_day);
+                      if (context.mounted) toast(context, 'Back to the default lunch box');
+                    } catch (e) {
+                      if (context.mounted) toast(context, e.toString());
+                    }
+                  }
                   if (v == 'delete') {
                     final ok = await showDialog<bool>(
                       context: context,
@@ -356,9 +369,15 @@ class _SchoolLunchScreenState extends State<SchoolLunchScreen> {
                     }
                   }
                 },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'copy', child: ListTile(leading: Icon(Icons.copy_all), title: Text('Same as another day'))),
-                  PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete_outline), title: Text('Delete this lunch'))),
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'copy', child: ListTile(leading: Icon(Icons.copy_all), title: Text('Same as another day'))),
+                  if (_day != SchoolLunch.defaultKey && app.lunches[_day] != null && app.lunches[SchoolLunch.defaultKey] != null)
+                    const PopupMenuItem(value: 'default', child: ListTile(leading: Icon(Icons.restore), title: Text('Back to the default box'))),
+                  PopupMenuItem(
+                      value: 'delete',
+                      child: ListTile(
+                          leading: const Icon(Icons.delete_outline),
+                          title: Text(_day == SchoolLunch.defaultKey ? 'Delete the default box' : 'Delete this lunch'))),
                 ],
               ),
             ],
@@ -371,13 +390,14 @@ class _SchoolLunchScreenState extends State<SchoolLunchScreen> {
                 onRefresh: _load,
                 child: ListView(padding: const EdgeInsets.fromLTRB(12, 4, 12, 16), children: [
                   if (_error != null) Padding(padding: const EdgeInsets.all(8), child: Text(_error!, style: const TextStyle(color: kAmber))),
+                  _defaultNote(),
                   _boxCard(l, waiting, h24),
                   if (l.eaten.isNotEmpty) _eatenCard(l, h24),
                   if (l.isPast && waiting.isNotEmpty) _notEatenCard(waiting),
                 ]),
               ),
             ),
-            if (!_edit && amounts.isNotEmpty) _sendBar(meal),
+            if (!_edit && amounts.isNotEmpty && _day != SchoolLunch.defaultKey) _sendBar(meal),
           ]),
         );
       },
@@ -390,7 +410,7 @@ class _SchoolLunchScreenState extends State<SchoolLunchScreen> {
     return SizedBox(
       height: 48,
       child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.fromLTRB(12, 6, 12, 0), children: [
-        for (final d in {today, next, if (_day != today && _day != next) _day})
+        for (final d in {today, next, if (_day != today && _day != next && _day != SchoolLunch.defaultKey) _day})
           Padding(
             padding: const EdgeInsets.only(right: 6),
             child: ChoiceChip(
@@ -404,6 +424,19 @@ class _SchoolLunchScreenState extends State<SchoolLunchScreen> {
               }),
             ),
           ),
+        Padding(
+          padding: const EdgeInsets.only(right: 6),
+          child: ChoiceChip(
+            avatar: const Icon(Icons.inventory_2_outlined, size: 18),
+            label: const Text('Default box'),
+            selected: _day == SchoolLunch.defaultKey,
+            onSelected: (_) => setState(() {
+              _day = SchoolLunch.defaultKey;
+              _pick.clear();
+              _edit = true;
+            }),
+          ),
+        ),
         ActionChip(
           avatar: const Icon(Icons.calendar_month, size: 18),
           label: const Text('Other day'),
@@ -442,6 +475,23 @@ class _SchoolLunchScreenState extends State<SchoolLunchScreen> {
           ...children,
         ]),
       );
+
+  Widget _defaultNote() {
+    if (_day == SchoolLunch.defaultKey) {
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(4, 8, 4, 0),
+        child: Text('Every school day (Monday to Friday) starts with this lunch box. Changing one day changes only that day.',
+            style: TextStyle(color: kMuted, fontSize: 13)),
+      );
+    }
+    if (app.lunchIsDefault(_day)) {
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(4, 8, 4, 0),
+        child: Text('From the default lunch box. Change it for this day with the pencil.', style: TextStyle(color: kMuted, fontSize: 13)),
+      );
+    }
+    return const SizedBox.shrink();
+  }
 
   Widget _boxCard(SchoolLunch l, List<LunchItem> waiting, bool h24) {
     final shown = _edit ? l.items.where((i) => !i.done).toList() : waiting;
@@ -580,7 +630,7 @@ class _SchoolLunchScreenState extends State<SchoolLunchScreen> {
       ]);
 
   Widget _sendBar(Meal meal) {
-    final canLog = kRemote || app.settings.flag('allowTreatments');
+    final canLog = kRemote || app.settings.flag('allowTreatments') || meal.carbs < 0.5;
     return Container(
       decoration: const BoxDecoration(color: kCard, border: Border(top: BorderSide(color: kBorder))),
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
@@ -604,8 +654,8 @@ class _SchoolLunchScreenState extends State<SchoolLunchScreen> {
             height: 48,
             child: FilledButton.icon(
               onPressed: _busy || !canLog ? null : _send,
-              icon: Icon(kRemote ? Icons.send : Icons.save_outlined),
-              label: Text(kRemote ? 'Send ${meal.carbs.round()} g to Loop' : 'Log ${meal.carbs.round()} g eaten',
+              icon: Icon(kRemote && meal.carbs >= 0.5 ? Icons.send : Icons.save_outlined),
+              label: Text(meal.carbs < 0.5 ? 'Eaten (0 g carbs)' : (kRemote ? 'Send ${meal.carbs.round()} g to Loop' : 'Log ${meal.carbs.round()} g eaten'),
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             ),
           ),
