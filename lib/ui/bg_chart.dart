@@ -530,7 +530,6 @@ class _BgPainter extends CustomPainter {
         lane = lastAt != null && t.t.difference(lastAt).inMinutes.abs() < 40 ? lane + 1 : 0;
         lastAt = t.t;
         _text(canvas, kd.$1, Offset(cx + 3, top + 10 + lane * 12.0), color: kd.$2);
-        hits.add(_Hit(Offset(cx, top + 10 + lane * 12.0), '${t.type}${t.notes.isNotEmpty ? ': ${t.notes}' : ''}', t.t));
       }
     }
 
