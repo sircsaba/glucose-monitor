@@ -71,7 +71,7 @@ void main() {
       expect(f.name, 'Corn tortilla chips');
       expect(f.brand, 'Acme');
       expect(f.portion, 28);
-      expect(f.carbs, closeTo(17.92, 0.01));
+      expect(f.n.carbs, closeTo(17.92, 0.01));
       expect(f.n.energy, closeTo(140, 0.01));
       expect(f.n.sodium, closeTo(112, 0.01));
       expect(f.gluten, Gluten.free);
@@ -80,7 +80,7 @@ void main() {
     test('changing the portion follows the per-100 g values', () {
       final f = foodFromOff(off, '0123456789012')!;
       f.setPortion(50);
-      expect(f.carbs, closeTo(32, 0.01));
+      expect(f.n.carbs, closeTo(32, 0.01));
     });
     test('unknown product', () {
       expect(foodFromOff({'status': 0}, '1'), isNull);
