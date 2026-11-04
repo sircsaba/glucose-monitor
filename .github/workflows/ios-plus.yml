@@ -50,10 +50,15 @@ jobs:
 
       - name: Prepare the Xcode project
         run: |
-          scripts/step.sh "Prepare Xcode project" flutter build ios --release --config-only --no-codesign --build-number=$BUILD_NUMBER --dart-define=PLUS=true
+          # Downloads sometimes drop (curl HTTP/2 errors): use HTTP/1.1 and try 3 times.
+          echo "--http1.1" >> ~/.curlrc
+          for try in 1 2 3; do
+            scripts/step.sh "Prepare Xcode project" flutter build ios --release --config-only --no-codesign --build-number=$BUILD_NUMBER --dart-define=PLUS=true && break
+            [ $try = 3 ] && exit 1; echo "Retrying in 30 s"; sleep 30
+          done
           python3 scripts/patch_platforms.py podfile
           if [ -f ios/Podfile ]; then
-            cd ios && ../scripts/step.sh "pod install" pod install
+            cd ios && for try in 1 2 3; do ../scripts/step.sh "pod install" pod install && break; [ $try = 3 ] && exit 1; sleep 30; done
           fi
 
       - uses: ruby/setup-ruby@v1
