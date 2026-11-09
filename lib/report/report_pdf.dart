@@ -197,7 +197,7 @@ Future<Uint8List> buildReportPdf(ReportData d, Set<int> which) async {
       footer: footer,
       build: (_) => [
         header('Daily stats'),
-        table(dailyStatsRows(d, mmol), font: 7.5),
+        table(dailyStatsRows(d, mmol), font: 7),
         pw.SizedBox(height: 6),
         pw.Text('Insulin in units, carbs in grams. V.low under ${fmtBg(54, mmol)}, V.high over ${fmtBg(250, mmol)}.', style: small),
       ],

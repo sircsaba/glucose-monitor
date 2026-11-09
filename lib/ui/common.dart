@@ -530,3 +530,95 @@ class CardGrid extends StatelessWidget {
     return Column(children: rows);
   }
 }
+
+// ---------- settings in small pages ----------
+
+/// A few settings that belong together, opened as their own short page
+/// instead of one long list. [summary] shows the current choices on the row.
+class SettingsGroup {
+  final String title;
+  final String? hint;
+  final IconData? icon;
+  final String Function()? summary;
+  final List<Widget> Function(BuildContext context) rows;
+  const SettingsGroup(this.title, {this.hint, this.icon, this.summary, required this.rows});
+
+  void open(BuildContext context) => Navigator.push(context, MaterialPageRoute(builder: (_) => GroupPage(this)));
+}
+
+/// The page of one [SettingsGroup].
+class GroupPage extends StatelessWidget {
+  final SettingsGroup group;
+  const GroupPage(this.group, {super.key});
+  @override
+  Widget build(BuildContext context) => SettingsPage(
+        title: group.title,
+        builder: (c) => [
+          if (group.hint != null)
+            Padding(padding: const EdgeInsets.only(left: 4, bottom: 10), child: Text(group.hint!, style: const TextStyle(color: kMuted, fontSize: 12.5))),
+          Section(children: group.rows(c)),
+        ],
+      );
+}
+
+/// A row that opens a [SettingsGroup], with its current choices under the name.
+class GroupRow extends StatelessWidget {
+  final SettingsGroup group;
+  const GroupRow(this.group, {super.key});
+  @override
+  Widget build(BuildContext context) {
+    String? sub;
+    try {
+      sub = group.summary?.call();
+    } catch (_) {}
+    return LinkRow(label: group.title, hint: (sub == null || sub.isEmpty) ? group.hint : sub, icon: group.icon, onTap: () => group.open(context));
+  }
+}
+
+/// A settings menu made of groups: one short row each, opening its own page.
+class GroupedSettingsPage extends StatelessWidget {
+  final String title;
+  final List<SettingsGroup> Function() groups;
+  final List<Widget> Function(BuildContext context)? top;
+  final List<Widget> Function(BuildContext context)? bottom;
+  final List<Widget>? actions;
+  const GroupedSettingsPage({super.key, required this.title, required this.groups, this.top, this.bottom, this.actions});
+  @override
+  Widget build(BuildContext context) => SettingsPage(
+        title: title,
+        actions: actions,
+        builder: (c) => [
+          ...?top?.call(c),
+          Section(children: [for (final g in groups()) GroupRow(g)]),
+          ...?bottom?.call(c),
+        ],
+      );
+}
+
+/// A colour choice bound to a setting (a row of colour dots).
+class ColorSettingRow extends StatelessWidget {
+  final String label;
+  final String settingKey;
+  const ColorSettingRow(this.label, this.settingKey, {super.key});
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text(label, style: const TextStyle(fontSize: 15)),
+          const SizedBox(height: 8),
+          ColorPick(dot: 32, value: app.settings.integer(settingKey), onPick: (v) => app.change((x) => x.set(settingKey, v))),
+        ]),
+      );
+}
+
+/// The name and hint of a settings row, for the settings search (null when
+/// the widget is not a named row).
+(String, String)? settingRowText(Widget w) => switch (w) {
+      SwitchRow r => (r.label, r.hint ?? ''),
+      StepRow r => (r.label, r.hint ?? ''),
+      ChoiceRow r => (r.label, r.hint ?? ''),
+      LinkRow r => (r.label, r.hint ?? ''),
+      ColorSettingRow r => (r.label, ''),
+      GroupRow r => (r.group.title, r.group.hint ?? ''),
+      _ => null,
+    };

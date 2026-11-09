@@ -571,7 +571,8 @@ class _RemoteScreenState extends State<RemoteScreen> {
             child: SingleChildScrollView(
               child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 const Text('Remote control settings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
+                _fold('Limits', '${fmtU(s.number('remoteMaxBolus'))} U · ${s.number('remoteMaxCarbs').round()} g', [
                 StepRow(
                   label: 'Largest bolus allowed',
                   hint: 'Here, before Loop checks its own maximum',
@@ -587,8 +588,8 @@ class _RemoteScreenState extends State<RemoteScreen> {
                   onPlus: () => change((x) => x.set('remoteMaxCarbs', (x.number('remoteMaxCarbs') + 10).clamp(10.0, 250.0))),
                   onTyped: (v) => change((x) => x.set('remoteMaxCarbs', v.roundToDouble().clamp(10.0, 250.0))),
                 ),
-                const SizedBox(height: 14),
-                const Text('Insulin safety', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                ]),
+                _fold('Insulin safety', 'None below ${fmtBg(s.number('safeLowMg'), app.mmol)} · warn below ${fmtBg(s.number('safeCautionMg'), app.mmol)}', [
                 StepRow(
                   label: 'No insulin below',
                   hint: 'Sending insulin is refused under this glucose',
@@ -605,8 +606,8 @@ class _RemoteScreenState extends State<RemoteScreen> {
                   onPlus: () => change((x) => x.set('safeCautionMg', (x.number('safeCautionMg') + (app.mmol ? mgPerMmol / 10 : 1)).clamp(54.0, 180.0))),
                   onTyped: (v) => change((x) => x.set('safeCautionMg', (app.mmol ? v * mgPerMmol : v).clamp(54.0, 180.0))),
                 ),
-                const SizedBox(height: 14),
-                const Text('Reminder to give insulin', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                ]),
+                _fold('Reminder to give insulin', s.flag('bolusRemindOn') ? 'On · ${fmtBg(s.number('bolusRemindMg'), app.mmol)} for ${s.integer('bolusRemindMin')} min' : 'Off', [
                 SwitchRow(
                   label: 'Ring when glucose stays high',
                   hint: 'You still send the insulin yourself',
@@ -637,7 +638,8 @@ class _RemoteScreenState extends State<RemoteScreen> {
                     last: true,
                   ),
                 ],
-                const SizedBox(height: 8),
+                ]),
+                _fold('Name and command site', (_cmdUrl ?? '').isEmpty ? 'Through the site this app shows' : 'Through $_cmdUrl', [
                 TextField(
                   controller: nameCtl,
                   decoration: const InputDecoration(labelText: 'Your name (shown in Loop)', hintText: kAppName),
@@ -650,6 +652,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
                 TextField(controller: urlCtl, decoration: const InputDecoration(labelText: 'Other site address (optional)', hintText: 'https://…')),
                 TextField(controller: secCtl, obscureText: true, decoration: const InputDecoration(labelText: 'Its API secret')),
                 const SizedBox(height: 8),
+                ]),
                 FilledButton(
                   onPressed: () async {
                     final u = urlCtl.text.trim();
@@ -679,6 +682,18 @@ class _RemoteScreenState extends State<RemoteScreen> {
       }),
     );
   }
+
+  /// A part of the settings that opens when tapped (less scrolling).
+  Widget _fold(String title, String summary, List<Widget> children) => ExpansionTile(
+        title: Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+        subtitle: Text(summary, style: const TextStyle(color: kMuted, fontSize: 12)),
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: const EdgeInsets.only(bottom: 8),
+        expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+        shape: const Border(),
+        collapsedShape: const Border(),
+        children: children,
+      );
 
   // ------------------------------------------------------------ view
 

@@ -545,6 +545,12 @@ class _DayViewState extends State<DayView> {
         icon: Icon(muted ? Icons.notifications_off : Icons.notifications_outlined, color: muted ? kAmber : kMuted),
       ),
       IconButton(
+        tooltip: 'Screen saver (alarms quiet, touch to come back)',
+        visualDensity: VisualDensity.compact,
+        onPressed: widget.preview ? null : app.startScreenSaver,
+        icon: const Icon(Icons.screenshot_monitor_outlined, color: kMuted),
+      ),
+      IconButton(
         tooltip: 'Night view',
         visualDensity: VisualDensity.compact,
         onPressed: widget.preview ? null : app.openNight,

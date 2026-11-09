@@ -847,7 +847,8 @@ const _gridChoices = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240];
 String _fmtMinutes(int m) => m < 60 ? '$m min' : (m % 60 == 0 ? '${m ~/ 60} h' : '${m ~/ 60} h ${m % 60}');
 
 /// Settings rows for the grid and the mouse-over labels (used in two screens).
-List<Widget> graphGridSettings() {
+/// Grid lines and the time lines of each graph button.
+List<Widget> gridSettings() {
   final buttons = app.graphButtons;
   final mins = gridMinutesList();
   void step(int i, int dir) {
@@ -859,32 +860,8 @@ List<Widget> graphGridSettings() {
     app.change((x) => x.set('gridMinutes', list));
   }
 
-  const tips = ['Nothing', 'Value', 'Value and time', 'Time only'];
   return [
     setSwitch('Grid lines', 'gridLines', hint: 'Dotted lines across and down the graph'),
-    setChoice('Basal on the graph', 'basalPos', const ['At the top', 'Under the graph']),
-    if (app.settings.integer('basalPos') == 0)
-      setMg('Basal starts at', 'basalFrom', min: 120, max: 360, hint: 'The basal bars stand on this glucose line and go up to the top of the graph'),
-    setSwitch('Basal rate on the bars', 'basalLabels', hint: 'U/h written on the basal bars, where there is room'),
-    if (app.settings.flag('basalLabels')) setChoice('Basal numbers', 'basalLabelPos', const ['Above the bars', 'In the bars']),
-    StepRow(
-      label: 'Basal numbers size',
-      value: '${app.settings.number('basalTextSize').toStringAsFixed(app.settings.number('basalTextSize') % 1 == 0 ? 0 : 1)} px',
-      onMinus: () => app.change((x) => x.set('basalTextSize', (x.number('basalTextSize') - 1).clamp(7.0, 30.0).roundToDouble())),
-      onPlus: () => app.change((x) => x.set('basalTextSize', (x.number('basalTextSize') + 1).clamp(7.0, 30.0).roundToDouble())),
-    ),
-    setSwitch('Basal numbers bold', 'basalTextBold'),
-    _colorRow('Basal numbers colour', 'basalTextColor'),
-    _colorRow('Basal bars colour', 'basalBarColor'),
-    setSwitch('Presets on the graph', 'presetShow', hint: 'Loop overrides and Trio temp targets: name, target range and time'),
-    StepRow(
-      label: 'Preset name size',
-      value: '${app.settings.number('presetTextSize').round()} px',
-      onMinus: () => app.change((x) => x.set('presetTextSize', (x.number('presetTextSize') - 1).clamp(7.0, 30.0).roundToDouble())),
-      onPlus: () => app.change((x) => x.set('presetTextSize', (x.number('presetTextSize') + 1).clamp(7.0, 30.0).roundToDouble())),
-    ),
-    setSwitch('Preset name bold', 'presetBold'),
-    _colorRow('Preset colour', 'presetColor'),
     for (var i = 0; i < 5 && i < buttons.length; i++)
       StepRow(
         label: 'Time lines on the ${buttons[i]} h graph',
@@ -892,19 +869,66 @@ List<Widget> graphGridSettings() {
         onMinus: () => step(i, -1),
         onPlus: () => step(i, 1),
       ),
+  ];
+}
+
+/// Basal bars and their numbers.
+List<Widget> basalSettings() => [
+      setSwitch('Basal on the graph', 'showBasal'),
+      setChoice('Basal placed', 'basalPos', const ['At the top', 'Under the graph']),
+      if (app.settings.integer('basalPos') == 0)
+        setMg('Basal starts at', 'basalFrom', min: 120, max: 360, hint: 'The basal bars stand on this glucose line and go up to the top of the graph'),
+      setSwitch('Basal rate on the bars', 'basalLabels', hint: 'U/h written on the basal bars, where there is room'),
+      if (app.settings.flag('basalLabels')) setChoice('Basal numbers', 'basalLabelPos', const ['Above the bars', 'In the bars']),
+      StepRow(
+        label: 'Basal numbers size',
+        value: '${app.settings.number('basalTextSize').toStringAsFixed(app.settings.number('basalTextSize') % 1 == 0 ? 0 : 1)} px',
+        onMinus: () => app.change((x) => x.set('basalTextSize', (x.number('basalTextSize') - 1).clamp(7.0, 30.0).roundToDouble())),
+        onPlus: () => app.change((x) => x.set('basalTextSize', (x.number('basalTextSize') + 1).clamp(7.0, 30.0).roundToDouble())),
+      ),
+      setSwitch('Basal numbers bold', 'basalTextBold'),
+      ColorSettingRow('Basal numbers colour', 'basalTextColor'),
+      ColorSettingRow('Basal bars colour', 'basalBarColor'),
+    ];
+
+/// Presets (overrides, temp targets) and the profile name on the graph.
+List<Widget> presetSettings() => [
+      setSwitch('Presets on the graph', 'presetShow', hint: 'Loop overrides and Trio temp targets: name, target range and time'),
+      StepRow(
+        label: 'Preset name size',
+        value: '${app.settings.number('presetTextSize').round()} px',
+        onMinus: () => app.change((x) => x.set('presetTextSize', (x.number('presetTextSize') - 1).clamp(7.0, 30.0).roundToDouble())),
+        onPlus: () => app.change((x) => x.set('presetTextSize', (x.number('presetTextSize') + 1).clamp(7.0, 30.0).roundToDouble())),
+      ),
+      setSwitch('Preset name bold', 'presetBold'),
+      ColorSettingRow('Preset colour', 'presetColor'),
+      setSwitch('Profile on the graph', 'profileShow', hint: 'Name of the profile in use, and a line where it changed'),
+    ];
+
+/// What touching (or the mouse over) the graph shows.
+List<Widget> tooltipSettings() {
+  const tips = ['Nothing', 'Value', 'Value and time', 'Time only'];
+  return [
     setChoice('Mouse over a reading shows', 'tipBg', tips, hint: 'On a phone: tap, or touch and hold and slide'),
     setChoice('Mouse over a treatment shows', 'tipTreat', tips),
   ];
 }
 
-/// Settings rows for SMBs / automatic boluses on the graph (used in two screens).
+/// Treatment markers (boluses, carbs) on the graph.
+List<Widget> treatmentSettings() => [
+      setSwitch('Treatments on the graph', 'showTreatments', hint: 'Boluses, carbs and SMBs'),
+      setInt('Treatment size', 'treatSize', step: 10, min: 50, max: 300, unit: '%'),
+      setChoice('Treatments placed', 'treatPlace', const ['At the top of the graph', 'On the glucose line']),
+    ];
+
+/// Settings rows for SMBs / automatic boluses on the graph.
 List<Widget> smbSettings() {
   final s = app.settings;
   String px(double v) => '${v.toStringAsFixed(v % 1 == 0 ? 0 : 1)} px';
   return [
     setSwitch('SMBs on the graph', 'smbShow', hint: 'Dots for SMBs and Loop automatic boluses (needs Treatments on the graph)'),
     setInt('SMB dot size', 'smbDotSize', step: 25, min: 50, max: 400, unit: '%'),
-    _colorRow('SMB dot colour', 'smbColor'),
+    ColorSettingRow('SMB dot colour', 'smbColor'),
     setSwitch('SMB amounts on the graph', 'smbLabels', hint: 'Units written above each SMB dot, where there is room'),
     StepRow(
       label: 'SMB amounts size',
@@ -913,7 +937,7 @@ List<Widget> smbSettings() {
       onPlus: () => app.change((x) => x.set('smbTextSize', (x.number('smbTextSize') + 1).clamp(7.0, 30.0).roundToDouble())),
     ),
     setSwitch('SMB amounts bold', 'smbTextBold'),
-    _colorRow('SMB amounts colour', 'smbTextColor'),
+    ColorSettingRow('SMB amounts colour', 'smbTextColor'),
     StepRow(
       label: 'Write SMB amounts from',
       hint: 'Smaller SMBs keep their dot but no number',
@@ -964,25 +988,20 @@ Widget colourStyleRow() {
   );
 }
 
-List<Widget> ttirSettings() => [
+/// Colours and brightness of the glucose dots.
+List<Widget> dotSettings() => [
       colourStyleRow(),
       setInt('Dot brightness', 'dotBright', step: 10, min: 50, max: 200, unit: '%', hint: 'Above 100 % makes the glucose dots brighter and more vivid'),
-      setSwitch('Time in tight range (TTIR)', 'ttirOn',
-          hint: 'Tints the part of your range above the tight range on graphs, and shows TTIR on reports and the main screen'),
-      setChoice('Time in range card on the main screen', 'tirPeriod', const ['Today, since midnight', 'Last 24 hours']),
-      setMg('Tight range up to', 'ttirHi', min: 100, max: 180, hint: 'Usual: 7.8 mmol/L (140 mg/dL). It starts at the low end of your range'),
-      _colorRow('Colour above the tight range', 'ttirColor'),
-      setSwitch('Profile on the graph', 'profileShow', hint: 'Name of the profile in use, and a line where it changed'),
     ];
 
-Widget _colorRow(String label, String key) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(label, style: const TextStyle(fontSize: 15)),
-        const SizedBox(height: 8),
-        ColorPick(dot: 32, value: app.settings.integer(key), onPick: (v) => app.change((x) => x.set(key, v))),
-      ]),
-    );
+/// Time in tight range (TTIR) and the time in range card.
+List<Widget> ttirSettings() => [
+      setSwitch('Time in tight range (TTIR)', 'ttirOn',
+          hint: 'Tints the part of your range above the tight range on graphs, and shows TTIR on reports and the main screen'),
+      setMg('Tight range up to', 'ttirHi', min: 100, max: 180, hint: 'Usual: 7.8 mmol/L (140 mg/dL). It starts at the low end of your range'),
+      ColorSettingRow('Colour above the tight range', 'ttirColor'),
+      setChoice('Time in range card on the main screen', 'tirPeriod', const ['Today, since midnight', 'Last 24 hours']),
+    ];
 
 /// One stretch of basal: a temp basal, or the profile's scheduled rate.
 class BasalSeg {

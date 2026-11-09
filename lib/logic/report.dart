@@ -232,6 +232,8 @@ class ReportData {
   double get avgCarbs => _avg((d) => d.ins.carbs);
   double get avgTdd => _avg((d) => d.ins.total);
   double get avgBolus => _avg((d) => d.ins.bolus);
+  double get avgManualBolus => _avg((d) => d.ins.manualBolus);
+  double get avgAutoBolus => _avg((d) => d.ins.autoBolus);
   double get avgBasal => _avg((d) => d.ins.totalBasal);
 
   double _avg(double Function(DayReport) f) {
@@ -259,4 +261,43 @@ int _lowEpisodes(List<Entry> es, double lo) {
     }
   }
   return n;
+}
+
+// ------------------------------------------------------------------ pods
+
+/// Treatment types that mark a new pod (or infusion site).
+const podChangeTypes = ['Site Change', 'Pod Change'];
+
+/// One pod: from its change to the next change (or now for the current pod).
+class PodPeriod {
+  final int number; // 1 = oldest in the list
+  final DateTime from, to;
+  final bool current;
+  const PodPeriod(this.number, this.from, this.to, this.current);
+  Duration get length => to.difference(from);
+}
+
+/// The pod changes in [treatments], oldest first. Two marks within 15 minutes
+/// (a Site Change and a Pod Change for the same pod) count once.
+List<DateTime> podChanges(List<Treatment> treatments) {
+  final ts = treatments.where((t) => podChangeTypes.contains(t.type)).map((t) => t.t).toList()..sort();
+  final out = <DateTime>[];
+  for (final t in ts) {
+    if (out.isEmpty || t.difference(out.last).inMinutes >= 15) out.add(t);
+  }
+  return out;
+}
+
+/// The pods between the changes, oldest first; the last one runs until [now].
+List<PodPeriod> podPeriods(List<DateTime> changes, DateTime now) => [
+      for (var i = 0; i < changes.length; i++)
+        if (changes[i].isBefore(now))
+          PodPeriod(i + 1, changes[i], i + 1 < changes.length ? changes[i + 1] : now, i + 1 >= changes.length),
+    ];
+
+/// "2 d 23 h", "14 h 5 min".
+String podLength(Duration d) {
+  final h = d.inHours;
+  if (h >= 24) return '${h ~/ 24} d ${h % 24} h';
+  return '$h h ${d.inMinutes % 60} min';
 }

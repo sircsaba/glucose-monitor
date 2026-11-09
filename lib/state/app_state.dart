@@ -17,6 +17,7 @@ import '../ui/alert_screen.dart';
 import '../ui/checklist_screen.dart';
 import '../ui/meal_plan_screen.dart';
 import '../ui/night_screen.dart';
+import '../ui/screen_saver.dart';
 import '../ui/target_screen.dart';
 import 'settings.dart';
 
@@ -164,6 +165,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   String? dueReason;
   bool _stepOpen = false;
   bool nightOpen = false;
+  // Screen saver: on by the button, or by the schedule in the settings.
+  bool _ssManual = false;
+  DateTime? _ssDismissed;
   bool checklistOpen = false;
   String _lastAutoNight = '';
   String _lastChecklist = '';
@@ -219,6 +223,33 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   /// Brightness button: the screen darker / normal.
+  /// True while the screen saver is on (alarms quiet, except urgent low when set).
+  bool get screenSaver =>
+      _ssManual ||
+      screenSaverScheduled(
+        on: settings.flag('ssAutoOn'),
+        from: settings.integer('ssFrom'),
+        endOn: settings.flag('ssEndOn'),
+        to: settings.integer('ssTo'),
+        now: DateTime.now(),
+        dismissed: _ssDismissed,
+      );
+
+  void startScreenSaver() {
+    _ssManual = true;
+    evaluate();
+    notifyListeners();
+  }
+
+  /// A touch: back to the app until the next scheduled start.
+  void endScreenSaver() {
+    if (!screenSaver) return;
+    _ssManual = false;
+    _ssDismissed = DateTime.now();
+    evaluate();
+    notifyListeners();
+  }
+
   void toggleDim() => change((s) => s.set('dimOn', !s.flag('dimOn')));
 
   void change(void Function(Settings s) f) {
@@ -542,6 +573,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     AlarmKind? pick;
     for (final k in cands) {
       if (snoozes.containsKey(k) || _quietMuted(k)) continue;
+      if (screenSaver && !(k == AlarmKind.redLow && settings.flag('ssUrgentLow'))) continue;
       pick = k;
       break;
     }
@@ -580,6 +612,11 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     final quiet = inQuietHours && !isRedAlarm(kind);
     final mode = s.integer('quietMode');
     final gentle = s.flag('gentleOn') && !(isRedAlarm(kind) && s.flag('urgentSkipsGentle'));
+    // An alarm that rings (urgent low) brings the app back from the screen saver.
+    if (!test && screenSaver) {
+      _ssManual = false;
+      _ssDismissed = now;
+    }
     active = ActiveAlarm(kind, now, gentle: gentle, test: test);
     player.start(
       cfg,

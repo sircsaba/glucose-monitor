@@ -4,6 +4,7 @@ import '../../state/app_state.dart';
 import '../../state/settings.dart';
 import '../bg_chart.dart';
 import '../common.dart';
+import 'display_settings_screen.dart';
 import '../home_screen.dart';
 
 /// Edits the main (day) screen: every element's size, colour, alignment,
@@ -254,19 +255,11 @@ class _DayLayoutScreenState extends State<DayLayoutScreen> {
               if (isGraph) ...[
                 setChoice('Graph height', 'graphFit', const ['Fit the screen on a computer', 'Always fit the screen', 'Fixed (Graph height above)'],
                     hint: 'Fit: the graph uses the room left, so the whole page shows without scrolling'),
-                setSwitch('Phone on its side: split the screen', 'landSplit', hint: 'Values on the left, graph on the right'),
-                setInt('Width of the values side', 'splitLeft', step: 5, min: 25, max: 70, unit: '%'),
-                setChoice('Bottom bar (Live, Treat…)', 'navCompact', const ['Thin on a computer', 'Always thin', 'Always normal'],
-                    hint: 'Thin leaves more room for the graph'),
-                ...graphGridSettings(),
-                setSwitch('Treatments on the graph', 'showTreatments', hint: 'Boluses, carbs and SMBs'),
-                setInt('Treatment size', 'treatSize', step: 10, min: 50, max: 300, unit: '%'),
-                setChoice('Treatments placed', 'treatPlace', const ['At the top of the graph', 'On the glucose line']),
-                ...smbSettings(),
-                setSwitch('Prediction', 'showPrediction'),
-                setSwitch('Basal on the graph', 'showBasal'),
-                setChoice('Dot size', 'dotSize', const ['Small', 'Medium', 'Large', 'Extra large']),
-                ...ttirSettings(),
+                LinkRow(
+                  label: 'Graph settings',
+                  hint: 'Top, dots, prediction, boluses and SMBs, basal, presets, grid',
+                  onTap: () => graphGroup().open(context),
+                ),
               ],
             ]),
             const Text(

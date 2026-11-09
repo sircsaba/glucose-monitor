@@ -34,8 +34,11 @@ class _SoundsScreenState extends State<SoundsScreen> {
           final cfg = s.sounds[_group];
           void upd(void Function(SoundCfg c) f) => app.change((x) => f(x.sounds[_group]));
 
-          Widget soundRow(int i) {
+          // Rows of one sound, read fresh each time (the Sound page stays open
+          // while settings change). [refresh] redraws the play buttons.
+          Widget soundRow(int i, VoidCallback refresh) {
             final d = kSounds[i];
+            final cur = app.settings.sounds[_group];
             final playing = app.player.previewing == i;
             return RowBox(
               child: Row(children: [
@@ -43,8 +46,8 @@ class _SoundsScreenState extends State<SoundsScreen> {
                   child: InkWell(
                     onTap: () => upd((c) => c.sound = i),
                     child: Row(children: [
-                      Icon(cfg.sound == i ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                          color: cfg.sound == i ? kAccent : kMuted),
+                      Icon(cur.sound == i ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                          color: cur.sound == i ? kAccent : kMuted),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -58,14 +61,72 @@ class _SoundsScreenState extends State<SoundsScreen> {
                 IconButton(
                   tooltip: playing ? 'Stop' : 'Play',
                   onPressed: () async {
-                    await app.player.preview(i, cfg.volMode == 2 ? cfg.v1 : (cfg.volMode == 1 ? cfg.v2 : cfg.v1));
-                    if (mounted) setState(() {});
+                    await app.player.preview(i, cur.volMode == 2 ? cur.v1 : (cur.volMode == 1 ? cur.v2 : cur.v1));
+                    refresh();
                   },
                   icon: Icon(playing ? Icons.stop_circle_outlined : Icons.play_circle_outline, color: playing ? kAccent : kMuted),
                 ),
               ]),
             );
           }
+
+          final soundGroup = SettingsGroup('Sound', summary: () => kSounds[app.settings.sounds[_group].sound.clamp(0, kSounds.length - 1)].name, rows: (_) => [
+                StatefulBuilder(
+                  builder: (c, set) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    const Padding(padding: EdgeInsets.only(top: 12, bottom: 4), child: Text('SOFT MUSIC', style: TextStyle(color: kMuted, fontSize: 12.5))),
+                    for (var i = 0; i < kSounds.length; i++)
+                      if (kSounds[i].soft) soundRow(i, () => set(() {})),
+                    const Padding(padding: EdgeInsets.only(top: 16, bottom: 4), child: Text('ALARM SOUNDS', style: TextStyle(color: kMuted, fontSize: 12.5))),
+                    for (var i = 0; i < kSounds.length; i++)
+                      if (!kSounds[i].soft) soundRow(i, () => set(() {})),
+                  ]),
+                ),
+              ]);
+
+          final snoozeGroup = SettingsGroup('Snooze buttons and limits',
+              summary: () => '${app.settings.snoozePresets.map(_mins).join(', ')} · red zone at most ${app.settings.integer('maxRedSnooze')} min',
+              rows: (_) => [
+                    StatefulBuilder(
+                      builder: (c, set) {
+                        final x0 = app.settings;
+                        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                          const Padding(
+                            padding: EdgeInsets.only(top: 12, bottom: 8),
+                            child: Text('Quick buttons on the alarm screen (up to 6)', style: TextStyle(color: kMuted, fontSize: 13)),
+                          ),
+                          Wrap(spacing: 8, runSpacing: 8, children: [
+                            for (final m in x0.snoozePresets)
+                              InputChip(label: Text(_mins(m)), onDeleted: () => app.change((x) => x.snoozePresets.remove(m))),
+                          ]),
+                          const SizedBox(height: 8),
+                          RowBox(
+                            child: Row(children: [
+                              const Expanded(child: Text('New button')),
+                              RoundButton('−', () => set(() => _newPreset = (_newPreset - 5).clamp(5, 240))),
+                              SizedBox(width: 70, child: Text('$_newPreset min', textAlign: TextAlign.center, style: kMono)),
+                              RoundButton('+', () => set(() => _newPreset = (_newPreset + 5).clamp(5, 240))),
+                              const SizedBox(width: 8),
+                              FilledButton(
+                                onPressed: x0.snoozePresets.length >= 6 || x0.snoozePresets.contains(_newPreset)
+                                    ? null
+                                    : () => app.change((x) => x.snoozePresets
+                                      ..add(_newPreset)
+                                      ..sort()),
+                                child: const Text('Add'),
+                              ),
+                            ]),
+                          ),
+                        ]);
+                      },
+                    ),
+                    setSwitch('Allow a custom snooze', 'allowCustomSnooze', hint: 'Pick any number of minutes on the alarm screen'),
+                    setInt('Custom snooze starts at', 'customSnoozeDef', step: 5, min: 5, max: 240, unit: 'min'),
+                    setInt('"I\'m treating it" snoozes for', 'treatingSnoozeMin', step: 5, min: 5, max: 60, unit: 'min'),
+                    setInt('Longest snooze in red zone', 'maxRedSnooze', step: 5, min: 5, max: 60, unit: 'min', hint: 'Safety limit, whatever button is pressed'),
+                    setInt('Longest snooze for any alarm', 'maxSnoozeMin', step: 15, min: 15, max: 480, unit: 'min'),
+                    setSwitch('Smart snooze', 'smartSnooze', hint: 'Ends a snooze early if glucose keeps going the wrong way'),
+                    setSwitch('Wake again if it becomes urgent', 'wakeIfUrgent', hint: 'A snoozed yellow low that drops into the red zone'),
+                  ]);
 
           final volRows = <Widget>[];
           if (cfg.volMode == 0) {
@@ -120,8 +181,7 @@ class _SoundsScreenState extends State<SoundsScreen> {
               ),
               SwitchRow(label: 'Vibrate', value: cfg.vibrate, onChanged: (v) => upd((c) => c.vibrate = v)),
             ]),
-            Section(title: 'Soft music', children: [for (var i = 0; i < kSounds.length; i++) if (kSounds[i].soft) soundRow(i)]),
-            Section(title: 'Alarm sounds', children: [for (var i = 0; i < kSounds.length; i++) if (!kSounds[i].soft) soundRow(i)]),
+            Section(children: [GroupRow(soundGroup)]),
             Section(title: 'Volume', children: [
               Padding(
                 padding: const EdgeInsets.only(top: 12, bottom: 8),
@@ -138,42 +198,7 @@ class _SoundsScreenState extends State<SoundsScreen> {
               SizedBox(height: 60, child: CustomPaint(painter: _VolumePainter(cfg), size: Size.infinite)),
               ...volRows,
             ]),
-            Section(title: 'Snooze buttons', padding: const EdgeInsets.fromLTRB(14, 12, 14, 0), children: [
-              const Text('Quick buttons on the alarm screen (up to 6)', style: TextStyle(color: kMuted, fontSize: 13)),
-              const SizedBox(height: 8),
-              Wrap(spacing: 8, runSpacing: 8, children: [
-                for (final m in s.snoozePresets)
-                  InputChip(
-                    label: Text(_mins(m)),
-                    onDeleted: () => app.change((x) => x.snoozePresets.remove(m)),
-                  ),
-              ]),
-              const SizedBox(height: 8),
-              RowBox(
-                child: Row(children: [
-                  const Expanded(child: Text('New button')),
-                  RoundButton('−', () => setState(() => _newPreset = (_newPreset - 5).clamp(5, 240))),
-                  SizedBox(width: 70, child: Text('$_newPreset min', textAlign: TextAlign.center, style: kMono)),
-                  RoundButton('+', () => setState(() => _newPreset = (_newPreset + 5).clamp(5, 240))),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: s.snoozePresets.length >= 6 || s.snoozePresets.contains(_newPreset)
-                        ? null
-                        : () => app.change((x) => x.snoozePresets
-                          ..add(_newPreset)
-                          ..sort()),
-                    child: const Text('Add'),
-                  ),
-                ]),
-              ),
-              setSwitch('Allow a custom snooze', 'allowCustomSnooze', hint: 'Pick any number of minutes on the alarm screen'),
-              setInt('Custom snooze starts at', 'customSnoozeDef', step: 5, min: 5, max: 240, unit: 'min'),
-              setInt('"I\'m treating it" snoozes for', 'treatingSnoozeMin', step: 5, min: 5, max: 60, unit: 'min'),
-              setInt('Longest snooze in red zone', 'maxRedSnooze', step: 5, min: 5, max: 60, unit: 'min', hint: 'Safety limit, whatever button is pressed'),
-              setInt('Longest snooze for any alarm', 'maxSnoozeMin', step: 15, min: 15, max: 480, unit: 'min'),
-              setSwitch('Smart snooze', 'smartSnooze', hint: 'Ends a snooze early if glucose keeps going the wrong way'),
-              setSwitch('Wake again if it becomes urgent', 'wakeIfUrgent', hint: 'A snoozed yellow low that drops into the red zone'),
-            ]),
+            Section(children: [GroupRow(snoozeGroup)]),
           ]);
         },
       ),

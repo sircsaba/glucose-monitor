@@ -108,6 +108,11 @@ def treatments(since_ms):
     for name, days_ago in (('Site Change', 1.6), ('Sensor Start', 6.2), ('Insulin Change', 1.6)):
         t = n - int(days_ago * day)
         out.append({'_id': f'x{name}', 'eventType': name, 'created_at': iso(t), 'enteredBy': 'Loop'})
+    # older pods, for the per-pod report
+    for days_ago in (4.6, 7.5, 10.4):
+        t = n - int(days_ago * day)
+        if t >= since_ms:
+            out.append({'_id': f'xpod{days_ago}', 'eventType': 'Site Change', 'created_at': iso(t), 'enteredBy': 'Loop'})
     out.sort(key=lambda d: d['created_at'], reverse=True)
     return out
 

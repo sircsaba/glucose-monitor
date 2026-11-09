@@ -23,13 +23,17 @@ class ReportsScreen extends StatefulWidget {
 }
 
 const _periods = [1, 7, 14, 30, 90];
+const _sincePod = -1; // since the last pod change
+const _allPods = -2; // one row per pod
 const reportTabs = ['Summary', 'Day to day', 'Daily stats', 'Distribution', 'Nutrition'];
 
 class _ReportsScreenState extends State<ReportsScreen> {
-  int _days = 14;
+  int _days = 14; // 1 to 90 days, or [_sincePod] / [_allPods]
   int _tab = 0;
   Future<ReportData>? _future;
-  int _loadedDays = 0;
+  Future<List<(PodPeriod, ReportData)>>? _pods;
+  PodPeriod? _pod; // a pod picked in the pod list
+  String _loadedKey = '';
   DateTime _loadedAt = DateTime(2000);
   bool _printing = false;
   Timer? _tick;
@@ -52,11 +56,28 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   bool _stale(DateTime now) => now.day != _loadedAt.day || now.difference(_loadedAt) > const Duration(minutes: 10);
 
+  String get _key => '$_days|${_pod?.from.millisecondsSinceEpoch}';
+
   void _load() {
-    _loadedDays = _days;
+    _loadedKey = _key;
     _loadedAt = DateTime.now();
-    _future = loadReport(_days);
+    if (_days == _allPods && _pod == null) {
+      _pods = loadPods();
+      _future = null;
+    } else {
+      final pod = _pod;
+      _future = _days > 0
+          ? loadReport(_days)
+          : pod != null
+              ? loadReportBetween(pod.from, pod.to)
+              : loadSincePod();
+    }
   }
+
+  void _period(int d) => setState(() {
+        _days = d;
+        _pod = null;
+      });
 
   Future<void> _print(bool all, ReportData data) async {
     setState(() => _printing = true);
@@ -77,17 +98,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
     // TickerMode is off while another tab is shown, and changes (rebuilding this
     // screen) when the Reports tab comes back into view.
     final visible = TickerMode.of(context);
-    if (_future == null || _loadedDays != _days || (stale && visible)) _load();
+    // A finished pod does not change: no need to reload it.
+    final fixed = _pod != null && !_pod!.current;
+    if ((_future == null && _pods == null) || _loadedKey != _key || (stale && visible && !fixed)) _load();
+    if (_days == _allPods && _pod == null) return _podList();
     return FutureBuilder<ReportData>(
       future: _future,
       builder: (context, snap) {
         final data = snap.connectionState == ConnectionState.done && !snap.hasError ? snap.data : null;
-        final head = Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 6, runSpacing: 6, children: [
-          const Text('Reports', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
-          Text('updated ${two(_loadedAt.hour)}:${two(_loadedAt.minute)}', style: const TextStyle(color: kMuted, fontSize: 11)),
-          const SizedBox(width: 8),
-          for (final d in _periods)
-            ChoiceChip(label: Text(d == 1 ? 'Today' : '${d}d'), selected: _days == d, onSelected: (_) => setState(() => _days = d)),
+        final head = _head([
           PopupMenuButton<bool>(
             enabled: data != null && data.bg != null && !_printing,
             tooltip: 'Print or save as PDF',
@@ -119,13 +138,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
         } else if (data == null || data.bg == null) {
           body = [const Padding(padding: EdgeInsets.all(20), child: Text('No readings in this period.'))];
         } else {
-          body = switch (_tab) {
+          body = [
+            if (_days < 0) _podTitle(data),
+            ...switch (_tab) {
             1 => _dayToDay(data),
             2 => _dailyStats(data),
             3 => _distribution(data),
             4 => nutritionTab(data.nutrition, _mmol),
             _ => _summary(data),
-          };
+          },
+          ];
         }
         return RefreshIndicator(
           onRefresh: () async => setState(_load),
@@ -135,6 +157,106 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
         );
       },
+    );
+  }
+
+  /// Title, update time and the period choices (plus [extra], the print button).
+  Widget _head(List<Widget> extra) => Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 6, runSpacing: 6, children: [
+        const Text('Reports', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
+        Text('updated ${two(_loadedAt.hour)}:${two(_loadedAt.minute)}', style: const TextStyle(color: kMuted, fontSize: 11)),
+        const SizedBox(width: 8),
+        for (final d in _periods) ChoiceChip(label: Text(d == 1 ? 'Today' : '${d}d'), selected: _days == d, onSelected: (_) => _period(d)),
+        ChoiceChip(
+          avatar: const Icon(Icons.change_circle_outlined, size: 16),
+          label: const Text('This pod'),
+          selected: _days == _sincePod,
+          onSelected: (_) => _period(_sincePod),
+        ),
+        ChoiceChip(label: const Text('Per pod'), selected: _days == _allPods, onSelected: (_) => _period(_allPods)),
+        ...extra,
+      ]);
+
+  /// Which pod the report is for, with the way back to the list.
+  Widget _podTitle(ReportData d) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Row(children: [
+          if (_pod != null)
+            IconButton(tooltip: 'All pods', icon: const Icon(Icons.arrow_back), onPressed: () => setState(() => _pod = null)),
+          Expanded(
+            child: Text(
+              '${_pod != null ? 'Pod ${_pod!.number}' : 'Current pod'}: ${_when(d.from)} → ${_pod != null && !_pod!.current ? _when(d.to) : 'now'}'
+              ' · ${podLength(d.to.difference(d.from))}',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ]),
+      );
+
+  static String _when(DateTime t) => '${t.year}-${two(t.month)}-${two(t.day)} ${two(t.hour)}:${two(t.minute)}';
+
+  // ---------------------------------------------------------------- pods
+
+  Widget _podList() => FutureBuilder<List<(PodPeriod, ReportData)>>(
+        future: _pods,
+        builder: (context, snap) {
+          List<Widget> body;
+          if (snap.connectionState != ConnectionState.done) {
+            body = [const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator()))];
+          } else if (snap.hasError) {
+            body = [Padding(padding: const EdgeInsets.all(20), child: Text(snap.error.toString(), style: const TextStyle(color: kAmber)))];
+          } else if (snap.data!.isEmpty) {
+            body = [
+              const Padding(
+                padding: EdgeInsets.all(20),
+                child: Text('No pod changes in the last 90 days. Pod changes come from the Site Change (or Pod Change) entries in Nightscout.'),
+              ),
+            ];
+          } else {
+            body = [
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text('Last 90 days, newest pod first. Tap a pod for its full report.', style: TextStyle(color: kMuted, fontSize: 12)),
+              ),
+              for (final (pod, d) in snap.data!.reversed) _podCard(pod, d),
+            ];
+          }
+          return RefreshIndicator(
+            onRefresh: () async => setState(_load),
+            child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 32), children: [_head(const []), const SizedBox(height: 14), ...body]),
+          );
+        },
+      );
+
+  Widget _podCard(PodPeriod pod, ReportData d) {
+    final b = d.bg;
+    final days = d.to.difference(d.from).inMinutes / 1440;
+    final stats = podStats(d, _mmol);
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => setState(() => _pod = pod),
+      child: _card([
+        Row(children: [
+          Expanded(
+            child: Text('Pod ${pod.number} · ${_when(pod.from)}${pod.current ? ' (current)' : ''}',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          ),
+          Text(podLength(pod.length), style: kMono.copyWith(fontSize: 13, color: kMuted)),
+          const Icon(Icons.chevron_right, color: kMuted),
+        ]),
+        if (b != null) ...[
+          const SizedBox(height: 8),
+          _rangeBar(b, 10),
+        ],
+        const SizedBox(height: 8),
+        Wrap(spacing: 14, runSpacing: 4, children: [
+          for (final kv in stats)
+            Text.rich(TextSpan(children: [
+              TextSpan(text: '${kv.$1} ', style: const TextStyle(color: kMuted, fontSize: 12)),
+              TextSpan(text: kv.$2, style: kMono.copyWith(fontSize: 13)),
+            ])),
+          if (days < 0.5) const Text('(less than half a day)', style: TextStyle(color: kMuted, fontSize: 12)),
+        ]),
+      ], padding: const EdgeInsets.fromLTRB(12, 10, 8, 12)),
     );
   }
 
@@ -385,9 +507,47 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
 /// Loads readings, treatments and profiles for the last [days] calendar days
 /// (1 = today since midnight).
-Future<ReportData> loadReport(int days) async {
+Future<ReportData> loadReport(int days) {
   final now = DateTime.now();
-  final from = DateTime(now.year, now.month, now.day - (days - 1));
+  return loadReportBetween(DateTime(now.year, now.month, now.day - (days - 1)), now);
+}
+
+/// The report since the last pod change.
+Future<ReportData> loadSincePod() async {
+  final last = await app.client.lastOfTypes(podChangeTypes, days: 10);
+  if (last == null) {
+    throw 'No pod change in the last 10 days. Pod changes come from the Site Change (or Pod Change) entries in Nightscout.';
+  }
+  return loadReportBetween(last, DateTime.now());
+}
+
+/// One report per pod over the last 90 days, oldest pod first.
+Future<List<(PodPeriod, ReportData)>> loadPods() async {
+  final now = DateTime.now();
+  final whole = await loadReportBetween(now.subtract(const Duration(days: 90)), now);
+  final pods = podPeriods(podChanges(whole.treatments), now);
+  final s = app.settings;
+  return [
+    for (final p in pods)
+      (
+        p,
+        ReportData(
+          from: p.from,
+          to: p.to,
+          entries: whole.entries.where((e) => !e.t.isBefore(p.from) && e.t.isBefore(p.to)).toList(),
+          treatments: whole.treatments.where((t) => !t.t.isBefore(p.from.subtract(const Duration(hours: 6))) && t.t.isBefore(p.to)).toList(),
+          profiles: whole.profiles,
+          lo: s.number('tirLo'),
+          hi: s.number('tirHi'),
+          tightHi: s.number('ttirHi'),
+          ttirOn: s.flag('ttirOn'),
+        ),
+      ),
+  ];
+}
+
+/// Loads readings, treatments and profiles between [from] and [to].
+Future<ReportData> loadReportBetween(DateTime from, DateTime now) async {
   final c = app.client;
   final entriesF = c.entriesBetween(from, now);
   final treatF = c.treatmentsBetween(from.subtract(const Duration(hours: 6)), now);
@@ -422,8 +582,8 @@ double _round1(double v) => (v * 10).round() / 10;
 
 List<PieSlice> insulinSlices(InsulinTotals ins) => [
       PieSlice(ins.totalBasal, RangeColors.basal, 'Basal ${fmtU(_round1(ins.totalBasal))} U'),
-      PieSlice(ins.manualBolus, RangeColors.bolus, 'Bolus ${fmtU(_round1(ins.manualBolus))} U'),
-      PieSlice(ins.autoBolus, RangeColors.autoBolus, 'Auto bolus ${fmtU(_round1(ins.autoBolus))} U'),
+      PieSlice(ins.manualBolus, RangeColors.bolus, 'Manual bolus ${fmtU(_round1(ins.manualBolus))} U'),
+      PieSlice(ins.autoBolus, RangeColors.autoBolus, 'Auto bolus (SMB) ${fmtU(_round1(ins.autoBolus))} U'),
     ];
 
 /// The figures on the summary: (name, value, note).
@@ -444,7 +604,8 @@ List<(String, String, String?)> summaryStats(ReportData d, bool mmol) {
     ('Readings', '${b.count}', 'sensor use ${(d.sensorUse * 100).round()}%'),
     ('Carbs per day', '${d.avgCarbs.round()} g', null),
     ('Insulin per day', '${fmtU(_round1(d.avgTdd))} U', 'basal ${ins.basalPct.round()}%'),
-    ('Bolus per day', '${fmtU(_round1(d.avgBolus))} U', null),
+    ('Manual bolus per day', '${fmtU(_round1(d.avgManualBolus))} U', null),
+    ('Auto bolus (SMB) per day', '${fmtU(_round1(d.avgAutoBolus))} U', null),
     ('Basal per day', '${fmtU(_round1(d.avgBasal))} U', null),
     if (ins.icrManual != null) ('Carb ratio (actual)', '1:${ins.icrManual!.toStringAsFixed(1)}', 'carbs / manual boluses'),
     if (ins.icrAll != null) ('Carb ratio (all)', '1:${ins.icrAll!.toStringAsFixed(1)}', 'auto boluses included'),
@@ -456,11 +617,30 @@ List<(String, String, String?)> summaryStats(ReportData d, bool mmol) {
   ];
 }
 
+/// The figures on a pod's row in the pod list.
+List<(String, String)> podStats(ReportData d, bool mmol) {
+  final b = d.bg;
+  final i = d.ins;
+  final perDay = i.hours >= 12 ? i.total * 24 / i.hours : null;
+  return [
+    if (b != null) ('In range', '${(b.inRange * 100).round()}%'),
+    if (b != null) ('Average', fmtBg(b.avg, mmol)),
+    ('Lows', '${d.lowEpisodes}'),
+    ('Carbs', '${i.carbs.round()} g'),
+    ('Manual bolus', '${fmtU(_round1(i.manualBolus))} U'),
+    ('Auto (SMB)', '${fmtU(_round1(i.autoBolus))} U'),
+    ('Basal', '${fmtU(_round1(i.totalBasal))} U'),
+    ('Total', '${fmtU(_round1(i.total))} U'),
+    if (perDay != null) ('Per day', '${fmtU(_round1(perDay))} U'),
+  ];
+}
+
 /// The totals under each day's graph.
 List<(String, String)> dayTotals(DayReport day, bool mmol) {
   final i = day.ins;
   return [
-    ('Bolus', '${fmtU(_round1(i.bolus))} U${i.autoBolus > 0 ? ' (auto ${fmtU(_round1(i.autoBolus))})' : ''}'),
+    ('Manual bolus', '${fmtU(_round1(i.manualBolus))} U'),
+    ('Auto bolus (SMB)', '${fmtU(_round1(i.autoBolus))} U'),
     ('Base basal', '${fmtU(_round1(i.baseBasal))} U'),
     ('Temp basal +', '${fmtU(_round1(i.tempPlus))} U'),
     ('Temp basal -', '${fmtU(_round1(-i.tempMinus))} U'),
@@ -497,12 +677,13 @@ List<List<String>> dailyStatsRows(ReportData d, bool mmol) {
         b == null ? '' : bg(b.median),
         b == null ? '' : bg(b.q75),
         '${ins.carbs.round()}',
-        fmtU(_round1(ins.bolus)),
+        fmtU(_round1(ins.manualBolus)),
+        fmtU(_round1(ins.autoBolus)),
         fmtU(_round1(ins.totalBasal)),
         fmtU(_round1(ins.total)),
       ];
   return [
-    ['Date', 'V.low', 'Low', if (d.ttirOn) 'Tight', 'In range', 'High', 'V.high', 'Readings', 'Min', 'Max', 'Avg', 'SD', 'CV', '25%', 'Median', '75%', 'Carbs', 'Bolus', 'Basal', 'Total'],
+    ['Date', 'V.low', 'Low', if (d.ttirOn) 'Tight', 'In range', 'High', 'V.high', 'Readings', 'Min', 'Max', 'Avg', 'SD', 'CV', '25%', 'Median', '75%', 'Carbs', 'Manual bolus', 'Auto (SMB)', 'Basal', 'Total'],
     for (final day in d.days) row('${day.day.year}-${two(day.day.month)}-${two(day.day.day)}', day.bg, day.ins),
     row('Period', d.bg, d.ins),
   ];

@@ -376,6 +376,14 @@ class Settings {
     'quietFrom': 1380,
     'quietTo': 390,
     'quietMode': 0, // 0 mute yellow, 1 half volume, 2 vibrate only
+    // Screen saver: the glucose drifting on a black screen, alarms quiet.
+    'ssAutoOn': false,
+    'ssFrom': 480, // 8:00
+    'ssEndOn': false,
+    'ssTo': 1260, // 21:00
+    'ssBright': 35, // % brightness of the glucose
+    'ssZoneColor': true,
+    'ssUrgentLow': true, // urgent low still rings
     // Night view
     'nightBrightness': 40,
     'nightKeepAwake': true,

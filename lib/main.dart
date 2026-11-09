@@ -8,6 +8,7 @@ import 'state/app_state.dart';
 import 'ui/common.dart';
 import 'ui/connect_screen.dart';
 import 'ui/home_screen.dart';
+import 'ui/screen_saver.dart';
 
 final GlobalKey<NavigatorState> navKey = GlobalKey<NavigatorState>();
 
@@ -100,6 +101,12 @@ class GlucoseApp extends StatelessWidget {
               scaled,
               Positioned.fill(child: IgnorePointer(child: ColoredBox(color: Colors.black.withValues(alpha: a)))),
             ]);
+          }
+          // Screen saver over everything (any touch ends it). An alert that is
+          // ringing, a due meal step or a reached target shows instead.
+          if (app.screenSaver && app.active == null && app.dueStep == null && app.targetHit == null &&
+              app.settings.str('nsUrl').isNotEmpty) {
+            scaled = Stack(fit: StackFit.expand, children: [scaled, const Positioned.fill(child: ScreenSaver())]);
           }
           if (!kIsWeb) return scaled;
           // In a browser, the first click or tap allows alarm sounds.

@@ -9,12 +9,26 @@ class DataSettingsScreen extends StatelessWidget {
   const DataSettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    const refresh = [60, 120, 300];
-    return SettingsPage(title: 'Data & general', builder: (context) {
-      final s = app.settings;
-      return [
-        Section(title: 'Nightscout site', children: [
+  Widget build(BuildContext context) => GroupedSettingsPage(
+        title: 'Data & general',
+        groups: dataGroups,
+        bottom: (_) => const [
+          Text(
+            'For information only. Always check a meter or sensor before making treatment decisions.',
+            style: TextStyle(color: kMuted, fontSize: 12, height: 1.5),
+          ),
+        ],
+      );
+}
+
+const _refresh = [60, 120, 300];
+
+/// The groups of Data & general (also searched from the Settings menu).
+List<SettingsGroup> dataGroups() => [
+      SettingsGroup('Nightscout site', icon: Icons.cloud_outlined, summary: () => app.settings.str('nsUrl'), rows: (context) {
+        final s = app.settings;
+        const refresh = _refresh;
+        return [
           LinkRow(
             label: s.str('nsUrl'),
             hint: '${s.flag('apiSecret') ? 'API secret' : 'Access token'} · tap to change',
@@ -60,16 +74,20 @@ class DataSettingsScreen extends StatelessWidget {
               onChanged: (v) => app.change((x) => x.set('enteredBy', v)),
             ),
           ),
-        ]),
-        Section(title: 'General', children: [
+        ];
+      }),
+      SettingsGroup('General', icon: Icons.tune, summary: () => app.settings.flag('time24') ? '24 h clock' : '12 h clock', rows: (context) {
+        final s = app.settings;
+        return [
           ChoiceRow(
             label: 'Time format',
             options: const ['24 h', '12 h'],
             index: s.flag('time24') ? 0 : 1,
             onChanged: (i) => app.change((x) => x.set('time24', i == 0)),
           ),
-        ]),
-        Section(title: 'Backup', children: [
+        ];
+      }),
+      SettingsGroup('Backup', icon: Icons.save_alt, hint: 'Copy, paste or reset every setting', rows: (context) => [
           LinkRow(
             label: 'Copy settings',
             hint: 'Copies every setting as text, to paste into another phone',
@@ -105,12 +123,5 @@ class DataSettingsScreen extends StatelessWidget {
               if (yes == true) app.resetAll();
             },
           ),
-        ]),
-        const Text(
-          'For information only. Always check a meter or sensor before making treatment decisions.',
-          style: TextStyle(color: kMuted, fontSize: 12, height: 1.5),
-        ),
-      ];
-    });
-  }
-}
+          ]),
+    ];

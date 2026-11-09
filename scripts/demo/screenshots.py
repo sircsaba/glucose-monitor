@@ -121,6 +121,16 @@ FOOD = [
     ('j-remote', 'plus', ['Treat', 'Remote control']),
     ('k-remote-carbs', 'plus', ['Treat', 'Remote control', 'Carbs']),
     ('l-remote-bolus', 'plus', ['Treat', 'Remote control', 'Bolus']),
+    ('m-pods', 'app', ['Reports', 'Per pod']),
+    ('n-this-pod', 'app', ['Reports', 'This pod']),
+    ('o-daily', 'app', ['Reports', 'Daily stats']),
+    ('p-settings', 'app', ['Settings']),
+    ('q-display', 'app', ['Settings', 'Display & graph']),
+    ('r-graph', 'app', ['Settings', 'Display & graph', 'Graph']),
+    ('s-search', 'app', ['Settings', 'Search settings', 'type:smb']),
+    ('t-saver-settings', 'app', ['Settings', 'Screen saver']),
+    ('u-saver', 'app', ['Screen saver (alarms quiet, touch to come back)']),
+    ('v-remote-settings', 'plus', ['Treat', 'Remote control', 'Settings']),
 ]
 TABLET = [
     ('1-live', 'app', []),
