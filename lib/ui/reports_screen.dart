@@ -525,7 +525,13 @@ Future<ReportData> loadSincePod() async {
 Future<List<(PodPeriod, ReportData)>> loadPods() async {
   final now = DateTime.now();
   final whole = await loadReportBetween(now.subtract(const Duration(days: 90)), now);
-  final pods = podPeriods(podChanges(whole.treatments), now);
+  // The same treatment can come twice (pages of a long period overlap).
+  final seen = <String>{};
+  final treatments = [
+    for (final t in whole.treatments)
+      if (seen.add('${t.t.millisecondsSinceEpoch}|${t.type}|${t.insulin}|${t.carbs}|${t.absolute}')) t,
+  ];
+  final pods = podPeriods(podChanges(treatments), now);
   final s = app.settings;
   return [
     for (final p in pods)
@@ -535,7 +541,7 @@ Future<List<(PodPeriod, ReportData)>> loadPods() async {
           from: p.from,
           to: p.to,
           entries: whole.entries.where((e) => !e.t.isBefore(p.from) && e.t.isBefore(p.to)).toList(),
-          treatments: whole.treatments.where((t) => !t.t.isBefore(p.from.subtract(const Duration(hours: 6))) && t.t.isBefore(p.to)).toList(),
+          treatments: treatments.where((t) => !t.t.isBefore(p.from.subtract(const Duration(hours: 6))) && t.t.isBefore(p.to)).toList(),
           profiles: whole.profiles,
           lo: s.number('tirLo'),
           hi: s.number('tirHi'),
