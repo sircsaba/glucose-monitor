@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../state/app_state.dart';
 import '../../state/settings.dart';
-import '../bg_chart.dart';
 import '../common.dart';
 import 'display_settings_screen.dart';
 import '../home_screen.dart';
