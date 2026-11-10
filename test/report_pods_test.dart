@@ -67,6 +67,6 @@ void main() {
     expect(last.first, 'Average');
     expect(last[h.indexOf('Carbs')], '50');
     expect(last[h.indexOf('Manual bolus')], fmtU(3));
-    expect(rows[1][h.indexOf('Carbs / U')], '15.0');
+    expect(rows[1][h.indexOf('Carbs / U')], '20.0'); // newest day first: 40 g / 2 U
   });
 }
