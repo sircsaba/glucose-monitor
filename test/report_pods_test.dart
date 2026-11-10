@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glucose_monitor/data/nightscout.dart';
+import 'package:glucose_monitor/logic/glucose.dart';
 import 'package:glucose_monitor/logic/report.dart';
+import 'package:glucose_monitor/ui/reports_screen.dart';
 
 void main() {
   final t0 = DateTime(2026, 11, 1, 18);
@@ -41,5 +43,30 @@ void main() {
     );
     expect(d.ins.manualBolus, closeTo(3, 0.001));
     expect(d.ins.autoBolus, closeTo(0.4, 0.001));
+  });
+
+  test('daily stats: last row is the average per day, carbs per unit', () {
+    final from = DateTime(2026, 11, 1);
+    final d = ReportData(
+      from: from,
+      to: from.add(const Duration(days: 2)),
+      entries: const [],
+      treatments: [
+        Treatment(t: from.add(const Duration(hours: 8)), type: 'Meal Bolus', insulin: 4, carbs: 60),
+        Treatment(t: from.add(const Duration(hours: 32)), type: 'Meal Bolus', insulin: 2, carbs: 40),
+      ],
+      profiles: const [],
+      lo: 70,
+      hi: 180,
+      tightHi: 140,
+      ttirOn: false,
+    );
+    final rows = dailyStatsRows(d, false);
+    final h = rows.first;
+    final last = rows.last;
+    expect(last.first, 'Average');
+    expect(last[h.indexOf('Carbs')], '50');
+    expect(last[h.indexOf('Manual bolus')], fmtU(3));
+    expect(rows[1][h.indexOf('Carbs / U')], '15.0');
   });
 }

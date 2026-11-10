@@ -199,7 +199,8 @@ Future<Uint8List> buildReportPdf(ReportData d, Set<int> which) async {
         header('Daily stats'),
         table(dailyStatsRows(d, mmol), font: 7),
         pw.SizedBox(height: 6),
-        pw.Text('Insulin in units, carbs in grams. V.low under ${fmtBg(54, mmol)}, V.high over ${fmtBg(250, mmol)}.', style: small),
+        pw.Text('Insulin in units, carbs in grams. V.low under ${fmtBg(54, mmol)}, V.high over ${fmtBg(250, mmol)}. '
+            'Average: glucose over the whole period; carbs and insulin per day (full days). Carbs / U: grams of carbs per unit of all insulin.', style: small),
       ],
     ));
   }

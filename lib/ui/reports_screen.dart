@@ -460,7 +460,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   List<Widget> _dailyStats(ReportData d) => [
         _card([
-          Text('Glucose in ${unitLabel(_mmol)}, insulin in units, carbs in grams.', style: const TextStyle(color: kMuted, fontSize: 12)),
+          Text(
+            'Glucose in ${unitLabel(_mmol)}, insulin in units, carbs in grams. '
+            'Average: glucose over the whole period; carbs and insulin per day (full days only). '
+            'Carbs / U: grams of carbs for each unit of all insulin (bolus, SMB and basal).',
+            style: const TextStyle(color: kMuted, fontSize: 12),
+          ),
           const SizedBox(height: 8),
           _table(dailyStatsRows(d, _mmol), const {0}),
         ], padding: const EdgeInsets.all(10)),
@@ -665,8 +670,9 @@ List<(String, String)> dayTotals(DayReport day, bool mmol) {
 List<List<String>> dailyStatsRows(ReportData d, bool mmol) {
   String bg(double v) => fmtBg(v, mmol);
   String p(double f) => '${(f * 100).round()}%';
-  List<String> row(String name, BgSummary? b, InsulinTotals ins) => [
-        name,
+  // Grams of carbs for each unit of insulin (all insulin: bolus, SMB and basal).
+  String ratio(double carbs, double total) => total <= 0 ? '' : (carbs / total).toStringAsFixed(1);
+  List<String> bgCells(BgSummary? b) => [
         b == null ? '' : p(b.veryLow),
         b == null ? '' : p(b.low),
         if (d.ttirOn) b == null ? '' : p(b.tight),
@@ -682,16 +688,32 @@ List<List<String>> dailyStatsRows(ReportData d, bool mmol) {
         b == null ? '' : bg(b.q25),
         b == null ? '' : bg(b.median),
         b == null ? '' : bg(b.q75),
-        '${ins.carbs.round()}',
-        fmtU(_round1(ins.manualBolus)),
-        fmtU(_round1(ins.autoBolus)),
-        fmtU(_round1(ins.totalBasal)),
-        fmtU(_round1(ins.total)),
+      ];
+  List<String> insCells(double carbs, double manual, double smb, double basal, double total) => [
+        '${carbs.round()}',
+        fmtU(_round1(manual)),
+        fmtU(_round1(smb)),
+        fmtU(_round1(basal)),
+        fmtU(_round1(total)),
+        ratio(carbs, total),
       ];
   return [
-    ['Date', 'V.low', 'Low', if (d.ttirOn) 'Tight', 'In range', 'High', 'V.high', 'Readings', 'Min', 'Max', 'Avg', 'SD', 'CV', '25%', 'Median', '75%', 'Carbs', 'Manual bolus', 'Auto (SMB)', 'Basal', 'Total'],
-    for (final day in d.days) row('${day.day.year}-${two(day.day.month)}-${two(day.day.day)}', day.bg, day.ins),
-    row('Period', d.bg, d.ins),
+    [
+      'Date', 'V.low', 'Low', if (d.ttirOn) 'Tight', 'In range', 'High', 'V.high', 'Readings', 'Min', 'Max', 'Avg', 'SD', 'CV', '25%', 'Median', '75%', //
+      'Carbs', 'Manual bolus', 'Auto (SMB)', 'Basal', 'Total', 'Carbs / U',
+    ],
+    for (final day in d.days)
+      [
+        '${day.day.year}-${two(day.day.month)}-${two(day.day.day)}',
+        ...bgCells(day.bg),
+        ...insCells(day.ins.carbs, day.ins.manualBolus, day.ins.autoBolus, day.ins.totalBasal, day.ins.total),
+      ],
+    // Glucose for the whole period; carbs and insulin as the average per day.
+    [
+      'Average',
+      ...bgCells(d.bg),
+      ...insCells(d.avgCarbs, d.avgManualBolus, d.avgAutoBolus, d.avgBasal, d.avgTdd),
+    ],
   ];
 }
 
