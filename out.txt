@@ -1,0 +1,18 @@
+Analyzing glucose-monitor...                                    
+
+warning • The '!' will have no effect because the receiver can't be null. Try removing the '!' operator • lib/logic/bolus_calc.dart:70:31 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null. Try removing the '!' operator • lib/logic/bolus_calc.dart:71:46 • unnecessary_non_null_assertion
+
+12 issues found. (ran in 15.3s)
+----- pages
+/tmp/pages/allrecipes.html 612 
+/tmp/pages/bbc.html 579910 <title>Banana bread recipe | Good Food
+/tmp/pages/budgetbytes.html 5715 <title>Just a moment...
+/tmp/pages/cookieandkate.html 5779 <title>Just a moment...
+/tmp/pages/kingarthur.html 280737 <title>Page Not Found | King Arthur Baking
+/tmp/pages/marmiton.html 340655 <title>Coq fermier au vin, purée écrasée à la fourchette : la meilleure recette
+/tmp/pages/recettesqc.html 432 
+/tmp/pages/ricardo.html 125265 <title>Bake-when-Ready Chocolate Chip and Pecan Cookies | RICARDO
+----- tests
+00:12 +102: /home/runner/work/glucose-monitor/glucose-monitor/test/faults_test.dart: late reading with LibreLinkUp error: Libre connection down
+00:13 +125: All tests passed!
