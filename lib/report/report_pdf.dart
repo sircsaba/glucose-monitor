@@ -251,6 +251,7 @@ Future<Uint8List> buildReportPdf(ReportData d, Set<int> which) async {
             '${r.daysWithMeals} of ${r.days.length} days.'), style: body),
         pw.SizedBox(height: 8),
         table(nutritionDayRows(r), font: 8),
+        if (r.byType.isNotEmpty) ...[pw.SizedBox(height: 8), table(mealTypeRows(r), font: 8)],
         pw.SizedBox(height: 12),
         pw.Text('Meals that raised glucose the most (reading when eating to the highest in the next 3 hours; * other carbs within 2 hours)', style: bold),
         pw.SizedBox(height: 4),

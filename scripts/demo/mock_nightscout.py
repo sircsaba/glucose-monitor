@@ -90,6 +90,11 @@ def treatments(since_ms):
         if t < since_ms:
             continue
         out.append({'_id': f'c{t}', 'eventType': 'Carb Correction', 'carbs': carbs, 'created_at': iso(t), 'enteredBy': 'Loop'})
+        if ago >= 20 and ago != 33.5:  # older meals described (meal type and words)
+            hour = datetime.fromtimestamp(t / 1000).hour
+            kind = 'breakfast' if hour < 10 else 'lunch' if hour < 15 else 'supper' if hour < 21 else 'snack'
+            out.append({'_id': f'n{t}', 'eventType': 'Note', 'created_at': iso(t), 'enteredBy': 'Monitor Glucose',
+                        'mealType': kind, 'foodType': 'Pasta and salad', 'notes': 'Pasta and salad', 'describedAt': iso(t + 60 * MIN)})
         if bolus:
             out.append({'_id': f'b{t}', 'eventType': 'Correction Bolus', 'insulin': bolus, 'created_at': iso(t + MIN), 'enteredBy': 'Loop'})
             for k in (1, 2):  # small automatic boluses after the meal

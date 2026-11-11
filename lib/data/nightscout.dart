@@ -43,6 +43,12 @@ class Treatment {
   // A meal from the Food screen: its foods and their nutrition (for the Nutrition report).
   final List<Map<String, dynamic>> foods;
   final Nutrition nutrition;
+  // What a carb entry was: meal type (breakfast, lunch, supper, snack) and
+  // what was eaten in words (Loop's food type, or typed in the app).
+  final String mealType;
+  final String foodType;
+  final DateTime? describedAt; // when a description of a carb entry was written
+  final String id;
   Treatment({
     required this.t,
     required this.type,
@@ -61,6 +67,10 @@ class Treatment {
     this.indefinite = false,
     this.foods = const [],
     this.nutrition = Nutrition.empty,
+    this.mealType = '',
+    this.foodType = '',
+    this.describedAt,
+    this.id = '',
   });
 
   bool get isMeal => foods.isNotEmpty;
@@ -303,6 +313,10 @@ class NightscoutClient {
       indefinite: (e['durationType'] ?? '').toString() == 'indefinite',
       foods: [for (final f in (e['foods'] is List ? e['foods'] as List : const [])) if (f is Map) Map<String, dynamic>.from(f)],
       nutrition: e['nutrition'] is Map ? Nutrition.fromJson(Map<String, dynamic>.from(e['nutrition'] as Map)) : Nutrition.empty,
+      mealType: (e['mealType'] ?? '').toString(),
+      foodType: (e['foodType'] ?? '').toString(),
+      describedAt: _time(e['describedAt']),
+      id: (e['_id'] ?? '').toString(),
     );
   }
 

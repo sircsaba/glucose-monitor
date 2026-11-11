@@ -11,7 +11,8 @@ import '../data/nightscout.dart';
 import '../logic/glucose.dart';
 import '../state/app_state.dart';
 import 'common.dart';
-import 'food_screen.dart';
+import '../logic/meal_link.dart';
+import 'carb_describe.dart';
 
 /// Every treatment over a period (carbs, boluses, automatic boluses / SMB,
 /// temp basals, overrides, site changes…), filtered by kind, with the columns
@@ -43,6 +44,7 @@ const tlColumns = {
   'rate': 'Basal rate (U/h)',
   'duration': 'Duration (min)',
   'target': 'Target',
+  'meal': 'Meal / what was eaten',
   'notes': 'Notes / reason',
   'by': 'Entered by',
 };
@@ -68,8 +70,10 @@ String _num(double? v, {int dec = 2}) {
 }
 
 /// One cell, as text, in the units the app shows.
-String tlCell(Treatment t, String col, bool mmol) {
+String tlCell(Treatment t, String col, bool mmol, {String meal = ''}) {
   switch (col) {
+    case 'meal':
+      return meal;
     case 'date':
       return '${t.t.year}-${two(t.t.month)}-${two(t.t.day)}';
     case 'time':
@@ -108,7 +112,7 @@ class _TreatmentLogScreenState extends State<TreatmentLogScreen> {
   DateTimeRange? _range;
   Future<List<Treatment>>? _future;
   final Set<String> _kinds = {'carbs', 'bolus', 'auto', 'basal', 'preset', 'profile', 'device', 'other'};
-  final Set<String> _cols = {'date', 'time', 'type', 'insulin', 'carbs', 'rate', 'duration', 'notes'};
+  final Set<String> _cols = {'date', 'time', 'type', 'insulin', 'carbs', 'meal', 'rate', 'duration', 'notes'};
   bool _busy = false;
 
   (DateTime, DateTime) get _period {
@@ -130,8 +134,18 @@ class _TreatmentLogScreenState extends State<TreatmentLogScreen> {
     _load();
   }
 
-  List<Treatment> _filtered(List<Treatment> all) =>
-      all.where((t) => tlKindsOf(t).any(_kinds.contains)).toList()..sort((a, b) => b.t.compareTo(a.t));
+  // Each carb entry with the note saying what was eaten (shown in its row).
+  Map<Treatment, Treatment> _links = {};
+
+  List<Treatment> _filtered(List<Treatment> all) {
+    _links = mealNotes(all);
+    final carbs = all.where(isCarbEntry).toList();
+    // The notes that describe a carb entry are shown in its row, not on their own.
+    bool describing(Treatment t) => isMealNote(t) && carbs.any((c) => c.t.difference(t.t).inSeconds.abs() <= 600);
+    return all.where((t) => !describing(t) && tlKindsOf(t).any(_kinds.contains)).toList()..sort((a, b) => b.t.compareTo(a.t));
+  }
+
+  String _meal(Treatment t) => isCarbEntry(t) ? mealText(t, _links[t]) : '';
 
   List<String> get _colOrder => tlColumns.keys.where(_cols.contains).toList();
 
@@ -147,7 +161,7 @@ class _TreatmentLogScreenState extends State<TreatmentLogScreen> {
     final cols = _colOrder;
     final b = StringBuffer()..writeln(cols.map((c) => q(tlColumns[c]! + (c == 'target' ? ' (${unitLabel(mmol)})' : ''))).join(','));
     for (final t in rows.reversed) {
-      b.writeln(cols.map((c) => q(tlCell(t, c, mmol))).join(','));
+      b.writeln(cols.map((c) => q(tlCell(t, c, mmol, meal: _meal(t)))).join(','));
     }
     // With a BOM so Excel reads accents and symbols correctly.
     final bytes = Uint8List.fromList([0xEF, 0xBB, 0xBF, ...utf8.encode(b.toString())]);
@@ -178,7 +192,7 @@ class _TreatmentLogScreenState extends State<TreatmentLogScreen> {
         pw.SizedBox(height: 8),
         pw.TableHelper.fromTextArray(
           headers: cols.map((c) => tlColumns[c]!).toList(),
-          data: [for (final t in rows.reversed) cols.map((c) => clean(tlCell(t, c, mmol))).toList()],
+          data: [for (final t in rows.reversed) cols.map((c) => clean(tlCell(t, c, mmol, meal: _meal(t)))).toList()],
           headerStyle: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
           cellStyle: const pw.TextStyle(fontSize: 8),
           headerDecoration: const pw.BoxDecoration(color: PdfColors.grey200),
@@ -221,25 +235,9 @@ class _TreatmentLogScreenState extends State<TreatmentLogScreen> {
     if (mounted) setState(() => _busy = false);
   }
 
-  Future<void> _addFoods(Treatment t) async {
-    final go = await showModalBottomSheet<bool>(
-      context: context,
-      builder: (c) => SafeArea(
-        child: ListTile(
-          leading: const Icon(Icons.restaurant_menu),
-          title: Text('Add the foods eaten (${(t.carbs ?? 0).round()} g at ${fmtClock(t.t, app.settings.flag('time24'))})'),
-          subtitle: const Text('Pick them in Food, then "Add to the entry"'),
-          onTap: () => Navigator.pop(c, true),
-        ),
-      ),
-    );
-    if (go != true || !mounted) return;
-    if (!app.meal.isEmpty) {
-      app.meal.items.clear();
-      app.mealChanged();
-    }
-    final done = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => FoodScreen(attachTo: t)));
-    if (done == true && mounted) setState(() {});
+  Future<void> _describe(Treatment t) async {
+    final saved = await describeCarbEntry(context, t, note: _links[t]);
+    if (saved && mounted) setState(_load);
   }
 
   @override
@@ -366,9 +364,15 @@ class _TreatmentLogScreenState extends State<TreatmentLogScreen> {
                         for (final t in rows.take(1000))
                           DataRow(cells: [
                             for (final c in cols)
-                              DataCell(Text(tlCell(t, c, mmol)),
-                                  // A carb entry: tap to add the foods that were eaten.
-                                  onTap: (t.carbs ?? 0) > 0 && t.foods.isEmpty ? () => _addFoods(t) : null),
+                              DataCell(
+                                  c == 'meal' && isCarbEntry(t) && _meal(t).isEmpty
+                                      ? const Text('tap to describe', style: TextStyle(color: kMuted, fontStyle: FontStyle.italic))
+                                      : ConstrainedBox(
+                                          constraints: BoxConstraints(maxWidth: c == 'meal' ? 280 : 400),
+                                          child: Text(tlCell(t, c, mmol, meal: _meal(t)), overflow: TextOverflow.ellipsis),
+                                        ),
+                                  // A carb entry: tap to say what was eaten.
+                                  onTap: isCarbEntry(t) ? () => _describe(t) : null),
                           ]),
                       ],
                     ),

@@ -1,5 +1,6 @@
 import '../data/nightscout.dart';
 import 'food.dart';
+import 'meal_link.dart';
 
 /// One day: carbs from every carb entry (Loop, Trio, AAPS, the app), and the
 /// rest of the nutrition from the meals put together on the Food screen.
@@ -36,7 +37,8 @@ class NutritionReport {
   final List<NutritionDay> days;
   final List<MealRise> meals; // biggest rise first
   final List<FoodRise> foods; // biggest average rise first (foods eaten at least twice)
-  NutritionReport(this.days, this.meals, this.foods);
+  final List<MealTypeStats> byType; // carb entries by meal type
+  NutritionReport(this.days, this.meals, this.foods, [this.byType = const []]);
 
   int get daysWithMeals => days.where((d) => d.mealCount > 0).length;
   double get avgCarbs => days.isEmpty ? 0 : days.fold(0.0, (a, d) => a + d.carbs) / days.length;
@@ -62,7 +64,9 @@ NutritionReport nutritionReport({required DateTime from, required DateTime to, r
     return null;
   }
 
-  final inRange = treatments.where((t) => !t.t.isBefore(from) && !t.t.isAfter(to)).toList()..sort((a, b) => a.t.compareTo(b.t));
+  // A carb entry described twice counts once (the newest description).
+  final inRange = withoutReplacedNotes(treatments.where((t) => !t.t.isBefore(from) && !t.t.isAfter(to)).toList())
+    ..sort((a, b) => a.t.compareTo(b.t));
   for (final t in inRange) {
     final d = dayOf(t.t);
     if (d == null) continue;
@@ -118,5 +122,5 @@ NutritionReport nutritionReport({required DateTime from, required DateTime to, r
         FoodRise(e.key, e.value.length, e.value.fold(0.0, (a, r) => a + r.rise!) / e.value.length,
             e.value.fold(0.0, (a, r) => a + r.carbs) / e.value.length),
   ]..sort((a, b) => b.avgRise.compareTo(a.avgRise));
-  return NutritionReport(days, rises, foods);
+  return NutritionReport(days, rises, foods, mealTypeStats(inRange));
 }

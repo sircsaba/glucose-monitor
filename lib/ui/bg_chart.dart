@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../data/nightscout.dart';
 import '../logic/glucose.dart';
+import '../logic/meal_link.dart';
 import '../logic/insulin.dart';
 import '../logic/profile.dart';
 import '../state/app_state.dart';
@@ -623,6 +624,7 @@ class _BgPainter extends CustomPainter {
       final fs = 9.5 * k;
       var smbLabelEnd = double.negativeInfinity;
       final sorted = [...treatments]..sort((a, b) => a.t.compareTo(b.t));
+      final meals = mealNotes(sorted); // what each carb entry was (tooltip)
       for (final t in sorted) {
         if (t.t.isAfter(tEnd)) continue;
         if (t.t.isBefore(tStart)) continue;
@@ -634,7 +636,8 @@ class _BgPainter extends CustomPainter {
           // Top lane, or just under the glucose dot.
           final cy = lineY == null ? 8 * k : math.min(plotBottom - r, lineY + 6 * k + r);
           canvas.drawCircle(Offset(tx, cy), r, Paint()..color = kAmber);
-          hits.add(_Hit(Offset(tx, cy), 'Carbs ${t.carbs!.round()} g', t.t));
+          final what = isCarbEntry(t) ? mealText(t, meals[t]) : '';
+          hits.add(_Hit(Offset(tx, cy), 'Carbs ${t.carbs!.round()} g${what.isEmpty ? '' : '\n$what'}', t.t));
           _text(canvas, '${t.carbs!.round()}g', Offset(tx, cy + r + fs * 0.75), color: kText, size: fs, center: true);
         }
         if ((t.insulin ?? 0) > 0) {

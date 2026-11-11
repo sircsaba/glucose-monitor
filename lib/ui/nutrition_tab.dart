@@ -40,6 +40,21 @@ List<List<String>> mealRiseRows(NutritionReport r, bool mmol, {int limit = 15}) 
         ],
     ];
 
+/// Carb entries by meal type (described in Food or the treatment log).
+List<List<String>> mealTypeRows(NutritionReport r) {
+  final days = r.days.isEmpty ? 1 : r.days.length;
+  return [
+    ['Meal', 'Entries', 'Carbs per entry', 'Carbs per day'],
+    for (final m in r.byType)
+      [
+        m.type.isEmpty ? 'Not set' : mealLabels[m.type] ?? m.type,
+        '${m.count}',
+        '${m.avg.round()} g',
+        '${(m.carbs / days).round()} g',
+      ],
+  ];
+}
+
 List<List<String>> foodRiseRows(NutritionReport r, bool mmol) => [
       ['Food', 'Meals', 'Average rise', 'Average carbs'],
       for (final f in r.foods.take(20)) [f.name, '${f.meals}', '+${fmtBg(f.avgRise, mmol)}', '${f.avgCarbs.round()} g'],
@@ -99,6 +114,13 @@ List<Widget> nutritionTab(NutritionReport r, bool mmol) {
     const SizedBox(height: 18),
     const Text('Day by day', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
     table(nutritionDayRows(r)),
+    if (r.byType.isNotEmpty) ...[
+      const SizedBox(height: 20),
+      const Text('Carbs by meal', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+      const Text('Breakfast, lunch, supper or snack, as set for each carb entry (Food › "Carbs to describe", or tap it in the Treatment log).',
+          style: TextStyle(color: kMuted, fontSize: 12.5)),
+      table(mealTypeRows(r)),
+    ],
     const SizedBox(height: 20),
     const Text('Meals that raised glucose the most', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
     const Text('From the reading when eating to the highest in the next 3 hours. * another meal or carbs within 2 hours.',

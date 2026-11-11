@@ -14,6 +14,7 @@ import '../logic/recipe_web.dart';
 import '../plus.dart';
 import '../state/app_state.dart';
 import 'bolus_calc_view.dart';
+import 'carb_describe.dart';
 import 'common.dart';
 import 'barcode_scan_screen.dart';
 import 'food_edit_screen.dart';
@@ -29,7 +30,10 @@ class FoodScreen extends StatefulWidget {
   /// A carb entry made earlier: the meal put together here is attached to it
   /// (what was eaten, for the nutrition report). Its carbs are not changed.
   final Treatment? attachTo;
-  const FoodScreen({super.key, this.attachTo});
+  // With [attachTo]: the meal type and words chosen before picking the foods.
+  final String attachMealType;
+  final String attachFoodType;
+  const FoodScreen({super.key, this.attachTo, this.attachMealType = '', this.attachFoodType = ''});
   @override
   State<FoodScreen> createState() => _FoodScreenState();
 }
@@ -407,10 +411,17 @@ class _FoodScreenState extends State<FoodScreen> {
         'eventType': 'Note',
         'created_at': t.t.toUtc().toIso8601String(),
         'enteredBy': app.settings.str('enteredBy').isEmpty ? kAppName : app.settings.str('enteredBy'),
-        'notes': 'Meal: ${m.describe()}',
+        'notes': [
+          if (widget.attachMealType.isNotEmpty) mealLabels[widget.attachMealType] ?? widget.attachMealType,
+          if (widget.attachFoodType.trim().isNotEmpty) widget.attachFoodType.trim(),
+          'Meal: ${m.describe()}',
+        ].join(' · '),
         'foods': m.toFoodsJson(),
         // Not "carbs": the entry already has them.
         'nutrition': m.total.toJson(),
+        if (widget.attachMealType.isNotEmpty) 'mealType': widget.attachMealType,
+        if (widget.attachFoodType.trim().isNotEmpty) 'foodType': widget.attachFoodType.trim(),
+        'describedAt': DateTime.now().toUtc().toIso8601String(),
       });
       if (!mounted) return;
       m.items.clear();
@@ -520,6 +531,7 @@ class _FoodScreenState extends State<FoodScreen> {
             if (_busy) const LinearProgressIndicator(),
             if (app.mealPlan != null) const Padding(padding: EdgeInsets.fromLTRB(12, 8, 12, 0), child: MealPlanBanner()),
             _lunchBanner(),
+            if (widget.attachTo == null) _toDescribe(),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
               child: TextField(
@@ -592,6 +604,44 @@ class _FoodScreenState extends State<FoodScreen> {
             if (!meal.isEmpty) _mealPanel(meal),
           ]);
         },
+      ),
+    );
+  }
+
+  /// Carb entries of the last day that say nothing about what was eaten.
+  Widget _toDescribe() {
+    final list = carbsToDescribe(max: 3);
+    if (list.isEmpty) return const SizedBox.shrink();
+    final t24 = app.settings.flag('time24');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+        decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: kBorder)),
+        child: Row(children: [
+          const Icon(Icons.edit_note, color: kMuted),
+          const SizedBox(width: 8),
+          const Text('Carbs to describe', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: [
+                for (final c in list)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ActionChip(
+                      label: Text('${fmtClock(c.t, t24)} · ${(c.carbs ?? 0).round()} g'),
+                      onPressed: () async {
+                        await describeCarbEntry(context, c);
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                  ),
+              ]),
+            ),
+          ),
+        ]),
       ),
     );
   }

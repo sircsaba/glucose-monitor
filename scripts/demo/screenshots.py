@@ -131,6 +131,9 @@ FOOD = [
     ('t-saver-settings', 'app', ['Settings', 'Screen saver']),
     ('u-saver', 'app', ['Screen saver (alarms quiet, touch to come back)']),
     ('v-remote-settings', 'plus', ['Treat', 'Remote control', 'Settings']),
+    ('w-food-describe', 'app', ['Treat', 'Food']),
+    ('x-log', 'app', ['Settings', 'Treatment log']),
+    ('y-nutrition', 'app', ['Reports', '14d', 'Nutrition']),
 ]
 TABLET = [
     ('1-live', 'app', []),
