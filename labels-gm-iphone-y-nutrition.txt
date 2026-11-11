@@ -1,0 +1,27 @@
+Reports
+updated 21:21
+Today
+7d
+14d
+30d
+90d
+This pod
+Per pod
+Print or save as PDF
+Summary
+Day to day
+Daily stats
+Distribution
+Nutrition
+Time in range
+99%
+Time in tight range (3.9–7.8)
+96%
+Below 0%
+3.9–7.8–10.0
+Above 1%
+Live
+Treat
+Target
+Reports
+Alarms

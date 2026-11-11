@@ -1,0 +1,9 @@
+BackScreen saver
+Back
+Decrease At
+−
+Increase At
++
+Decrease Brightness of the glucose
+Increase Brightness of the glucose
+Start the screen saver now

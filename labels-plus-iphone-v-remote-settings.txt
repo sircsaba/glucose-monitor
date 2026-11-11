@@ -1,0 +1,11 @@
+Dialog
+Remote control settings
+Limits
+2 U · 50 g
+Insulin safety
+None below 4.0 · warn below 5.0
+Reminder to give insulin
+Off
+Name and command site
+Through the site this app shows
+Save

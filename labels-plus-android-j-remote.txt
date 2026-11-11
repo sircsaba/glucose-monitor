@@ -1,0 +1,19 @@
+BackLoop remote controlSettings
+Back
+Settings
+Enter
+Set up
+Override
+None runningCarbs
+20 g + 0.9 UBolus
+No bolus suggestedSettings
+Something to set up
+Override
+None running
+Carbs
+20 g + 0.9 U
+Bolus
+No bolus suggested
+Settings
+Something to set up
+Tap a card.

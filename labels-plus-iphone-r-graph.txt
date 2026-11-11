@@ -1,0 +1,27 @@
+BackGraph
+Back
+Prediction
+Top of graph
+Auto: just above your high line, higher when readings go above it
+Auto
+Graph height
+Fit: the graph uses the room left, so the whole page shows without scrolling
+Fit the screen on a computer
+Dot size
+Small
+Boluses and carbs
+Shown on · 100%
+SMB and automatic boluses
+Dots 100% · amounts off
+Basal
+At the top
+Presets and profile
+Presets on · profile on
+Grid and time lines
+Grid on
+Glucose dot colours
+Brightness 100%
+Time in tight range
+On, up to 7.8
+Touching the graph
+Reading: value and time

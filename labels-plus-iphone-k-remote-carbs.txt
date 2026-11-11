@@ -1,0 +1,44 @@
+BackLoop remote controlSettings
+Back
+Settings
+Enter
+Set up
+Override
+None runningCarbs
+20 g + 0.95 UBolus
+No bolus suggestedSettings
+Something to set up
+Override
+None running
+Carbs
+20 g + 0.95 U
+Bolus
+No bolus suggested
+Settings
+Something to set up
+Carbs
+Carbs
+Absorption time
+Eaten
+Insulin with the carbs
+Suggested by the calculator
+Decrease Carbs
+−
+Type Carbs
+20 g
+Increase Carbs
++
+Decrease Absorption time
+Type Absorption time
+3 h
+Increase Absorption time
+Decrease Eaten
+Type Eaten
+now
+Increase Eaten
+Decrease Insulin with the carbs
+Type Insulin with the carbs
+0.95 U
+Increase Insulin with the carbs
+Calculation: 0.95 U
+Send 20 g + 0.95 U to Loop
