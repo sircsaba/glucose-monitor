@@ -325,6 +325,11 @@ class Settings {
     'gridMinutes': [15, 15, 15, 30, 60], // minutes between time lines, for each graph button
     'tipBg': 2, // mouse over a reading: 0 nothing, 1 value, 2 value and time, 3 time
     'tipTreat': 2, // mouse over a treatment: same choices
+    // Also in the tooltip of a reading, like Nightscout:
+    'tipDelta': true,
+    'tipIob': true,
+    'tipCob': true,
+    'tipBasal': true,
     'navCompact': 0, // bottom bar: 0 thin on a computer, 1 always thin, 2 always normal
     'landSplit': true, // phone on its side: values left, graph right
     'splitLeft': 40, // percent of the width for the values

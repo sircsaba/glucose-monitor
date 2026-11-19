@@ -167,7 +167,12 @@ List<SettingsGroup> graphSubGroups() => [
       SettingsGroup('Time in tight range', summary: () => app.settings.flag('ttirOn')
           ? 'On, up to ${fmtBg(app.settings.number('ttirHi'), app.mmol)}'
           : 'Off', rows: (_) => ttirSettings()),
-      SettingsGroup('Touching the graph', summary: () => 'Reading: ${const ['nothing', 'value', 'value and time', 'time'][app.settings.integer('tipBg').clamp(0, 3)]}',
+      SettingsGroup('Touching the graph', summary: () {
+        final st = app.settings;
+        final what = const ['nothing', 'value', 'value and time', 'time'][st.integer('tipBg').clamp(0, 3)];
+        final more = [if (st.flag('tipDelta')) 'delta', if (st.flag('tipIob')) 'IOB', if (st.flag('tipCob')) 'COB', if (st.flag('tipBasal')) 'basal'];
+        return 'Reading: $what${st.integer('tipBg') != 0 && more.isNotEmpty ? ', ${more.join(', ')}' : ''}';
+      },
           rows: (_) => tooltipSettings()),
     ];
 

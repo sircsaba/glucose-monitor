@@ -129,6 +129,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   List<Entry> entries = [];
   List<Treatment> treatments = [];
   DeviceInfo? device;
+  List<StatusPoint> statusPoints = []; // IOB and COB of the last day (graph tooltip)
   DateTime? sensorStart;
   DateTime? siteChange;
   DateTime? insulinChange;
@@ -355,6 +356,15 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         treatments = await c.treatmentsSince(now.subtract(const Duration(hours: 24)));
       }
       device = await c.deviceStatus();
+      // IOB and COB of the last day, for the graph's tooltip (only when shown).
+      if (settings.integer('tipBg') != 0 && (settings.flag('tipIob') || settings.flag('tipCob'))) {
+        try {
+          final from = (full || statusPoints.isEmpty) ? now.subtract(const Duration(hours: 24)) : statusPoints.last.t.add(const Duration(seconds: 1));
+          final add = await c.statusPoints(from, now.add(const Duration(minutes: 5)));
+          final cut = now.subtract(const Duration(hours: 26));
+          statusPoints = [...statusPoints.where((p) => p.t.isAfter(cut)), ...add]..sort((a, b) => a.t.compareTo(b.t));
+        } catch (_) {}
+      }
       if (full || _n % 15 == 0) {
         // Ages are extras: a problem here must not stop the glucose readings.
         try {

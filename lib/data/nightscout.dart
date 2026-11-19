@@ -88,6 +88,60 @@ class LogEvent {
 }
 
 /// Loop / pump status from the latest device status uploads.
+/// Insulin and carbs on board at one moment (from a loop upload), for the
+/// graph's tooltip on past readings.
+class StatusPoint {
+  final DateTime t;
+  final double? iob;
+  final double? cob;
+  const StatusPoint(this.t, this.iob, this.cob);
+}
+
+/// IOB and COB of one devicestatus upload (Loop, Trio, AAPS), or null.
+StatusPoint? statusPointOf(Map ds) {
+  double? iob, cob;
+  DateTime? t;
+  final l = ds['loop'];
+  if (l is Map) {
+    final i = l['iob'];
+    if (i is Map) iob = _d(i['iob']);
+    final c = l['cob'];
+    if (c is Map) cob = _d(c['cob']);
+    t = _time(l['timestamp']);
+  }
+  final o = ds['openaps'];
+  if (o is Map) {
+    final i = o['iob'];
+    if (i is Map) {
+      iob ??= _d(i['iob']);
+    } else if (i is List && i.isNotEmpty && i.first is Map) {
+      iob ??= _d((i.first as Map)['iob']);
+    }
+    final sug = o['suggested'];
+    if (sug is Map) {
+      cob ??= _d(sug['COB']);
+      t ??= _time(sug['timestamp']) ?? _time(sug['deliverAt']);
+    }
+  }
+  t ??= _time(ds['created_at']);
+  if (t == null || (iob == null && cob == null)) return null;
+  return StatusPoint(t, iob, cob);
+}
+
+/// The status point closest to [t] (within [within]), or null.
+StatusPoint? statusNear(List<StatusPoint> points, DateTime t, {Duration within = const Duration(minutes: 10)}) {
+  StatusPoint? best;
+  var bd = within.inSeconds + 1;
+  for (final p in points) {
+    final d = p.t.difference(t).inSeconds.abs();
+    if (d < bd) {
+      bd = d;
+      best = p;
+    }
+  }
+  return best;
+}
+
 class DeviceInfo {
   DateTime? loopTime;
   double? iob;
@@ -386,6 +440,24 @@ class NightscoutClient {
       }
     }
     return best;
+  }
+
+  /// IOB and COB from the loop's uploads between [from] and [to].
+  Future<List<StatusPoint>> statusPoints(DateTime from, DateTime to) async {
+    final out = <StatusPoint>[];
+    // Uploads are big (forecasts): ask in pieces of 6 hours.
+    for (var a = from; a.isBefore(to); a = a.add(const Duration(hours: 6))) {
+      var b = a.add(const Duration(hours: 6));
+      if (b.isAfter(to)) b = to;
+      final j = await _get('/api/v1/devicestatus.json', {
+        'find[created_at][\$gte]': a.toUtc().toIso8601String(),
+        'find[created_at][\$lt]': b.toUtc().toIso8601String(),
+        'count': '400',
+      });
+      if (j is List) out.addAll(j.whereType<Map>().map(statusPointOf).whereType<StatusPoint>());
+    }
+    out.sort((a, b) => a.t.compareTo(b.t));
+    return out;
   }
 
   Future<DeviceInfo> deviceStatus() async {

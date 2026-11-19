@@ -155,3 +155,18 @@ List<MapEntry<DateTime, String>> profileChanges(List<Treatment> treatments, List
   out.sort((a, b) => a.key.compareTo(b.key));
   return out;
 }
+
+/// The basal rate running at [t] (U/h): the temp basal then, else the
+/// profile's schedule. Null when neither is known.
+double? basalRateAt(List<Treatment> treatments, List<ProfileDoc> profiles, DateTime t) {
+  Treatment? tb;
+  for (final x in treatments) {
+    if (x.type != 'Temp Basal' || x.absolute == null || x.t.isAfter(t)) continue;
+    if (tb == null || x.t.isAfter(tb.t)) tb = x;
+  }
+  if (tb != null) {
+    final end = tb.t.add(Duration(seconds: ((tb.duration ?? 30) * 60).round()));
+    if (t.isBefore(end)) return tb.absolute;
+  }
+  return profileAt(profiles, t)?.basalAt(t);
+}

@@ -42,6 +42,7 @@ class _BgChartState extends State<BgChart> {
   double _width = 1;
   List<Entry> _oldEntries = [];
   List<Treatment> _oldTreats = [];
+  List<StatusPoint> _oldStatus = [];
   DateTime? _oldFrom; // older data loaded back to here
   bool _loadingOld = false;
   static const _maxBack = Duration(days: 90);
@@ -72,6 +73,13 @@ class _BgChartState extends State<BgChart> {
       }
       _oldEntries = em.values.toList()..sort((a, b) => a.t.compareTo(b.t));
       _oldTreats = tl;
+      final s = app.settings;
+      if (s.integer('tipBg') != 0 && (s.flag('tipIob') || s.flag('tipCob'))) {
+        try {
+          final more = await c.statusPoints(from, have);
+          _oldStatus = [...more, ..._oldStatus]..sort((a, b) => a.t.compareTo(b.t));
+        } catch (_) {}
+      }
       _oldFrom = from;
     } catch (_) {}
     _loadingOld = false;
@@ -175,6 +183,11 @@ class _BgChartState extends State<BgChart> {
           dotBright: s.integer('dotBright') / 100.0,
           profiles: s.flag('profileShow') ? app.profiles : null,
           basalProfiles: app.profiles,
+          status: live ? app.statusPoints : [..._oldStatus, ...app.statusPoints],
+          tipDelta: s.flag('tipDelta'),
+          tipIob: s.flag('tipIob'),
+          tipCob: s.flag('tipCob'),
+          tipBasal: s.flag('tipBasal'),
         ),
       ),
     );
@@ -289,6 +302,8 @@ class _BgPainter extends CustomPainter {
   final double dotBright;
   final List<ProfileDoc>? profiles; // null = profile not shown
   final List<ProfileDoc> basalProfiles; // scheduled basal between temp basals
+  final List<StatusPoint> status; // IOB and COB through the day (tooltip)
+  final bool tipDelta, tipIob, tipCob, tipBasal; // extra lines in a reading's tooltip
 
   _BgPainter({
     required this.entries,
@@ -336,6 +351,11 @@ class _BgPainter extends CustomPainter {
     required this.dotBright,
     required this.profiles,
     required this.basalProfiles,
+    this.status = const [],
+    this.tipDelta = false,
+    this.tipIob = false,
+    this.tipCob = false,
+    this.tipBasal = false,
   });
 
   static void _dotted(Canvas c, Offset a, Offset b, Paint p, {double on = 2, double off = 3}) {
@@ -746,6 +766,37 @@ class _BgPainter extends CustomPainter {
           final v = '${fmtBg(best.mg, mmol)} ${unitLabel(mmol)}';
           final tm = fmtClock(best.t, h24);
           text = tipBg == 1 ? v : (tipBg == 3 ? tm : '$v · $tm');
+          // Like Nightscout: change since the reading before, IOB, COB, basal.
+          final extra = <String>[];
+          if (tipDelta) {
+            // Over 5 minutes like Nightscout (readings can come every minute).
+            Entry? prev;
+            var pd = 1 << 30;
+            for (final e in visible) {
+              final ago = best.t.difference(e.t).inSeconds;
+              if (ago < 150 || ago > 600) continue;
+              final d = (ago - 300).abs();
+              if (d < pd) {
+                pd = d;
+                prev = e;
+              }
+            }
+            if (prev != null) {
+              final mins = best.t.difference(prev.t).inSeconds / 60;
+              extra.add('Δ ${fmtDelta((best.mg - prev.mg) * 5 / mins, mmol)} per 5 min');
+            }
+          }
+          final st = (tipIob || tipCob) ? statusNear(status, best.t) : null;
+          final ic = [
+            if (tipIob && st?.iob != null) 'IOB ${fmtU(st!.iob!)} U',
+            if (tipCob && st?.cob != null) 'COB ${st!.cob!.round()} g',
+          ];
+          if (ic.isNotEmpty) extra.add(ic.join(' · '));
+          if (tipBasal) {
+            final b = basalRateAt(treatments, basalProfiles, best.t);
+            if (b != null) extra.add('Basal ${b.toStringAsFixed(b < 1 ? 2 : 1)} U/h');
+          }
+          if (extra.isNotEmpty) text = '$text\n${extra.join('\n')}';
           at = Offset(x(best.t), y(best.mg));
           canvas.drawCircle(at, rad + 3, Paint()
             ..style = PaintingStyle.stroke
@@ -913,6 +964,12 @@ List<Widget> tooltipSettings() {
   const tips = ['Nothing', 'Value', 'Value and time', 'Time only'];
   return [
     setChoice('Mouse over a reading shows', 'tipBg', tips, hint: 'On a phone: tap, or touch and hold and slide'),
+    if (app.settings.integer('tipBg') != 0) ...[
+      setSwitch('Also: change (delta)', 'tipDelta', hint: 'Glucose change over 5 minutes'),
+      setSwitch('Also: insulin on board (IOB)', 'tipIob', hint: 'From the loop at that time'),
+      setSwitch('Also: carbs on board (COB)', 'tipCob', hint: 'From the loop at that time'),
+      setSwitch('Also: basal rate', 'tipBasal', hint: 'Temp basal then, or the profile'),
+    ],
     setChoice('Mouse over a treatment shows', 'tipTreat', tips),
   ];
 }
