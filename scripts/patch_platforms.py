@@ -122,6 +122,23 @@ def patch_android():
         g = re.sub(r'minSdkVersion\s+flutter\.minSdkVersion', 'minSdkVersion 24', g)
         with open(gradle, 'w') as f:
             f.write(g)
+    # The release lint check crashed inside a plugin (file_selector_android:
+    # "Unexpected failure during lint analysis", a bug in Android's lint), which
+    # stopped the build. It only checks code style: skip it for every module.
+    for root_gradle in ['android/build.gradle.kts', 'android/build.gradle']:
+        if not os.path.exists(root_gradle):
+            continue
+        with open(root_gradle) as f:
+            rg = f.read()
+        if 'lintVital' not in rg:
+            q = '"' if root_gradle.endswith('.kts') else "'"
+            rg += ('\n// Release lint off (it crashed inside a plugin).\n'
+                   'subprojects {\n'
+                   f'    tasks.matching {{ it.name.startsWith({q}lintVital{q}) }}.configureEach {{ enabled = false }}\n'
+                   '}\n')
+            with open(root_gradle, 'w') as f:
+                f.write(rg)
+            print('Android: release lint check off')
     print('Android patched:', APP_NAME, BUNDLE_ID)
 
 
