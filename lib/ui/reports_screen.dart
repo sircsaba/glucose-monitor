@@ -618,6 +618,12 @@ List<(String, String, String?)> summaryStats(ReportData d, bool mmol) {
     ('Manual bolus per day', '${fmtU(_round1(d.avgManualBolus))} U', null),
     ('Auto bolus (SMB) per day', '${fmtU(_round1(d.avgAutoBolus))} U', null),
     ('Basal per day', '${fmtU(_round1(d.avgBasal))} U', null),
+    if (ins.hours >= 12) ...[
+      ('Boluses per day', (ins.manualBolusEntries * 24 / ins.hours).toStringAsFixed(1), '${ins.manualBolusEntries} in all'),
+      ('SMBs per day', (ins.smbEntries * 24 / ins.hours).toStringAsFixed(0), '${ins.smbEntries} in all'),
+      ('Temp basals per day', (ins.tempBasals * 24 / ins.hours).toStringAsFixed(0), '${ins.tempBasals} in all'),
+      ('Basal running per day', '${(ins.basalMinutes * 24 / ins.hours / 60).toStringAsFixed(1)} h', 'the rest at 0 U/h'),
+    ],
     if (ins.icrManual != null) ('Carb ratio (actual)', '1:${ins.icrManual!.toStringAsFixed(1)}', 'carbs / manual boluses'),
     if (ins.icrAll != null) ('Carb ratio (all)', '1:${ins.icrAll!.toStringAsFixed(1)}', 'auto boluses included'),
     if (isf != null) ('ISF estimate', mmol ? (isf / mgPerMmol).toStringAsFixed(1) : isf.round().toString(), '1800 rule, $unit/U'),
@@ -632,17 +638,23 @@ List<(String, String, String?)> summaryStats(ReportData d, bool mmol) {
 List<(String, String)> podStats(ReportData d, bool mmol) {
   final b = d.bg;
   final i = d.ins;
-  final perDay = i.hours >= 12 ? i.total * 24 / i.hours : null;
+  final days = i.hours / 24;
+  // Per day only when the pod has run long enough for it to mean something.
+  String daily(num n, String Function(double) f) => days >= 0.5 ? ' (${f(n / days)}/day)' : '';
+  String hm(double minutes) => '${minutes ~/ 60} h ${two(minutes.round() % 60)}';
   return [
     if (b != null) ('In range', '${(b.inRange * 100).round()}%'),
     if (b != null) ('Average', fmtBg(b.avg, mmol)),
     ('Lows', '${d.lowEpisodes}'),
     ('Carbs', '${i.carbs.round()} g'),
+    ('Total insulin used', '${fmtU(_round1(i.total))} U${daily(i.total, (v) => fmtU(_round1(v)))}'),
     ('Manual bolus', '${fmtU(_round1(i.manualBolus))} U'),
     ('Auto (SMB)', '${fmtU(_round1(i.autoBolus))} U'),
     ('Basal', '${fmtU(_round1(i.totalBasal))} U'),
-    ('Total', '${fmtU(_round1(i.total))} U'),
-    if (perDay != null) ('Per day', '${fmtU(_round1(perDay))} U'),
+    ('Boluses', '${i.manualBolusEntries}${daily(i.manualBolusEntries, (v) => v.toStringAsFixed(1))}'),
+    ('SMBs', '${i.smbEntries}${daily(i.smbEntries, (v) => v.toStringAsFixed(0))}'),
+    ('Temp basals', '${i.tempBasals}${daily(i.tempBasals, (v) => v.toStringAsFixed(0))}'),
+    ('Basal running', days >= 0.5 ? '${hm(i.basalMinutes / days)} per day' : hm(i.basalMinutes.toDouble())),
   ];
 }
 

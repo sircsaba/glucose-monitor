@@ -34,6 +34,10 @@ void main() {
       treatments: [
         Treatment(t: t0.add(const Duration(hours: 1)), type: 'Meal Bolus', insulin: 3),
         Treatment(t: t0.add(const Duration(hours: 2)), type: 'Correction Bolus', insulin: 0.4, isSmb: true),
+        Treatment(t: t0.add(const Duration(hours: 3)), type: 'Correction Bolus', insulin: 0.3, isSmb: true),
+        // Basal at 0 for 2 hours, then 1 U/h for 1 hour (no profile: nothing outside them).
+        Treatment(t: t0.add(const Duration(hours: 4)), type: 'Temp Basal', absolute: 0, duration: 120),
+        Treatment(t: t0.add(const Duration(hours: 6)), type: 'Temp Basal', absolute: 1, duration: 60),
       ],
       profiles: const [],
       lo: 70,
@@ -42,7 +46,15 @@ void main() {
       ttirOn: false,
     );
     expect(d.ins.manualBolus, closeTo(3, 0.001));
-    expect(d.ins.autoBolus, closeTo(0.4, 0.001));
+    expect(d.ins.autoBolus, closeTo(0.7, 0.001));
+    expect(d.ins.smbEntries, 2);
+    expect(d.ins.manualBolusEntries, 1);
+    expect(d.ins.tempBasals, 2);
+    expect(d.ins.basalMinutes, 60);
+    final stats = {for (final s in podStats(d, false)) s.$1: s.$2};
+    expect(stats['SMBs'], '2 (2/day)');
+    expect(stats['Boluses'], '1 (1.0/day)');
+    expect(stats['Basal running'], '1 h 00 per day');
   });
 
   test('daily stats: last row is the average per day, carbs per unit', () {

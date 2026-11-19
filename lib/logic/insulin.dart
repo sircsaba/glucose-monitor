@@ -12,6 +12,9 @@ class InsulinTotals {
   final double tempMinus; // less (negative number) from temp basals below it
   final int carbEntries;
   final int bolusEntries;
+  final int smbEntries; // automatic boluses (part of bolusEntries)
+  final int tempBasals; // temp basals set by the loop (or by hand)
+  final int basalMinutes; // minutes with basal running (above 0 U/h)
   final double hours; // length of the period
 
   InsulinTotals({
@@ -23,8 +26,13 @@ class InsulinTotals {
     required this.tempMinus,
     required this.carbEntries,
     required this.bolusEntries,
+    this.smbEntries = 0,
+    this.tempBasals = 0,
+    this.basalMinutes = 0,
     required this.hours,
   });
+
+  int get manualBolusEntries => bolusEntries - smbEntries;
 
   double get manualBolus => bolus - autoBolus;
   double get totalBasal => baseBasal + tempPlus + tempMinus;
@@ -54,14 +62,18 @@ bool _isBolus(Treatment t) => (t.insulin ?? 0) > 0 && t.type != 'Temp Basal';
 /// before [from] (a temp basal can start earlier), sorted by time.
 InsulinTotals insulinTotals(List<Treatment> treatments, List<ProfileDoc> profiles, DateTime from, DateTime to) {
   var bolus = 0.0, auto = 0.0, carbs = 0.0;
-  var carbN = 0, bolusN = 0;
+  var carbN = 0, bolusN = 0, smbN = 0, tempN = 0;
   for (final t in treatments) {
     if (t.t.isBefore(from) || !t.t.isBefore(to)) continue;
     if (_isBolus(t)) {
       bolus += t.insulin!;
       bolusN++;
-      if (t.isSmb) auto += t.insulin!;
+      if (t.isSmb) {
+        auto += t.insulin!;
+        smbN++;
+      }
     }
+    if (t.type == 'Temp Basal' && t.absolute != null) tempN++;
     if ((t.carbs ?? 0) > 0) {
       carbs += t.carbs!;
       carbN++;
@@ -71,7 +83,7 @@ InsulinTotals insulinTotals(List<Treatment> treatments, List<ProfileDoc> profile
   // Temp basals: each runs for its duration or until the next one starts.
   final temps = treatments.where((t) => t.type == 'Temp Basal' && t.absolute != null).toList();
   var base = 0.0, plus = 0.0, minus = 0.0;
-  var k = 0;
+  var k = 0, running = 0;
   // One-minute steps are precise enough and simple.
   for (var m = from; m.isBefore(to); m = m.add(const Duration(minutes: 1))) {
     final sched = profileAt(profiles, m)?.basalAt(m) ?? 0;
@@ -84,6 +96,7 @@ InsulinTotals insulinTotals(List<Treatment> treatments, List<ProfileDoc> profile
       final end = tb.t.add(Duration(seconds: ((tb.duration ?? 30) * 60).round()));
       if (m.isBefore(end)) rate = tb.absolute!;
     }
+    if (rate > 0.001) running++;
     base += sched / 60;
     final diff = (rate - sched) / 60;
     if (diff > 0) {
@@ -101,6 +114,9 @@ InsulinTotals insulinTotals(List<Treatment> treatments, List<ProfileDoc> profile
     tempMinus: minus,
     carbEntries: carbN,
     bolusEntries: bolusN,
+    smbEntries: smbN,
+    tempBasals: tempN,
+    basalMinutes: running,
     hours: to.difference(from).inMinutes / 60,
   );
 }
