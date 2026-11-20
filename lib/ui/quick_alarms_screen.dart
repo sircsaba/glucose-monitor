@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../logic/glucose.dart';
+import '../plus.dart';
 import '../state/app_state.dart';
 import '../state/settings.dart';
 import 'common.dart';
-import 'settings/menu_screen.dart';
+import 'target_screen.dart';
 
 class QuickAlarmsScreen extends StatelessWidget {
   const QuickAlarmsScreen({super.key});
@@ -31,14 +32,14 @@ class QuickAlarmsScreen extends StatelessWidget {
           children: [
             Row(children: [
               const Expanded(child: Text('Alarms', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600))),
-              TextButton(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuScreen())),
-                child: const Text('All settings ›'),
-              ),
+              const SettingsGear(),
             ]),
             const SizedBox(height: 4),
             Text('Now using the "${r.name}" range', style: const TextStyle(color: kMuted, fontSize: 13)),
             const SizedBox(height: 12),
+            // Monitor Glucose Plus and web: the Target alert lives here (the
+            // Overrides tab took its place in the bottom bar).
+            if (kRemote) ...[const TargetScreen(embedded: true), const SizedBox(height: 14)],
             Section(children: [
               for (var i = 0; i < kSoundGroups.length; i++)
                 RowBox(

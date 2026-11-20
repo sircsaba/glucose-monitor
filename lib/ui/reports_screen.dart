@@ -161,7 +161,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   /// Title, update time and the period choices (plus [extra], the print button).
-  Widget _head(List<Widget> extra) => Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 6, runSpacing: 6, children: [
+  Widget _head(List<Widget> extra) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(child: _headWrap(extra)),
+        const SettingsGear(),
+      ]);
+
+  Widget _headWrap(List<Widget> extra) => Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 6, runSpacing: 6, children: [
         const Text('Reports', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
         Text('updated ${two(_loadedAt.hour)}:${two(_loadedAt.minute)}', style: const TextStyle(color: kMuted, fontSize: 11)),
         const SizedBox(width: 8),

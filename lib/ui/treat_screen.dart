@@ -109,6 +109,7 @@ class _TreatScreenState extends State<TreatScreen> {
               const Expanded(child: Text('Add treatment', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600))),
               if (l != null)
                 Text('${fmtBg(l.mg, mmol)} ${arrowText(l.direction)}', style: kMono.copyWith(color: app.colorFor(l.mg), fontSize: 16)),
+              const SettingsGear(),
             ]),
             const SizedBox(height: 14),
             const MealPlanBanner(),

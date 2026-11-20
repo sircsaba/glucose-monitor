@@ -53,6 +53,30 @@ class RemoteSecrets {
 /// profile; carbs and boluses need Loop's one-time password (its QR code,
 /// read once).
 const Color _kOn = Color(0xFF2E9E4F); // an override is running
+const Color kOverrideOn = _kOn;
+
+/// The override running now: from Loop's latest status upload (every 5
+/// minutes), or else from the override treatments. Null when none runs.
+({String name, DateTime? end})? activeOverride() {
+  final d = app.device;
+  if (d != null && d.overrideSeen) {
+    return d.overrideActive ? (name: d.overrideName, end: d.overrideEnd) : null;
+  }
+  Treatment? last;
+  final list = app.treatments.where((t) => t.type == 'Temporary Override').toList()..sort((a, b) => a.t.compareTo(b.t));
+  for (final t in list) {
+    last = t;
+  }
+  if (last == null) return null;
+  if ((last.duration ?? 0) <= 0 && !last.indefinite) return null;
+  final end = last.indefinite ? null : last.t.add(Duration(seconds: ((last.duration ?? 0) * 60).round()));
+  if (end != null && end.isBefore(DateTime.now())) return null;
+  return (name: last.reason, end: end);
+}
+
+/// Loop's own Pre-meal cannot be started by a remote command: a Loop override
+/// preset named "Pre-meal" (or Premeal) is used for the quick start.
+bool isPremealPreset(OverridePreset p) => p.name.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '').contains('premeal');
 
 String _presetLabel(ProfileDoc? loop, String name) {
   for (final p in loop?.presets ?? const <OverridePreset>[]) {
@@ -74,7 +98,9 @@ class RemoteScreen extends StatefulWidget {
   final void Function(bool carbs)? onSent;
   /// The card to open first: override, carbs, bolus or settings.
   final String? section;
-  const RemoteScreen({super.key, this.carbs, this.mealNote, this.absorption, this.carbInsulin, this.bolus, this.onSent, this.section});
+  /// The Overrides tab of Monitor Glucose Plus: only the overrides, no page around it.
+  final bool overridesTab;
+  const RemoteScreen({super.key, this.carbs, this.mealNote, this.absorption, this.carbInsulin, this.bolus, this.onSent, this.section, this.overridesTab = false});
   @override
   State<RemoteScreen> createState() => _RemoteScreenState();
 }
@@ -100,8 +126,11 @@ class _RemoteScreenState extends State<RemoteScreen> {
   void initState() {
     super.initState();
     _loadSecrets();
+    var n = 0;
     _tick = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted && _totp != null) setState(() {});
+      n++;
+      // The tab only shows minutes left: redraw every 30 s.
+      if (mounted && (widget.overridesTab ? n % 30 == 0 : _totp != null)) setState(() {});
     });
   }
 
@@ -387,6 +416,25 @@ class _RemoteScreenState extends State<RemoteScreen> {
       if (dur != null && dur > 0) 'duration': dur,
     })) {
       await _sent('Override sent', ['${p.label}', choices[pick].$1]);
+    }
+  }
+
+  /// One more hour: the same preset again, for what was left plus 60 minutes.
+  Future<void> _extend(({String name, DateTime? end}) a, OverridePreset? p) async {
+    if (a.end == null) return;
+    final left = a.end!.difference(DateTime.now()).inMinutes.clamp(0, 24 * 60);
+    final mins = left + 60;
+    final label = p?.label ?? (a.name.isEmpty ? 'Override' : a.name);
+    final until = fmtClock(DateTime.now().add(Duration(minutes: mins)), s.flag('time24'));
+    if (!await _confirm('Extend by 1 hour?', '$label\nUntil $until')) return;
+    if (!await _unlock('extend $label')) return;
+    if (await _send({
+      'eventType': 'Temporary Override',
+      'reason': a.name,
+      'reasonDisplay': label,
+      'duration': mins,
+    })) {
+      await _sent('Override sent', [label, 'Until $until']);
     }
   }
 
@@ -710,22 +758,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
 
   /// The override running now: from Loop's latest status upload (every 5
   /// minutes), or else from the override treatments.
-  ({String name, DateTime? end})? get _activeOverride {
-    final d = app.device;
-    if (d != null && d.overrideSeen) {
-      return d.overrideActive ? (name: d.overrideName, end: d.overrideEnd) : null;
-    }
-    Treatment? last;
-    final list = app.treatments.where((t) => t.type == 'Temporary Override').toList()..sort((a, b) => a.t.compareTo(b.t));
-    for (final t in list) {
-      last = t;
-    }
-    if (last == null) return null;
-    if ((last.duration ?? 0) <= 0 && !last.indefinite) return null;
-    final end = last.indefinite ? null : last.t.add(Duration(seconds: ((last.duration ?? 0) * 60).round()));
-    if (end != null && end.isBefore(DateTime.now())) return null;
-    return (name: last.reason, end: end);
-  }
+  ({String name, DateTime? end})? get _activeOverride => activeOverride();
 
   Widget _calcTile(BolusCalc c) => Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -758,8 +791,151 @@ class _RemoteScreenState extends State<RemoteScreen> {
         ]),
       );
 
+  // ------------------------------------------------------------ Overrides tab
+
+  Widget _overridesTabView() => ListenableBuilder(
+        listenable: app,
+        builder: (context, _) {
+          final loop = _loop;
+          final active = _activeOverride;
+          final t24 = s.flag('time24');
+          final l = app.latest;
+          final presets = loop?.presets ?? const <OverridePreset>[];
+          OverridePreset? find(String name) {
+            for (final p in presets) {
+              if (p.name == name) return p;
+            }
+            return null;
+          }
+
+          final premeal = presets.where(isPremealPreset).firstOrNull;
+          final others = presets.where((p) => p != premeal).toList();
+          final hasSecret = _otherSite ? (_cmdSecret ?? '').isNotEmpty : (s.flag('apiSecret') || (_savedSecret ?? '').isNotEmpty);
+          final running = active == null ? null : find(active.name);
+
+          Widget presetRow(OverridePreset p, {bool last = false}) {
+            final on = active != null && active.name == p.name;
+            return RowBox(
+              last: last,
+              child: Row(children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(p.label, style: TextStyle(fontSize: 16, fontWeight: on ? FontWeight.w700 : FontWeight.w500, color: on ? _kOn : null)),
+                    Text(_presetInfo(p), style: const TextStyle(color: kMuted, fontSize: 12)),
+                  ]),
+                ),
+                if (on)
+                  const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('Running', style: TextStyle(color: _kOn, fontWeight: FontWeight.w600)))
+                else
+                  FilledButton(onPressed: () => _override(p), child: const Text('Start')),
+              ]),
+            );
+          }
+
+          return AbsorbPointer(
+            absorbing: _sending,
+            child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 32), children: [
+              Row(children: [
+                const Expanded(child: Text('Overrides', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600))),
+                if (l != null)
+                  Text('${fmtBg(l.mg, app.mmol)} ${arrowText(l.direction)}', style: kMono.copyWith(color: app.colorFor(l.mg), fontSize: 16)),
+                const SettingsGear(),
+              ]),
+              const SizedBox(height: 10),
+              if (loop?.deviceToken == null || !hasSecret)
+                _card('Ready?', [
+                  _check(loop?.deviceToken != null,
+                      loop == null ? 'No Loop profile on this site yet' : (loop.deviceToken == null ? 'Loop profile without a device token' : 'Loop phone found')),
+                  _check(hasSecret, hasSecret ? 'API secret available' : 'API secret: asked when you send',
+                      fix: hasSecret ? null : () => _secret().then((_) => setState(() {})), fixLabel: 'Enter'),
+                ]),
+              // The override running now.
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: active != null ? _kOn.withValues(alpha: 0.16) : kCard,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: active != null ? _kOn : kBorder),
+                ),
+                child: active == null
+                    ? const Row(children: [
+                        Icon(Icons.tune_outlined, color: kMuted),
+                        SizedBox(width: 10),
+                        Text('No override running', style: TextStyle(fontSize: 16, color: kMuted)),
+                      ])
+                    : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                        Row(children: [
+                          const Icon(Icons.tune, color: _kOn),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(running?.label ?? (active.name.isEmpty ? 'Override' : active.name),
+                                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: _kOn)),
+                          ),
+                        ]),
+                        const SizedBox(height: 4),
+                        Text(
+                          active.end == null
+                              ? 'Until stopped'
+                              : 'Until ${fmtClock(active.end!, t24)} · ${_mins(math.max(0, active.end!.difference(DateTime.now()).inMinutes))} left',
+                          style: const TextStyle(fontSize: 15),
+                        ),
+                        if (running != null) Text(_presetInfo(running), style: const TextStyle(color: kMuted, fontSize: 12)),
+                        const SizedBox(height: 12),
+                        Row(children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: active.end == null ? null : () => _extend(active, running),
+                              icon: const Icon(Icons.more_time),
+                              label: const Text('Extend 1 h'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton.icon(
+                              style: FilledButton.styleFrom(backgroundColor: kRed, foregroundColor: Colors.white),
+                              onPressed: _cancelOverride,
+                              icon: const Icon(Icons.stop_circle_outlined),
+                              label: const Text('Stop'),
+                            ),
+                          ),
+                        ]),
+                      ]),
+              ),
+              // Pre-meal quick start.
+              Section(title: 'Quick start', children: [
+                if (premeal != null)
+                  presetRow(premeal, last: true)
+                else
+                  const RowBox(
+                    last: true,
+                    child: Text(
+                      'Pre-meal: Loop does not let its own Pre-meal be started from another phone. '
+                      'Add an override preset in Loop named "Pre-meal" (for example target 80–100 mg/dL, 1 hour) '
+                      'and it appears here as the quick start.',
+                      style: TextStyle(color: kMuted, fontSize: 13),
+                    ),
+                  ),
+              ]),
+              Section(title: 'Loop presets', children: [
+                if (others.isEmpty)
+                  const RowBox(last: true, child: Text('No override presets in Loop\'s profile yet.', style: TextStyle(color: kMuted, fontSize: 13)))
+                else
+                  for (var i = 0; i < others.length; i++) presetRow(others[i], last: i == others.length - 1),
+              ]),
+              const Text(
+                'Start asks for how long: the preset\'s own time, or another. Every command is confirmed and unlocked '
+                'like in Remote control, and Loop shows its own notification on the Loop phone.',
+                style: TextStyle(color: kMuted, fontSize: 12, height: 1.4),
+              ),
+            ]),
+          );
+        },
+      );
+
   @override
   Widget build(BuildContext context) {
+    if (widget.overridesTab) return _overridesTabView();
     return Scaffold(
       appBar: AppBar(title: const Text('Loop remote control'), actions: [
         IconButton(tooltip: 'Settings', icon: const Icon(Icons.tune), onPressed: _settings),

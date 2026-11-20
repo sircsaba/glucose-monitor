@@ -134,6 +134,10 @@ FOOD = [
     ('w-food-describe', 'app', ['Treat', 'Food']),
     ('x-log', 'app', ['Settings', 'Treatment log']),
     ('y-nutrition', 'app', ['Reports', '14d', 'Nutrition']),
+    ('za-overrides', 'plus', ['Overrides']),
+    ('zb-alarms-plus', 'plus', ['Alarms']),
+    ('zc-target-app', 'app', ['Target']),
+    ('zd-treat-plus', 'plus', ['Treat']),
 ]
 TABLET = [
     ('1-live', 'app', []),

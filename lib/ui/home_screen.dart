@@ -11,7 +11,9 @@ import '../state/app_state.dart';
 import '../state/settings.dart';
 import 'bg_chart.dart';
 import 'common.dart';
+import '../plus.dart';
 import 'quick_alarms_screen.dart';
+import 'remote_screen.dart';
 import 'reports_screen.dart';
 import 'settings/menu_screen.dart';
 import 'target_screen.dart';
@@ -26,19 +28,24 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _tab = 0;
 
+  // Monitor Glucose Plus and web: Overrides in place of Target (the Target
+  // alert moves to the Alarms tab). The store version keeps Target.
   static const _tabs = [
     (Icons.show_chart, 'Live'),
     (Icons.add_circle_outline, 'Treat'),
-    (Icons.flag_outlined, 'Target'),
+    kRemote ? (Icons.tune, 'Overrides') : (Icons.flag_outlined, 'Target'),
     (Icons.bar_chart, 'Reports'),
     (Icons.notifications_none, 'Alarms'),
   ];
-  static const _targetTab = 2;
+  static const _middleTab = 2;
+  static const _alarmsTab = 4;
 
-  /// Light background on the Target button while a target alert is active.
+  /// Light background on a tab button: Target (or, in Plus, Alarms) while a
+  /// target alert is active; Overrides in green while an override runs.
   Color? _tabTint(int i) {
+    if (kRemote && i == _middleTab) return activeOverride() != null ? kOverrideOn.withValues(alpha: 0.45) : null;
     final w = app.target;
-    if (i != _targetTab || w == null) return null;
+    if (w == null || i != (kRemote ? _alarmsTab : _middleTab)) return null;
     return Color(w.color).withValues(alpha: 0.35);
   }
 
@@ -90,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         child: IndexedStack(
           index: _tab,
-          children: const [LiveScreen(), TreatScreen(), TargetScreen(), ReportsScreen(), QuickAlarmsScreen()],
+          children: const [LiveScreen(), TreatScreen(), kRemote ? RemoteScreen(overridesTab: true) : TargetScreen(), ReportsScreen(), QuickAlarmsScreen()],
         ),
       ),
       bottomNavigationBar: _compactNav(context) ? _thinBar() : NavigationBar(
@@ -104,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   : Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                       decoration: BoxDecoration(color: _tabTint(i), borderRadius: BorderRadius.circular(14)),
-                      child: Icon(Icons.flag, color: kText),
+                      child: Icon(_tabs[i].$1, color: kText),
                     ),
               label: _tabs[i].$2,
             ),

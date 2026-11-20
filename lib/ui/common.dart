@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../logic/glucose.dart';
 import '../state/app_state.dart';
 import '../state/settings.dart';
+import 'settings/menu_screen.dart';
 
 const Color kBg = Color(0xFF0D1117);
 const Color kCard = Color(0xFF161B22);
@@ -622,3 +623,15 @@ class ColorSettingRow extends StatelessWidget {
       GroupRow r => (r.group.title, r.group.hint ?? ''),
       _ => null,
     };
+
+/// The settings gear at the top right of every tab.
+class SettingsGear extends StatelessWidget {
+  const SettingsGear({super.key});
+  @override
+  Widget build(BuildContext context) => IconButton(
+        tooltip: 'Settings',
+        visualDensity: VisualDensity.compact,
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuScreen())),
+        icon: const Icon(Icons.settings_outlined, color: kMuted),
+      );
+}

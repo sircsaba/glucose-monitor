@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../data/nightscout.dart';
 import '../logic/glucose.dart';
 import '../state/app_state.dart';
 import '../state/settings.dart';
@@ -11,7 +12,9 @@ import 'common.dart';
 /// down. Shows the defaults (Settings › Target alert), which can be changed for
 /// this time only, and an Activate button.
 class TargetScreen extends StatefulWidget {
-  const TargetScreen({super.key});
+  /// In the Alarms tab (Monitor Glucose Plus): a card instead of a whole tab.
+  final bool embedded;
+  const TargetScreen({super.key, this.embedded = false});
   @override
   State<TargetScreen> createState() => _TargetScreenState();
 }
@@ -88,12 +91,14 @@ class _TargetScreenState extends State<TargetScreen> {
         final mmol = app.mmol;
         final l = app.latest;
         final w = app.target;
+        if (widget.embedded) return _embeddedCard(w, mmol, l);
         return ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 32), children: [
           Row(children: [
             const Expanded(child: Text('Target alert', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600))),
             if (l != null)
               Text('Now ${fmtBg(l.mg, mmol)} ${arrowText(l.direction)}',
                   style: kMono.copyWith(fontSize: 18, color: app.isStale ? kMuted : app.colorFor(l.mg))),
+            const SettingsGear(),
           ]),
           const SizedBox(height: 4),
           const Text('One time: sound, vibrate and / or flash when the glucose reaches a value.',
@@ -145,11 +150,55 @@ class _TargetScreenState extends State<TargetScreen> {
     );
   }
 
-  List<Widget> _setup(bool mmol) {
+  /// The card at the top of the Alarms tab: value and direction, Activate,
+  /// and the other choices folded under "More".
+  Widget _embeddedCard(TargetWatch? w, bool mmol, Entry? l) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(16), border: Border.all(color: kBorder)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          const Icon(Icons.flag_outlined, color: kMuted),
+          const SizedBox(width: 8),
+          const Expanded(child: Text('Target alert', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600))),
+          if (l != null)
+            Text('Now ${fmtBg(l.mg, mmol)} ${arrowText(l.direction)}',
+                style: kMono.copyWith(fontSize: 15, color: app.isStale ? kMuted : app.colorFor(l.mg))),
+        ]),
+        const Text('One time: sound, vibrate and / or flash when the glucose reaches a value.', style: TextStyle(color: kMuted, fontSize: 12.5)),
+        const SizedBox(height: 10),
+        if (w != null)
+          _activeCard(w, mmol)
+        else ...[
+          Section(children: _mainRows(mmol)),
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: const Text('More: sound, vibrate, flash, colour, countdown', style: TextStyle(fontSize: 14)),
+              childrenPadding: const EdgeInsets.only(bottom: 8),
+              children: [Section(children: _moreRows())],
+            ),
+          ),
+          _activateButton(mmol),
+          TextButton(onPressed: () => setState(_loadDefaults), child: const Text('Back to the defaults')),
+        ],
+      ]),
+    );
+  }
+
+  List<Widget> _setup(bool mmol) => [
+        Section(children: [..._mainRows(mmol), ..._moreRows()]),
+        _activateButton(mmol),
+        const SizedBox(height: 8),
+        TextButton(onPressed: () => setState(_loadDefaults), child: const Text('Back to the defaults')),
+        const Text('Defaults: Settings › Target alert.', style: TextStyle(color: kMuted, fontSize: 12), textAlign: TextAlign.center),
+      ];
+
+  List<Widget> _mainRows(bool mmol) {
     final step = mmol ? mgPerMmol / 10 : 1.0;
     final rising = _risingNow();
     return [
-      Section(children: [
         StepRow(
           label: 'Alert at',
           value: '${fmtBg(_mg, mmol)} ${mmol ? 'mmol' : 'mg'}',
@@ -172,6 +221,10 @@ class _TargetScreenState extends State<TargetScreen> {
             ),
           ]),
         ),
+    ];
+  }
+
+  List<Widget> _moreRows() => [
         SwitchRow(label: 'Sound', value: _sound, onChanged: (v) => _edit(() => _sound = v)),
         if (_sound)
           ChoiceRow(
@@ -207,8 +260,11 @@ class _TargetScreenState extends State<TargetScreen> {
               onChanged: (i) => _edit(() => _timerAction = i),
             ),
           ),
-      ]),
-      SizedBox(
+      ];
+
+  Widget _activateButton(bool mmol) {
+    final rising = _risingNow();
+    return SizedBox(
         height: 56,
         child: FilledButton.icon(
           style: FilledButton.styleFrom(backgroundColor: Color(_color), foregroundColor: kBg),
@@ -216,11 +272,7 @@ class _TargetScreenState extends State<TargetScreen> {
           icon: const Icon(Icons.flag),
           label: Text('Activate: ${rising ? '≥' : '≤'} ${fmtBg(_mg, mmol)}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
         ),
-      ),
-      const SizedBox(height: 8),
-      TextButton(onPressed: () => setState(_loadDefaults), child: const Text('Back to the defaults')),
-      const Text('Defaults: Settings › Target alert.', style: TextStyle(color: kMuted, fontSize: 12), textAlign: TextAlign.center),
-    ];
+      );
   }
 }
 
