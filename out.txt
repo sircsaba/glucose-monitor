@@ -1,0 +1,17 @@
+Analyzing glucose-monitor...                                    
+
+warning • The '!' will have no effect because the receiver can't be null. Try removing the '!' operator • lib/logic/bolus_calc.dart:70:31 • unnecessary_non_null_assertion
+warning • The '!' will have no effect because the receiver can't be null. Try removing the '!' operator • lib/logic/bolus_calc.dart:71:46 • unnecessary_non_null_assertion
+
+57 issues found. (ran in 13.2s)
+----- pages
+/tmp/pages/allrecipes.html 680519 <title>Simple Page
+/tmp/pages/bbc.html 579128 <title>Banana bread recipe | Good Food
+/tmp/pages/budgetbytes.html 5693 <title>Just a moment...
+/tmp/pages/cookieandkate.html 5758 <title>Just a moment...
+/tmp/pages/kingarthur.html 280521 <title>Page Not Found | King Arthur Baking
+/tmp/pages/marmiton.html 340393 <title>Coq fermier au vin, purée écrasée à la fourchette : la meilleure recette
+/tmp/pages/recettesqc.html 432 
+/tmp/pages/ricardo.html 129815 <title>Bake-when-Ready Chocolate Chip and Pecan Cookies | RICARDO
+----- tests
+00:19 +127: All tests passed!
