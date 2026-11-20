@@ -1,0 +1,18 @@
+BackDisplay & graph
+Back
+Patient
+No name shown
+Units
+mmol/L
+Buttons above the graph
+1, 2, 3, 6, 12 h
+Graph
+Top auto · small dots · prediction on
+Brightness
+Normal
+Screen saver
+With the button on the main screen
+Screen size and layout
+Size Auto · Auto layout
+Reports
+Time in range 3.9–10.0

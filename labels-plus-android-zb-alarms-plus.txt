@@ -1,0 +1,20 @@
+Alarms
+Settings
+Now using the "Day" range
+Decrease Alert at
+−
+Type Alert at
+4.6 mmol
+Increase Alert at
++
+Going up to it
+Going down to it
+More: sound, vibrate, flash, colour, countdown
+Activate: ≤ 4.6
+Back to the defaults
+SNOOZED NOW
+Nothing is snoozed
+Live
+Treat
+Overrides
+Reports

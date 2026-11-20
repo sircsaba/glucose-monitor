@@ -1,0 +1,7 @@
+Popup menu
+Recipe from a PDF file
+Recipe from a web address
+Type or paste a recipe
+Count net carbs (carbs − fibre)
+Canadian nutrition label
+US nutrition label
